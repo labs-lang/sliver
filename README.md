@@ -1,24 +1,22 @@
 
-# SLiVER 1.0
-## May 2018
+# SLiVER 1.0 • May 2018
 
 Symbolic LAbS VERifier
 
 ## Package contents 
 
-README.txt        this file
+|Filename|Description
+|------------------|----------------------------------|
+|README.txt        |this file|
+|sliver.py         |SLiVER command-line front-end|
+|core/             |CSeq core framework|
+|labs/             |LAbS parser and translator|
+|lib/              |Frontend libraries|
+|flock.labs        |a simple, parametric LAbS system|
+|*other files*     |CSeq|
 
-sliver.py         SLiVER command-line front-end
 
-core/             SLiVER core framework
-
-lib/              Frontend libraries
-
-flock.labs        a simple, parametric LAbS system.
-
-<other files>     CSeq
-
-##Installation
+## Installation
 
 To install SLiVER, please follow the steps below:
 
