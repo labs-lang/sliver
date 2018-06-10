@@ -25,7 +25,8 @@ To install SLiVER, please follow the steps below:
     - backends: CBMC, ESBMC, CSeq
       (none of the above tools is specifically required
       but at least one of them is needed for verification).
-    The bundled CSeq backend requires Python 2.7 with the `pycparser` module.
+    
+   The bundled CSeq backend requires Python 2.7 with the `pycparser` module.
 
 2. create a directory, suppose this is called `/workspace`
 
