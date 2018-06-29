@@ -30,11 +30,13 @@ To install SLiVER, please follow the steps below:
 
 2. create a directory, suppose this is called `/workspace`
 
-3. extract the entire package contents in `/workspace`
+3. Download the latest version of SLiVER from the [**Releases** page](https://github.com/lou1306/sliver/releases)
 
-4. set execution (+x) permissions for `sliver.py`
+4. extract the entire package contents in `/workspace`
 
-5. make sure that the backend's binary is in the search path, or
+5. set execution (+x) permissions for `sliver.py`
+
+6. make sure that the backend's binary is in the search path, or
    amend the command strings in `sliver.py` accordingly.
 
 
@@ -55,3 +57,7 @@ Invoking the tool with the `--help` switch:
     ./sliver.py --help
 
 will provide further usage directions.
+
+## Publications
+
+[1] R. De Nicola, L. Di Stefano, and O. Inverso, “Multi-Agent Systems with Virtual Stigmergy,” in 16th International Workshop On Foundations Of coordination Languages And Self-adaptative Systems (FOCLASA), 2018. [Link](http://pages.di.unipi.it/foclasa/assets/files/pap-11.pdf)
