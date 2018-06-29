@@ -60,4 +60,4 @@ will provide further usage directions.
 
 ## Publications
 
-[1] R. De Nicola, L. Di Stefano, and O. Inverso, “Multi-Agent Systems with Virtual Stigmergy,” in 16th International Workshop On Foundations Of coordination Languages And Self-adaptative Systems (FOCLASA), 2018. [Link](http://pages.di.unipi.it/foclasa/assets/files/pap-11.pdf)
+[1] R. De Nicola, L. Di Stefano, and O. Inverso, “Multi-Agent Systems with Virtual Stigmergy,” in 16th International Workshop On Foundations Of Coordination Languages And Self-adaptative Systems (FOCLASA), 2018. [Link](http://pages.di.unipi.it/foclasa/assets/files/pap-11.pdf)
