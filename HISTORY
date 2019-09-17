@@ -1,0 +1,10 @@
+Version 1.2 - 2019-06
+Improved intermediate representation
+
+Version 1.1 - 2018-11 (internal release)
+LabsTranslate: Improved/updated parser
+C translation: general improvements
+C translation: support for generating __CPROVER_bitvector[] typedefs
+
+Version 1.0 - 2018-05
+Initial release of SLiVER
