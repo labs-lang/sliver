@@ -12,15 +12,17 @@ This page contains binary releases of SLiVER for Linux x64 systems.
 Typically, a SLiVER release will contain the following files and directories:
 
 |Filename|Description
-|------------------|----------------------------------|
-|README.txt        |Installation instructions
-|sliver.py         |SLiVER command-line front-end|
-|core/             |CSeq core framework|
-|labs/             |LAbS parser and translator|
-|lib/              |Frontend libraries|
-|*.labs            |Example LAbS specifications|
-|cbmc-simulator    |CBMC5.4 binary|
-|*other files*     |CSeq and Python libraries used by SLiVER|
+|-------------------|----------------------------------|
+|cbmc-simulator     |CBMC5.4 binary|
+|cseq/              |CSeq core framework|
+|examples/          |Example LAbS specifications|
+|HISTORY            |Change log|
+|labs/              |LAbS parser and translator|
+|LICENSE            |The software license for SLiVER|
+|README.txt         |Release-specific instructions|
+|sliver.py          |SLiVER command-line front-end|
+|*.py               |SLiVER support files| 
+|*other files*      |Python libraries used by SLiVER|
 
 ## Installation
 
@@ -57,7 +59,7 @@ will provide further usage directions.
 ## Support
 
 If you encounter any issues while running SLiVER, please submit
-an [issue](https://github.com/lou1306/sliver/issues).
+an [issue](https://github.com/labs-lang/sliver/issues).
 
 ## Publications
 
