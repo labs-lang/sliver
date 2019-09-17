@@ -5,7 +5,7 @@ SLiver is a tool for the analysis of multi-agent systems specified in the
 LAbS language [1]. At the moment, it support under-approximate analysis
 via bounded model checking.
 
-This page contains binary releases of SLiVER for Linux x64 systems.
+This page contains source code and binary releases of SLiVER for Linux x64 systems.
 
 ## Package contents 
 
@@ -24,37 +24,20 @@ Typically, a SLiVER release will contain the following files and directories:
 |*.py               |SLiVER support files| 
 |*other files*      |Python libraries used by SLiVER|
 
-## Installation
+## Installation and usage
 
 To install SLiVER, please follow the steps below:
 
 1. install Python 3.5 or higher.
     
-2. (Optional) Install Python 2.7 with the `pycparser` module
-   (required by the bundled CSeq backend).
+2. (Optional) Install Python 2.7 (required by the bundled CSeq backend).
 
-2. create a directory, suppose this is called `/workspace`
+3. Download and extract the latest version of SLiVER from the [**Releases** page](https://github.com/labs-lang/sliver/releases)
 
-3. Download the latest version of SLiVER from the [**Releases** page](https://github.com/labs-lang/sliver/releases)
+4. set execution (+x) permissions for `sliver.py`, `cseq/cseq.py`, `cbmc-simulator` 
+5. Invoking `./sliver.py --help` from the command line should now display basig usage directions.
 
-4. extract the entire package contents in `/workspace`
-
-5. set execution (+x) permissions for `sliver.py`, `cseq.py`, `cbmc-simulator` 
-
-6. make sure that the backend's binary is in the search path, or
-   amend the command strings in `sliver.py` accordingly.
-
-7. Follow `/workspace/README.txt` for additional instructions.
-
-## Usage
-
-All releases contain one or more examples. Please follow the README.txt file for specific instructions on how to analyse them.
-
-Invoking the tool with the `--help` switch:
-
-    ./sliver.py --help
-
-will provide further usage directions.
+6. Follow `README.txt` for additional (release-specific) instructions.
 
 ## Support
 
