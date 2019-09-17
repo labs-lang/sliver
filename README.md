@@ -33,7 +33,7 @@ To install SLiVER, please follow the steps below:
 
 2. create a directory, suppose this is called `/workspace`
 
-3. Download the latest version of SLiVER from the [**Releases** page](https://github.com/lou1306/sliver/releases)
+3. Download the latest version of SLiVER from the [**Releases** page](https://github.com/labs-lang/sliver/releases)
 
 4. extract the entire package contents in `/workspace`
 
