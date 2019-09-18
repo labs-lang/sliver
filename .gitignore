@@ -1,5 +1,6 @@
 linux_x64
 *.zip
+cseq/
 HISTORY-dev
 
 # Created by https://www.gitignore.io/api/python
