@@ -109,21 +109,22 @@ def cleanup(fname, backend):
     '--backend',
     type=click.Choice(b.value for b in Backends),
     default=Backends.CBMC.value, **DEFAULTS("backend"))
-@click.option('--debug', default=False, is_flag=True, **DEFAULTS("debug"))
-@click.option('--fair/--no-fair', default=False, **DEFAULTS("fair"))
-@click.option('--bv/--no-bv', default=True, **DEFAULTS("bitvector"))
-@click.option('--simulate', default=0, type=int, **DEFAULTS("simulate"))
-@click.option('--show', default=False, is_flag=True, **DEFAULTS("show"))
-@click.option('--steps', default=0, type=int, **DEFAULTS("steps"))
-@click.option('--sync/--no-sync', default=False, **DEFAULTS("sync"))
-@click.option('--timeout', default=0, type=int, **DEFAULTS("timeout"))
-@click.option('--cores', default=4, type=int, **DEFAULTS("cores"))
+@click.option('--debug', **DEFAULTS("debug", default=False, is_flag=True))
+@click.option('--fair/--no-fair', **DEFAULTS("fair", default=False))
+@click.option('--bv/--no-bv', **DEFAULTS("bitvector", default=True))
+@click.option('--simulate', **DEFAULTS("simulate", default=0, type=int))
+@click.option('--show', **DEFAULTS("show", default=False, is_flag=True))
+@click.option('--steps', **DEFAULTS("steps", default=0, type=int))
+@click.option('--sync/--no-sync', **DEFAULTS("sync", default=False))
+@click.option('--timeout', **DEFAULTS("timeout", default=0, type=int))
+@click.option('--cores', **DEFAULTS("cores", default=4, type=int))
+@click.option('--from', **DEFAULTS("from", type=int))
+@click.option('--to', **DEFAULTS("to", type=int))
 @click.option(
     '--lang',
     type=click.Choice(l.value for l in Languages),
     default=Languages.C.value, **DEFAULTS("lang"))
-def main(file, backend, steps, fair, bv, simulate, show, sync, values, timeout,
-         debug, cores, lang):
+def main(file, backend, fair, simulate, show, values, timeout, lang, **kwargs):
     """
 * * *  SLiVER - Symbolic LAbS VERification. v1.3 (July 2019) * * *
 
@@ -134,7 +135,8 @@ VALUES -- assign values for parameterised specification (key=value)
 
     print("Encoding...", file=sys.stderr)
     c_program, fname, info = parse_linux(
-        file, values, steps, fair, simulate, bv, sync, lang)
+        file, values, kwargs["steps"], fair,
+        simulate, kwargs["bv"], kwargs["sync"], lang)
     info = info.decode().replace("\n", "|")[:-1]
     if fname:
         if show:
@@ -148,11 +150,12 @@ VALUES -- assign values for parameterised specification (key=value)
         if backend == "cbmc":
             check_cbmc_version()
 
-        backend_call = backends_debug[backend] if debug else backends[backend]
+        backend_call = \
+            backends_debug[backend] if kwargs["debug"] else backends[backend]
 
         if backend == "cseq":
-            backend_call.extend(["--cores", str(cores)])
-            backend_call.extend(["--steps", str(steps), "-i"])
+            backend_call.extend(["--cores", str(kwargs["cores"])])
+            backend_call.extend(["--steps", str(kwargs["steps"]), "-i"])
 
         backend_call.append(fname)
 
