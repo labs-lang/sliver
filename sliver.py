@@ -2,59 +2,23 @@
 import click
 import platform
 import sys
-from subprocess import check_output, DEVNULL, CalledProcessError
+from subprocess import check_output, CalledProcessError
 from os import remove
 import uuid
 from pathlib import Path
 
-from cex import translateCPROVER
 from info import raw_info
-from cli import DEFAULTS, SHORTDESCR, Backends, Languages
+from cli import DEFAULTS, SHORTDESCR, Languages
+from backends import ALL_BACKENDS
 from __about__ import __version__
 
-SYS = platform.system()
-__DIR = Path(__file__).parent
-
-backends = {
-    "cbmc": ["/usr/local/bin/cbmc5.4"],
-    "esbmc": [
-        "esbmc", "--no-bounds-check", "--no-div-by-zero-check",
-        "--no-pointer-check", "--no-align-check",
-        "--no-unwinding-assertions", "--z3"],
-    "cseq": [
-        "cseq/cseq.py", "-l", "labs_parallel", "--split", "_I"]
-}
-
-
-backends_debug = {
-    "cbmc":
-        backends["cbmc"] + ["--bounds-check", "--signed-overflow-check"],
-    "esbmc": [
-        "esbmc", "--no-pointer-check", "--no-align-check",
-        "--no-unwinding-assertions", "--z3"],
-    "cseq": backends["cseq"]
-}
-
-
-def check_cbmc_version():
-    cbmc_check = backends["cbmc"] + ["--version"]
-    CBMC_V, CBMC_SUBV = check_output(
-        cbmc_check, cwd=__DIR).decode().strip().split(".")
-    if not (int(CBMC_V) <= 5 and int(CBMC_SUBV) <= 4):
-        additional_flags = ["--trace", "--stop-on-fail"]
-        backends["cbmc"].extend(additional_flags)
-        backends_debug["cbmc"].extend(additional_flags)
-
-
-if "Linux" in SYS:
-    env = {"LD_LIBRARY_PATH": "labs/libunwind"}
-    TIMEOUT_CMD = "/usr/bin/timeout"
-else:
-    env = {}
-    TIMEOUT_CMD = "/usr/local/bin/gtimeout"
+__DIR = Path(__file__).parent.resolve()
 
 
 def parse_linux(file, values, bound, fair, simulate, bv, sync, lang):
+    env = {"LD_LIBRARY_PATH": "labs/libunwind"} \
+        if "Linux" in platform.system() \
+        else {}
     call = [
         __DIR / Path("labs/LabsTranslate"),
         "--file", file,
@@ -72,7 +36,7 @@ def parse_linux(file, values, bound, fair, simulate, bv, sync, lang):
             call.append(b)
     try:
         out = check_output(call, env=env)
-        fname = make_filename(file, values, bound, fair, sync)
+        fname = str(__DIR / make_filename(file, values, bound, fair, sync))
         with open(fname, 'wb') as out_file:
             out_file.write(out)
         return out.decode("utf-8"), fname, raw_info(call)
@@ -83,7 +47,7 @@ def parse_linux(file, values, bound, fair, simulate, bv, sync, lang):
 
 def make_filename(file, values, bound, fair, sync):
     result = "_".join((
-        file[:-5],
+        Path(file[:-5]).name,
         str(bound), ("fair" if fair else "unfair"),
         ("sync" if sync else ""),
         "".join(v.replace("=", "") for v in values),
@@ -107,8 +71,8 @@ def cleanup(fname, backend):
 @click.argument('values', nargs=-1)
 @click.option(
     '--backend',
-    type=click.Choice(b.value for b in Backends),
-    default=Backends.CBMC.value, **DEFAULTS("backend"))
+    type=click.Choice(b for b in ALL_BACKENDS.keys()),
+    default="cbmc", **DEFAULTS("backend"))
 @click.option('--debug', **DEFAULTS("debug", default=False, is_flag=True))
 @click.option('--fair/--no-fair', **DEFAULTS("fair", default=False))
 @click.option('--bv/--no-bv', **DEFAULTS("bitvector", default=True))
@@ -124,7 +88,7 @@ def cleanup(fname, backend):
     '--lang',
     type=click.Choice(l.value for l in Languages),
     default=Languages.C.value, **DEFAULTS("lang"))
-def main(file, backend, fair, simulate, show, values, timeout, lang, **kwargs):
+def main(file, backend, fair, simulate, show, values, lang, **kwargs):
     """
 * * *  SLiVER - Symbolic LAbS VERification. v1.3 (July 2019) * * *
 
@@ -143,71 +107,16 @@ VALUES -- assign values for parameterised specification (key=value)
             print(c_program)
             cleanup(fname, backend)
             return
-
-        if simulate:
-            backend = "cseq"
-
-        if backend == "cbmc":
-            check_cbmc_version()
-
-        backend_call = \
-            backends_debug[backend] if kwargs["debug"] else backends[backend]
-
-        if backend == "cseq":
-            backend_call.extend(["--cores", str(kwargs["cores"])])
-            backend_call.extend(["--steps", str(kwargs["steps"]), "-i"])
-
-        backend_call.append(fname)
-
-        if simulate:
-            backend_call.extend([
-                "--simulate", str(simulate),
-                "--info", info])
-
-        if timeout > 0:
-            backend_call = [TIMEOUT_CMD, str(timeout)] + backend_call
+        sim_or_verify = "Running simulation" if simulate else "Verifying"
+        print(
+            "{} with backend {}...".format(sim_or_verify, backend),
+            file=sys.stderr)
         try:
-            sim_or_verify = "Running simulation" if simulate else "Verifying"
-            print(
-                "{} with backend {}...".format(sim_or_verify, backend),
-                file=sys.stderr)
-            out = check_output(backend_call, stderr=DEVNULL, cwd=__DIR)
+            back = ALL_BACKENDS[backend](__DIR, fname, info, **kwargs)
+            back.run()
         except KeyboardInterrupt:
             print("Verification stopped (keyboard interrupt)", file=sys.stderr)
-            out = b""
-        except CalledProcessError as err:
-            out = b""
-            if err.returncode == 10:
-                out = err.output
-            elif err.returncode == 1 and backend == "cseq":
-                out = err.output
-            elif err.returncode == 6:
-                print("Backend failed with parsing error.", file=sys.stderr)
-            elif err.returncode == 124:
-                print(
-                    "Timed out after {} seconds"
-                    .format(timeout), file=sys.stderr)
-            else:
-                print(
-                    "Unexpected error (return code: {})"
-                    .format(err.returncode), file=sys.stderr)
-                print(err.output.decode())
         finally:
-            out = out.decode("utf-8")
-
-            if ("VERIFICATION SUCCESSFUL" in out):
-                print("No properties violated!", end="", file=sys.stderr)
-                if simulate:
-                    print(" (simulation mode)", file=sys.stderr)
-                else:
-                    print("", file=sys.stderr)
-            else:
-                if backend == "cseq" and not simulate:
-                    print(translateCPROVER(out, fname, info, 19))
-                elif not simulate:
-                    print(translateCPROVER(out, fname, info))
-                else:
-                    print(out)
             cleanup(fname, backend)
 
 
