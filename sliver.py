@@ -3,69 +3,17 @@ import click
 import platform
 import sys
 from subprocess import check_output, DEVNULL, CalledProcessError
-from enum import Enum
 from os import remove
 import uuid
 from pathlib import Path
 
 from cex import translateCPROVER
 from info import raw_info
-from __about__ import __date__, __summary__, __version__
+from cli import DEFAULTS, SHORTDESCR, Backends, Languages
+from __about__ import __version__
 
 SYS = platform.system()
 __DIR = Path(__file__).parent
-
-
-class Backends(Enum):
-    CBMC = "cbmc"
-    ESBMC = "esbmc"
-    CSeq = "cseq"
-
-
-class Languages(Enum):
-    C = "c"
-    LNT = "lnt"
-
-
-SHORTDESCR = "SLiVER"
-LONGDESCR = """
-* * * {} - {} v{} ({}) * * *
-
-FILE -- path of LABS file to analyze
-
-VALUES -- assign values for parameterised specification (key=value)
-""".format(SHORTDESCR, __summary__, __version__, __date__)
-
-HELPMSG = {
-    "backend": "Backend to use in verification mode.",
-
-    "bitvector":
-        "Enable bitvector optimization where supported",
-
-    "cores": "Number of CPU cores for parallel analysis",
-
-    "debug": "Enable additional checks in the backend.",
-
-    "lang": "Target language for the code generator.",
-
-    "fair": "Enforce fair interleaving of components.",
-
-    "show": "Print C encoding and exit.",
-
-    "simulate": (
-        "Number of simulation traces to analyze. "
-        "If 0, run in verification mode."),
-
-    "steps": (
-        "Number of system evolutions."
-        "If 0, generate an unbounded system."),
-
-    "sync": "Force synchronous stigmergy messages.",
-
-    "timeout": (
-        "Configure time limit (seconds)."
-        "Set to 0 to disable timeout.")
-}
 
 backends = {
     "cbmc": ["/usr/local/bin/cbmc5.4"],
@@ -151,13 +99,6 @@ def cleanup(fname, backend):
                 remove("_cs_" + fname + suffix)
     except FileNotFoundError:
         pass
-
-
-def DEFAULTS(name):
-    return {
-        "help": HELPMSG[name],
-        "show_default": True
-    }
 
 
 @click.command()
