@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """Functions and classes to obtain and represent structured information
 about a LAbS system
 """
