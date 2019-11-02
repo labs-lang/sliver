@@ -15,7 +15,7 @@ from __about__ import __version__
 __DIR = Path(__file__).parent.resolve()
 
 
-def parse_linux(file, values, bound, fair, simulate, bv, sync, lang):
+def generate_code(file, values, bound, fair, simulate, bv, sync, lang):
     env = {"LD_LIBRARY_PATH": "labs/libunwind"} \
         if "Linux" in platform.system() \
         else {}
@@ -98,13 +98,13 @@ VALUES -- assign values for parameterised specification (key=value)
 """
 
     print("Encoding...", file=sys.stderr)
-    c_program, fname, info = parse_linux(
+    code, fname, info = generate_code(
         file, values, kwargs["steps"], fair,
         simulate, kwargs["bv"], kwargs["sync"], lang)
     info = info.decode().replace("\n", "|")[:-1]
     if fname:
         if show:
-            print(c_program)
+            print(code)
             cleanup(fname, backend)
             return
         sim_or_verify = "Running simulation" if simulate else "Verifying"
