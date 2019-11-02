@@ -28,12 +28,11 @@ def generate_code(file, values, bound, fair, simulate, bv, sync, lang):
         (fair, "--fair"), (simulate, "--simulation"),
         (not bv, "--no-bitvector"), (sync, "--sync")
     ]
+    call.extend(b for a, b in flags if a)
 
     if values:
-        call.extend(["--values"] + list(values))
-    for a, b in flags:
-        if a:
-            call.append(b)
+        call.extend(["--values", *values])
+
     try:
         out = check_output(call, env=env)
         fname = str(__DIR / make_filename(file, values, bound, fair, sync))
