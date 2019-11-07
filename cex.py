@@ -59,6 +59,10 @@ def translateCPROVER(cex, fname, info, offset=-1):
             translatedcex += """Violated property: {}\n""".format(prop)
             break  # Stop converting after the 1st property has been violated
 
+        # case 3: violated property in simulation run
+        elif ln.startswith(">>>") and "violated" in ln:
+            translatedcex += ln + "\n"
+
     if len(translatedcex) > 0:
         translatedcex = "Counterexample:\n\n{}\n".format(translatedcex)
 
