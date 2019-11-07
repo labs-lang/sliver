@@ -111,39 +111,43 @@ def _mapCPROVERstate(A, B, C, info):
             last_sys = []
             return result
 
-        is_attr = ATTR.match(keys["lvalue"])
-        if is_attr and keys["rvalue"] != UNDEF:
-            tid, k = is_attr.group(1), is_attr.group(2)
-            agent = "{} {}:".format(info.spawn[int(tid)], tid)
-            last_return = "attr"
-            return "{}{}".format(
-                agent,
-                pprint_assign(info.i, int(k), "<-", keys["rvalue"]))
+        try:
+            is_attr = ATTR.match(keys["lvalue"])
+            if is_attr and keys["rvalue"] != UNDEF:
+                tid, k = is_attr.group(1), is_attr.group(2)
+                agent = "{} {}:".format(info.spawn[int(tid)], tid)
+                last_return = "attr"
+                return "{}{}".format(
+                    agent,
+                    pprint_assign(info.i, int(k), "<-", keys["rvalue"]))
 
-        is_lstig = LSTIG.match(keys["lvalue"])
-        if is_lstig and keys["rvalue"] != UNDEF:
-            tid, k = is_lstig.group(1), is_lstig.group(2)
-            agent = "{} {}:".format(info.spawn[int(tid)], tid)
-            last_return = "lstig"
-            last_agent = agent
-            return "{}{}".format(
-                agent,
-                pprint_assign(info.lstig, int(k), "<~", keys["rvalue"]))
+            is_lstig = LSTIG.match(keys["lvalue"])
+            if is_lstig and keys["rvalue"] != UNDEF:
+                tid, k = is_lstig.group(1), is_lstig.group(2)
+                agent = "{} {}:".format(info.spawn[int(tid)], tid)
+                last_return = "lstig"
+                last_agent = agent
+                return "{}{}".format(
+                    agent,
+                    pprint_assign(info.lstig, int(k), "<~", keys["rvalue"]))
 
-        if (keys["lvalue"].startswith("__LABS_step") and
-                keys["rvalue"] != last_step):
-            last_return = "step"
-            last_step = keys["rvalue"].replace("u", "")
-            return "--step {}--\n".format(last_step)
+            if (keys["lvalue"].startswith("__LABS_step") and
+                    keys["rvalue"] != last_step):
+                last_return = "step"
+                last_step = keys["rvalue"].replace("u", "")
+                return "--step {}--\n".format(last_step)
 
-        is_env = ENV.match(keys["lvalue"])
-        if is_env and keys["rvalue"] != UNDEF:
-            k = is_env.group(1)
-            last_return = "env"
-            return pprint_assign(info.e, int(k), "<--", keys["rvalue"])
+            is_env = ENV.match(keys["lvalue"])
+            if is_env and keys["rvalue"] != UNDEF:
+                k = is_env.group(1)
+                last_return = "env"
+                return pprint_assign(info.e, int(k), "<--", keys["rvalue"])
+        except KeyError:
+            return ""
         return ""
 
     except Exception as e:
             print('unable to parse state %s' % keys['State'])
             print(e)
+            print(A, B, C, sep="\n")
             return ""  # (A,B,C + '\n')
