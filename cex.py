@@ -18,7 +18,7 @@ UNDEF = "16960"
 def pprint_assign(lst, key, arrow, value):
     v = get_var(lst, key)
     if v.is_array:
-        return "\t{}[{}] {} {}\n".format(v.name, key - v.index, arrow, value)
+        return f"\t{v.name}[{key - v.index}] {arrow} {value}\n"
     else:
         return "\t{} {} {}\n".format(v.name, arrow, value)
 
