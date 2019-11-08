@@ -58,8 +58,10 @@ HELPMSG = {
         "Set to 0 to disable timeout."),
 
     "to": (
-        "Parallel analysis: partition end. "
-    )
+        "Parallel analysis: partition end."
+    ),
+
+    "verbose": "Print additional messages from the backend."
 }
 
 
