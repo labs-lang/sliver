@@ -24,6 +24,11 @@ class Backend:
 
     def fname_arg(self):
         return [self.filename]
+    def cleanup(self, fname):
+        try:
+            os.remove(fname)
+        except FileNotFoundError:
+            pass
 
     def run(self):
         args = self.debug_args if self.kwargs["debug"] else self.args
@@ -91,6 +96,10 @@ class Cseq(Backend):
     def fname_arg(self):
         print(["-i", self.cwd / self.filename])
         return ["-i", str(self.cwd / self.filename)]
+    def cleanup(self, fname):
+        super().cleanup(fname)
+        for suffix in ("", ".map", ".cbmc-assumptions.log"):
+            os.remove("_cs_" + fname + suffix)
 
 
 class Esbmc(Backend):

@@ -53,16 +53,6 @@ def make_filename(file, values, bound, fair, sync, language):
     return result.replace("__", "_")
 
 
-def cleanup(fname, backend):
-    try:
-        remove(fname)
-        if backend == "cseq":
-            for suffix in ("", ".map", ".cbmc-assumptions.log"):
-                remove("_cs_" + fname + suffix)
-    except FileNotFoundError:
-        pass
-
-
 @click.command()
 @click.version_option(__version__, prog_name=SHORTDESCR)
 @click.argument('file', required=True, type=click.Path(exists=True))
@@ -112,9 +102,11 @@ VALUES -- assign values for parameterised specification (key=value)
                 file=sys.stderr)
             status = backend.run(fname, info)
         except KeyboardInterrupt:
-            print("Verification stopped (keyboard interrupt)", file=sys.stderr)
+            status = ExitStatus.KILLED
         finally:
-            cleanup(fname, backend)
+            backend.cleanup(fname)
+            print(ExitStatus.format(status))
+            sys.exit(status.value)
 
 
 if __name__ == "__main__":
