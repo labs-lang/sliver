@@ -143,4 +143,25 @@ class Esbmc(Backend):
             "--no-unwinding-assertions", "--z3"]
 
 
-ALL_BACKENDS = {clz.__name__.lower(): clz for clz in (Cbmc, Cseq, Esbmc)}
+class Cadp(Backend):
+    def __init__(self, cwd, **kwargs):
+        super().__init__(cwd, **kwargs)
+        self.command = "lnt.open"
+        self.args = ["evaluator", "-diag", "fairly.mcl"]
+        self.debug_args = ["evaluator", "-verbose", "-diag", "fairly.mcl"]
+        self.language = Language.LNT
+
+    def preprocess(self, code, fname):
+        base_name = Path(fname).stem.upper()
+        return code.replace("module HEADER is", f"module {base_name} is")
+
+    def handle_success(self, out) -> ExitStatus:
+        out_str = out.decode()
+        if "\nFALSE\n" in out_str:
+            print(out_str)  # Todo: actual cex translation
+            return ExitStatus.FAILED
+        else:
+            return super().handle_success(self, out)
+
+
+ALL_BACKENDS = {clz.__name__.lower(): clz for clz in (Cbmc, Cseq, Esbmc, Cadp)}
