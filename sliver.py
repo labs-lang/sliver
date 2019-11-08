@@ -83,6 +83,7 @@ def cleanup(fname, backend):
 @click.option('--cores', **DEFAULTS("cores", default=4, type=int))
 @click.option('--from', **DEFAULTS("from", type=int))
 @click.option('--to', **DEFAULTS("to", type=int))
+@click.option('--verbose', **DEFAULTS("verbose", default=False, is_flag=True))
 def main(file, backend_arg, fair, simulate, show, values, **kwargs):
     """
 * * *  SLiVER - Symbolic LAbS VERification. v1.3 (July 2019) * * *
