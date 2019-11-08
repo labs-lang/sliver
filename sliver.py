@@ -3,13 +3,11 @@ import click
 import platform
 import sys
 from subprocess import check_output, CalledProcessError
-from os import remove
-import uuid
 from pathlib import Path
 
 from info import raw_info
-from backends import ALL_BACKENDS
 from cli import DEFAULTS, SHORTDESCR
+from backends import ALL_BACKENDS, ExitStatus
 from __about__ import __version__
 
 __DIR = Path(__file__).parent.resolve()
