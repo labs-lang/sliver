@@ -2,8 +2,9 @@
 import os
 import platform
 from enum import Enum
+from pathlib import Path
 from subprocess import check_output, CalledProcessError, DEVNULL
-from sys import stderr, exit
+from sys import stderr
 from cex import translateCPROVER
 
 
@@ -31,55 +32,60 @@ class ExitStatus(Enum):
 
 
 class Backend:
-    def __init__(self, cwd, filename, info, **kwargs):
+    def __init__(self, cwd, **kwargs):
         if "Linux" in platform.system():
             self.timeout_cmd = "/usr/bin/timeout"
         else:
             self.timeout_cmd = "/usr/local/bin/gtimeout"
         self.cwd = cwd
-        self.filename = filename
-        self.info = info
         self.kwargs = kwargs
 
-    def fname_arg(self):
-        return [self.filename]
     def cleanup(self, fname):
         try:
             os.remove(fname)
         except FileNotFoundError:
             pass
 
-    def run(self):
+    def filename_argument(self, fname):
+        """Returns a CLI argument for the input file.
+        """
+        return [fname]
+
+    def preprocess(self, code, fname):
+        return code
+
+    def run(self, fname, info):
         args = self.debug_args if self.kwargs["debug"] else self.args
-        cmd = [self.command, *args, *self.fname_arg()]
+        cmd = [self.command, *self.filename_argument(fname), *args]
         if self.kwargs.get("timeout", 0) > 0:
             cmd = [self.timeout_cmd, str(self.kwargs["timeout"]), *cmd]
         try:
-            print(" ".join(cmd))
+            if self.kwargs["verbose"]:
+                print("Backend call:", " ".join(cmd), file=stderr)
             out = check_output(cmd, stderr=DEVNULL, cwd=self.cwd)
             return self.handle_success(out)
         except CalledProcessError as err:
-            out = b""
-            return self.handle_error(err)
+            if self.kwargs["verbose"]:
+                print("------Backend output:------")
+                print(err.output.decode())
+                print("---------------------------")
+            return self.handle_error(err, fname, info)
 
-    def handle_success(self, out):
-        print("No properties violated!", file=stderr)
+    def handle_success(self, out) -> ExitStatus:
+        print(out.decode(), file=stderr)
+        return ExitStatus.SUCCESS
 
-    def handle_error(self, err):
+    def handle_error(self, err, fname, info) -> ExitStatus:
         if err.returncode == 124:
-            print(
-                "Timed out after {} seconds"
-                .format(self.kwargs["timeout"]), file=stderr)
-            exit(124)
+            return ExitStatus.TIMEOUT
         else:
-            print(
-                f"Unexpected error (return code: {err.returncode})",
-                file=stderr)
-            print(err.output.decode(), file=stderr)
+            return ExitStatus.BACKEND_ERROR
 
 
 class Cbmc(Backend):
-    def __init__(self, cwd, filename, info, **kwargs):
+    def __init__(self, cwd, **kwargs):
+        super().__init__(cwd, **kwargs)
+        self.language = Language.C
         self.command = os.environ.get("CBMC") or "cbmc"
         self.args = []
         self.debug_args = ["--bounds-check", "--signed-overflow-check"]
@@ -92,29 +98,31 @@ class Cbmc(Backend):
             self.args.extend(additional_flags)
             self.debug_args.extend(additional_flags)
 
-        super().__init__(cwd, filename, info, **kwargs)
-
-    def handle_error(self, err: CalledProcessError):
+    def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode == 10:
             out = err.output.decode("utf-8")
-            print(translateCPROVER(out, self.filename, self.info))
+            print(translateCPROVER(out, fname, info))
+            return ExitStatus.FAILED
         elif err.returncode == 6:
             print("Backend failed with parsing error.", file=stderr)
+            return ExitStatus.BACKEND_ERROR
         else:
-            super().handle_error(err)
+            return super().handle_error(err, fname, info)
 
 
 class Cseq(Backend):
-    def __init__(self, cwd, filename, info, **kwargs):
+    def __init__(self, cwd, **kwargs):
+        super().__init__(cwd, **kwargs)
+        self.language = Language.C
         self.command = os.environ.get("CSEQ") or str(cwd / "cseq" / "cseq.py")
+        # TODO change split
         self.args = ["-l", "labs_parallel", "--split", "_I"]
         self.debug_args = self.args
-        super().__init__(cwd, filename, info, **kwargs)
         self.cwd /= "cseq"
 
-    def fname_arg(self):
-        print(["-i", self.cwd / self.filename])
-        return ["-i", str(self.cwd / self.filename)]
+    def filename_argument(self, fname):
+        return ["-i", str(self.cwd / fname)]
+
     def cleanup(self, fname):
         super().cleanup(fname)
         for suffix in ("", ".map", ".cbmc-assumptions.log"):
@@ -122,7 +130,9 @@ class Cseq(Backend):
 
 
 class Esbmc(Backend):
-    def __init__(self, cwd, filename, info, **kwargs):
+    def __init__(self, cwd, **kwargs):
+        super().__init__(cwd, **kwargs)
+        self.language = Language.C
         self.command = os.environ.get("ESBMC") or "esbmc"
         self.args = [
             "--no-bounds-check", "--no-div-by-zero-check",
