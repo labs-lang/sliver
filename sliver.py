@@ -8,14 +8,14 @@ import uuid
 from pathlib import Path
 
 from info import raw_info
-from cli import DEFAULTS, SHORTDESCR, Languages
 from backends import ALL_BACKENDS
+from cli import DEFAULTS, SHORTDESCR
 from __about__ import __version__
 
 __DIR = Path(__file__).parent.resolve()
 
 
-def generate_code(file, values, bound, fair, simulate, bv, sync, lang):
+def generate_code(file, values, bound, fair, simulate, bv, sync, backend):
     env = {"LD_LIBRARY_PATH": "labs/libunwind"} \
         if "Linux" in platform.system() \
         else {}
@@ -23,7 +23,7 @@ def generate_code(file, values, bound, fair, simulate, bv, sync, lang):
         __DIR / Path("labs/LabsTranslate"),
         "--file", file,
         "--bound", str(bound),
-        "--enc", lang]
+        "--enc", backend.language.value]
     flags = [
         (fair, "--fair"), (simulate, "--simulation"),
         (not bv, "--no-bitvector"), (sync, "--sync")
@@ -69,7 +69,7 @@ def cleanup(fname, backend):
 @click.argument('file', required=True, type=click.Path(exists=True))
 @click.argument('values', nargs=-1)
 @click.option(
-    '--backend',
+    '--backend', "backend_arg",
     type=click.Choice(b for b in ALL_BACKENDS.keys()),
     default="cbmc", **DEFAULTS("backend"))
 @click.option('--debug', **DEFAULTS("debug", default=False, is_flag=True))
@@ -83,11 +83,7 @@ def cleanup(fname, backend):
 @click.option('--cores', **DEFAULTS("cores", default=4, type=int))
 @click.option('--from', **DEFAULTS("from", type=int))
 @click.option('--to', **DEFAULTS("to", type=int))
-@click.option(
-    '--lang',
-    type=click.Choice(l.value for l in Languages),
-    default=Languages.C.value, **DEFAULTS("lang"))
-def main(file, backend, fair, simulate, show, values, lang, **kwargs):
+def main(file, backend_arg, fair, simulate, show, values, **kwargs):
     """
 * * *  SLiVER - Symbolic LAbS VERification. v1.3 (July 2019) * * *
 
@@ -97,9 +93,10 @@ VALUES -- assign values for parameterised specification (key=value)
 """
 
     print("Encoding...", file=sys.stderr)
+    backend = ALL_BACKENDS[backend_arg](__DIR, **kwargs)
     code, fname, info = generate_code(
         file, values, kwargs["steps"], fair,
-        simulate, kwargs["bv"], kwargs["sync"], lang)
+        simulate, kwargs["bv"], kwargs["sync"], backend)
     info = info.decode().replace("\n", "|")[:-1]
     if fname:
         if show:

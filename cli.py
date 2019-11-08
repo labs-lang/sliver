@@ -5,11 +5,6 @@ from __about__ import __date__, __summary__, __version__
 from typing import Dict
 
 
-class Languages(Enum):
-    C = "c"
-    LNT = "lnt"
-
-
 class Args(Enum):
     BACKEND = "backend"
     BV = "bv"

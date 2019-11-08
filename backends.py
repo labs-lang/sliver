@@ -6,6 +6,11 @@ from sys import stderr, exit
 from cex import translateCPROVER
 
 
+class Language(Enum):
+    C = "c"
+    LNT = "lnt"
+
+
 class Backend:
     def __init__(self, cwd, filename, info, **kwargs):
         if "Linux" in platform.system():
