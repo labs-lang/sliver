@@ -34,23 +34,22 @@ def generate_code(file, values, bound, fair, simulate, bv, sync, backend):
         call.extend(["--values", *values])
 
     try:
-        out = check_output(call, env=env)
-        fname = str(__DIR / make_filename(file, values, bound, fair, sync))
-        with open(fname, 'wb') as out_file:
-            out_file.write(out)
-        return out.decode("utf-8"), fname, raw_info(call)
+        out = check_output(call, env=env).decode("utf-8")
+        fname = str(__DIR / make_filename(
+            file, values, bound, fair, sync, backend.language))
+        out = backend.preprocess(out, fname)
+        return out, fname, raw_info(call)
     except CalledProcessError as e:
         print(e, file=sys.stderr)
         return None, None, None
 
 
-def make_filename(file, values, bound, fair, sync):
+def make_filename(file, values, bound, fair, sync, language):
     result = "_".join((
-        Path(file[:-5]).name,
+        Path(file).stem,
         str(bound), ("fair" if fair else "unfair"),
         ("sync" if sync else ""),
-        "".join(v.replace("=", "") for v in values),
-        str(uuid.uuid4())[:6])) + ".c"
+        "".join(v.replace("=", "") for v in values))) + "." + language.value
     return result.replace("__", "_")
 
 
@@ -102,15 +101,16 @@ VALUES -- assign values for parameterised specification (key=value)
     if fname:
         if show:
             print(code)
-            cleanup(fname, backend)
-            return
-        sim_or_verify = "Running simulation" if simulate else "Verifying"
-        print(
-            "{} with backend {}...".format(sim_or_verify, backend),
-            file=sys.stderr)
+            sys.exit(0)
+        else:
+            with open(fname, 'w') as out_file:
+                out_file.write(code)
         try:
-            back = ALL_BACKENDS[backend](__DIR, fname, info, **kwargs)
-            back.run()
+            sim_or_verify = "Running simulation" if simulate else "Verifying"
+            print(
+                "{} with backend {}...".format(sim_or_verify, backend_arg),
+                file=sys.stderr)
+            status = backend.run(fname, info)
         except KeyboardInterrupt:
             print("Verification stopped (keyboard interrupt)", file=sys.stderr)
         finally:
