@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import platform
+from enum import Enum
 from subprocess import check_output, CalledProcessError, DEVNULL
 from sys import stderr, exit
 from cex import translateCPROVER
@@ -9,6 +10,24 @@ from cex import translateCPROVER
 class Language(Enum):
     C = "c"
     LNT = "lnt"
+
+
+class ExitStatus(Enum):
+    SUCCESS = 0
+    BACKEND_ERROR = 1
+    FAILED = 10
+    TIMEOUT = 124
+    KILLED = 130
+
+    @staticmethod
+    def format(code) -> str:
+        return {
+            ExitStatus.SUCCESS: "Verification succesful.",
+            ExitStatus.BACKEND_ERROR: "Backend failed.",
+            ExitStatus.FAILED: "Verification failed.",
+            ExitStatus.TIMEOUT: "Verification stopped (timeout).",
+            ExitStatus.KILLED: "\nVerification stopped (keyboard interrupt)."
+        }.get(code, f"Unexpected exit code {code.value}")
 
 
 class Backend:
