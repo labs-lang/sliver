@@ -130,8 +130,12 @@ class Cseq(Backend):
 
     def cleanup(self, fname):
         super().cleanup(fname)
-        for suffix in ("", ".map", ".cbmc-assumptions.log"):
-            os.remove("_cs_" + fname + suffix)
+        path = Path(fname)
+        for suffix in (".c", ".c.map", ".cbmc-assumptions.log"):
+            try:
+                os.remove(str(path.parent / ("_cs_" + path.stem + suffix)))
+            except FileNotFoundError:
+                pass
 
 
 class Esbmc(Backend):
