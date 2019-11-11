@@ -117,6 +117,11 @@ class Cseq(Backend):
         self.command = os.environ.get("CSEQ") or str(cwd / "cseq" / "cseq.py")
         # TODO change split
         self.args = ["-l", "labs_parallel", "--split", "_I"]
+
+        for arg in ("steps", "cores", "from", "to"):
+            if kwargs.get(arg) is not None:
+                self.args.extend((f"--{arg}", str(kwargs[arg])))
+
         self.debug_args = self.args
         self.cwd /= "cseq"
 
