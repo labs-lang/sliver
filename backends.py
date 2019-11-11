@@ -60,7 +60,7 @@ class Backend:
         if self.kwargs.get("timeout", 0) > 0:
             cmd = [self.timeout_cmd, str(self.kwargs["timeout"]), *cmd]
         try:
-            if self.kwargs["verbose"]:
+            if self.kwargs.get("verbose"):
                 print("Backend call:", " ".join(cmd), file=stderr)
             out = check_output(cmd, stderr=DEVNULL, cwd=self.cwd)
             return self.handle_success(out)
