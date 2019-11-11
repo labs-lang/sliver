@@ -137,6 +137,17 @@ class Cseq(Backend):
             except FileNotFoundError:
                 pass
 
+    def handle_error(self, err: CalledProcessError, fname, info):
+        if err.returncode in (1, 10):
+            out = err.output.decode("utf-8")
+            print(translateCPROVER(out, fname, info, 19))
+            return ExitStatus.FAILED
+        elif err.returncode == 6:
+            print("Backend failed with parsing error.", file=stderr)
+            return ExitStatus.BACKEND_ERROR
+        else:
+            return super().handle_error(err, fname, info)
+
 
 class Esbmc(Backend):
     def __init__(self, cwd, **kwargs):
