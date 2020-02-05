@@ -181,7 +181,7 @@ class Cadp(Backend):
             print(out_str)  # Todo: actual cex translation
             return ExitStatus.FAILED
         else:
-            return super().handle_success(self, out)
+            return super().handle_success(out)
 
 
 ALL_BACKENDS = {clz.__name__.lower(): clz for clz in (Cbmc, Cseq, Esbmc, Cadp)}
