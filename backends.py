@@ -16,6 +16,7 @@ class Language(Enum):
 class ExitStatus(Enum):
     SUCCESS = 0
     BACKEND_ERROR = 1
+    PARSING_ERROR = 6
     FAILED = 10
     TIMEOUT = 124
     KILLED = 130
@@ -25,6 +26,7 @@ class ExitStatus(Enum):
         return {
             ExitStatus.SUCCESS: "Verification succesful.",
             ExitStatus.BACKEND_ERROR: "Backend failed.",
+            ExitStatus.PARSING_ERROR: "Could not parse input file.",
             ExitStatus.FAILED: "Verification failed.",
             ExitStatus.TIMEOUT: "Verification stopped (timeout).",
             ExitStatus.KILLED: "\nVerification stopped (keyboard interrupt)."

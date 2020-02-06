@@ -85,6 +85,9 @@ VALUES -- assign values for parameterised specification (key=value)
     code, fname, info = generate_code(
         file, values, kwargs["steps"], fair,
         simulate, kwargs["bv"], kwargs["sync"], backend)
+    if code is None:
+        print(ExitStatus.format(ExitStatus.PARSING_ERROR))
+        sys.exit(ExitStatus.PARSING_ERROR)
     info = info.decode().replace("\n", "|")[:-1]
     if fname:
         if show:
