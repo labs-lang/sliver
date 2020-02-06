@@ -3,7 +3,7 @@ import os
 import platform
 from enum import Enum
 from pathlib import Path
-from subprocess import check_output, CalledProcessError, DEVNULL
+from subprocess import check_output, CalledProcessError, DEVNULL, STDOUT
 from sys import stderr
 from cex import translateCPROVER
 
@@ -64,7 +64,7 @@ class Backend:
         try:
             if self.kwargs.get("verbose"):
                 print("Backend call:", " ".join(cmd), file=stderr)
-            out = check_output(cmd, stderr=DEVNULL, cwd=self.cwd)
+            out = check_output(cmd, stderr=STDOUT, cwd=self.cwd)
             return self.handle_success(out)
         except CalledProcessError as err:
             if self.kwargs["verbose"]:
