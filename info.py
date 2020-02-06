@@ -74,10 +74,11 @@ else:
 
 
 class Info(object):
-    def __init__(self, spawn, e):
+    def __init__(self, spawn, e, props):
         self.spawn = spawn
         self.i = {}
         self.lstig = {}
+        self.properties = props.split(";")
         for c in spawn.values():
             self.i.update(c.iface)
             self.lstig.update(c.lstig)
@@ -90,10 +91,11 @@ class Info(object):
         """Deserialize system info
         """
         lines = txt.split("|")
-        envs, comps = lines[0], lines[1:]
+        envs, comps, props = lines[0], lines[1:-1], lines[-1]
         return Info(
             spawn=Spawn.parse(comps),
-            e=[Variable(*v.split("=")) for v in envs.split(";") if v])
+            e=[Variable(*v.split("=")) for v in envs.split(";") if v],
+            props=props)
 
     def instrument(self):
         # max_index = info["Comp"].num_agents() - 1
