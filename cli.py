@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from enum import Enum
-from __about__ import __date__, __summary__, __version__
+from __about__ import __date__, __summary__, __title__, __version__
 from typing import Dict
 
 
@@ -14,14 +14,13 @@ def get(kwargs: Dict, arg: Args):
     return kwargs[arg.value]
 
 
-SHORTDESCR = "SLiVER"
 LONGDESCR = """
 * * * {} - {} v{} ({}) * * *
 
 FILE -- path of LABS file to analyze
 
 VALUES -- assign values for parameterised specification (key=value)
-""".format(SHORTDESCR, __summary__, __version__, __date__)
+""".format(__title__.lower(), __summary__, __version__, __date__)
 
 HELPMSG = {
     "backend": "Backend to use in verification mode.",

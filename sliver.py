@@ -6,9 +6,9 @@ from subprocess import check_output, CalledProcessError
 from pathlib import Path
 
 from info import raw_info, Info
-from cli import DEFAULTS, SHORTDESCR
+from cli import DEFAULTS
 from backends import ALL_BACKENDS, ExitStatus
-from __about__ import __version__
+from __about__ import __title__, __version__
 
 __DIR = Path(__file__).parent.resolve()
 
@@ -52,7 +52,7 @@ def make_filename(file, values, bound, fair, sync, language):
 
 
 @click.command()
-@click.version_option(__version__, prog_name=SHORTDESCR)
+@click.version_option(__version__, prog_name=__title__.lower())
 @click.argument('file', required=True, type=click.Path(exists=True))
 @click.argument('values', nargs=-1)
 @click.option(

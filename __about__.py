@@ -2,7 +2,7 @@ __all__ = [
     "__title__", "__summary__", "__uri__", "__version__"
 ]
 
-__title__ = "sliver"
+__title__ = "SLiVER"
 __summary__ = "Symbolic LAbS VERification"
 __uri__ = "https://github.com/labs-lang/sliver"
 
