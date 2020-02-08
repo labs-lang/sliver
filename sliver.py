@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-import click
 import platform
 import sys
 from subprocess import check_output, CalledProcessError
 from pathlib import Path
+
+import click
 
 from info import raw_info, Info
 from cli import DEFAULTS
