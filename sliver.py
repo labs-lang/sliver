@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import platform
 import sys
+import re
 from subprocess import check_output, CalledProcessError
 from pathlib import Path
 
@@ -45,7 +46,8 @@ def generate_code(file, values, bound, fair, simulate, bv, sync, backend):
 
 def make_filename(file, values, bound, fair, sync, language):
     result = "_".join((
-        Path(file).stem,
+        # turn "file" into a valid identifier ([A-Za-z_][A-Za-z0-9_]+)
+        re.sub(r'\W|^(?=\d)', '_', Path(file).stem),
         str(bound), ("fair" if fair else "unfair"),
         ("sync" if sync else ""),
         "".join(v.replace("=", "") for v in values))) + "." + language.value
