@@ -169,9 +169,16 @@ class Cadp(Backend):
     def __init__(self, cwd, **kwargs):
         super().__init__(cwd, **kwargs)
         self.command = "lnt.open"
-        self.args = ["evaluator", "-diag", "fairly.mcl"]
-        self.debug_args = ["evaluator", "-verbose", "-diag", "fairly.mcl"]
+        self.args = ["evaluator", "-diag"]
+        self.debug_args = ["evaluator", "-verbose", "-diag"]
         self.language = Language.LNT
+
+    def run(self, fname, info):
+        mcl = "fairly.mcl" if info.properties[0] == "finally" else "never.mcl"
+        mcl = str(Path("cadp") / Path(mcl))
+        self.args.append(mcl)
+        self.debug_args.append(mcl)
+        return super().run(fname, info)
 
     def preprocess(self, code, fname):
         base_name = Path(fname).stem.upper()
