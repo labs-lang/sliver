@@ -1,5 +1,5 @@
 import re
-from info import Info, get_var
+from info import get_var
 
 
 ATTR = re.compile(r"I\[([0-9]+)l?\]\[([0-9]+)l?\]")
@@ -24,7 +24,6 @@ def pprint_assign(lst, key, arrow, value):
 
 
 def translateCPROVER(cex, fname, info, offset=-1):
-    info = Info.parse(info)
     with open(fname) as f:
         c_program = f.readlines()
     translatedcex = ''

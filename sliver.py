@@ -5,7 +5,7 @@ import sys
 from subprocess import check_output, CalledProcessError
 from pathlib import Path
 
-from info import raw_info
+from info import raw_info, Info
 from cli import DEFAULTS, SHORTDESCR
 from backends import ALL_BACKENDS, ExitStatus
 from __about__ import __version__
@@ -89,6 +89,7 @@ VALUES -- assign values for parameterised specification (key=value)
         print(ExitStatus.format(ExitStatus.PARSING_ERROR))
         sys.exit(ExitStatus.PARSING_ERROR)
     info = info.decode().replace("\n", "|")[:-1]
+    info = Info.parse(info)
     if fname:
         if show:
             print(code)
