@@ -15,6 +15,9 @@ CONFIRM = re.compile(r"propagate_or_confirm=FALSE")
 UNDEF = "16960"
 
 
+def pprint_agent(info, tid):
+    return f"{info.spawn[int(tid)]} {tid}"
+
 def pprint_assign(lst, key, arrow, value):
     v = get_var(lst, key)
     if v.is_array:
@@ -106,7 +109,7 @@ def _mapCPROVERstate(A, B, C, info):
             last_sys.append("confirm ")
         elif keys["lvalue"] == "guessedcomp":
             tid = int(keys["rvalue"])
-            agent = "from {} {}: ".format(info.spawn[tid], tid)
+            agent = f"from {pprint_agent(info, tid)}:"
             last_sys.append(agent)
         elif keys["lvalue"] == "guessedkey":
             last_sys.append(info.lstig[int(keys["rvalue"])].name)
@@ -118,7 +121,7 @@ def _mapCPROVERstate(A, B, C, info):
             is_attr = ATTR.match(keys["lvalue"])
             if is_attr and keys["rvalue"] != UNDEF:
                 tid, k = is_attr.group(1), is_attr.group(2)
-                agent = "{} {}:".format(info.spawn[int(tid)], tid)
+                agent = pprint_agent(info, tid)
                 last_return = "attr"
                 return "{}{}".format(
                     agent,
@@ -127,7 +130,7 @@ def _mapCPROVERstate(A, B, C, info):
             is_lstig = LSTIG.match(keys["lvalue"])
             if is_lstig and keys["rvalue"] != UNDEF:
                 tid, k = is_lstig.group(1), is_lstig.group(2)
-                agent = "{} {}:".format(info.spawn[int(tid)], tid)
+                agent = pprint_agent(info, tid)
                 last_return = "lstig"
                 last_agent = agent
                 return "{}{}".format(
