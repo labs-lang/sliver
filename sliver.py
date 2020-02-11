@@ -92,6 +92,8 @@ VALUES -- assign values for parameterised specification (key=value)
         print(ExitStatus.format(ExitStatus.PARSING_ERROR))
         sys.exit(ExitStatus.PARSING_ERROR)
     info = info.decode().replace("\n", "|")[:-1]
+    if kwargs["debug"]:
+        print("[DEBUG]", info, file=sys.stderr)
     info = Info.parse(info)
     if fname:
         if show:
