@@ -93,9 +93,9 @@ VALUES -- assign values for parameterised specification (key=value)
         simulate, kwargs["bv"], kwargs["sync"], backend)
     if code is None:
         print(ExitStatus.format(ExitStatus.PARSING_ERROR))
-        sys.exit(ExitStatus.PARSING_ERROR)
+        sys.exit(ExitStatus.PARSING_ERROR.value)
     info = info.decode().replace("\n", "|")[:-1]
-    if kwargs["debug"]:
+    if kwargs.get("debug"):
         print("[DEBUG]", info, file=sys.stderr)
     info = Info.parse(info)
     if fname:
