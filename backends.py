@@ -195,6 +195,27 @@ class Cadp(Backend):
         self.debug_args.append(mcl)
         return super().verify(fname, info)
 
+    def simulate(self, fname, info, simulate):
+        cmd = [
+            "lnt.open", fname, "executor",
+            str(self.kwargs.get("steps", 1)), "2"]
+        if self.kwargs.get("timeout", 0) > 0:
+            cmd = [self.timeout_cmd, str(self.kwargs["timeout"]), *cmd]
+
+        try:
+            for i in range(simulate):
+                self.verbose_output(
+                    f"Backend call: {' '.join(cmd)}", file=stderr)
+                out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
+                self.verbose_output(out, "Backend output")
+                print(f"====== Trace #{i+1} ======")
+                print(translate_cadp(out, info))
+                print(f"========================")
+            return ExitStatus.SIM_SUCCESS
+        except CalledProcessError as err:
+            self.verbose_output(err.output.decode(), "Backend output")
+            return ExitStatus.BACKEND_ERROR
+
     def cleanup(self, fname):
         aux = (str(Path(self.cwd) / f) for f in
                ("evaluator", "executor", "evaluator@1.o", "evaluator.bcg"))
