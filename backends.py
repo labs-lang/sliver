@@ -60,7 +60,7 @@ class Backend:
     def preprocess(self, code, fname):
         return code
 
-    def run(self, fname, info):
+    def verify(self, fname, info):
         args = self.debug_args if self.kwargs["debug"] else self.args
         cmd = [self.command, *self.filename_argument(fname), *args]
         if self.kwargs.get("timeout", 0) > 0:
@@ -177,12 +177,12 @@ class Cadp(Backend):
         self.debug_args = ["evaluator", "-verbose", "-diag"]
         self.language = Language.LNT
 
-    def run(self, fname, info):
+    def verify(self, fname, info):
         mcl = "fairly.mcl" if info.properties[0] == "finally" else "never.mcl"
         mcl = str(Path("cadp") / Path(mcl))
         self.args.append(mcl)
         self.debug_args.append(mcl)
-        return super().run(fname, info)
+        return super().verify(fname, info)
 
     def cleanup(self, fname):
         aux = (str(Path(self.cwd) / f) for f in

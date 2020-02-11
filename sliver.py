@@ -107,7 +107,7 @@ VALUES -- assign values for parameterised specification (key=value)
             print(
                 "{} with backend {}...".format(sim_or_verify, backend_arg),
                 file=sys.stderr)
-            status = backend.run(fname, info)
+            status = backend.verify(fname, info)
         except KeyboardInterrupt:
             status = ExitStatus.KILLED
         finally:
