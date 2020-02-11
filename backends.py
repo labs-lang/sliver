@@ -4,7 +4,7 @@ import platform
 from enum import Enum
 from pathlib import Path
 from subprocess import check_output, CalledProcessError, STDOUT
-from sys import stderr
+from sys import stderr, stdout
 from cex import translateCPROVER, translate_cadp
 
 
@@ -70,20 +70,24 @@ class Backend:
         if self.kwargs.get("timeout", 0) > 0:
             cmd = [self.timeout_cmd, str(self.kwargs["timeout"]), *cmd]
         try:
-            if self.kwargs.get("verbose"):
-                print("Backend call:", " ".join(cmd), file=stderr)
+            self.verbose_output(f"Backend call: {' '.join(cmd)}", file=stderr)
             out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
-            self.verbose_output(out)
+            self.verbose_output(out, "Backend output")
             return self.handle_success(out, info)
         except CalledProcessError as err:
-            self.verbose_output(err.output.decode())
+            self.verbose_output(err.output.decode(), "Backend output")
             return self.handle_error(err, fname, info)
 
-    def verbose_output(self, output):
-        if self.kwargs["verbose"]:
-            print("------Backend output:------")
-            print(output)
-            print("---------------------------")
+    def verbose_output(self, output, decorate=None, file=stdout):
+        if self.kwargs.get("verbose"):
+            if decorate:
+                print(
+                    f"------{decorate}:------",
+                    output,
+                    "---------------------------",
+                    sep="\n", file=file)
+            else:
+                print(output, file=file)
 
     def handle_success(self, out, info) -> ExitStatus:
         return ExitStatus.SUCCESS
