@@ -64,6 +64,10 @@ class Backend:
     def preprocess(self, code, fname):
         return code
 
+    def simulate(self, fname, info, simulate):
+        print("This backend does not support simulation.", file=stderr)
+        return ExitStatus.BACKEND_ERROR
+
     def verify(self, fname, info):
         args = self.debug_args if self.kwargs["debug"] else self.args
         cmd = [self.command, *self.filename_argument(fname), *args]
