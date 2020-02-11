@@ -82,6 +82,9 @@ FILE -- path of LABS file to analyze
 
 VALUES -- assign values for parameterised specification (key=value)
 """
+    if simulate and kwargs.get("steps", 0) == 0:
+        print("Must specify the length of simulation traces")
+        sys.exit(ExitStatus.INVALID_ARGS.value)
 
     print("Encoding...", file=sys.stderr)
     backend = ALL_BACKENDS[backend_arg](__DIR, **kwargs)
