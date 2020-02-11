@@ -3,9 +3,9 @@ import os
 import platform
 from enum import Enum
 from pathlib import Path
-from subprocess import check_output, CalledProcessError, DEVNULL, STDOUT
+from subprocess import check_output, CalledProcessError, STDOUT
 from sys import stderr
-from cex import translateCPROVER
+from cex import translateCPROVER, translate_cadp
 
 
 class Language(Enum):
@@ -69,7 +69,7 @@ class Backend:
             if self.kwargs.get("verbose"):
                 print("Backend call:", " ".join(cmd), file=stderr)
             out = check_output(cmd, stderr=STDOUT, cwd=self.cwd)
-            return self.handle_success(out)
+            return self.handle_success(out, info)
         except CalledProcessError as err:
             if self.kwargs["verbose"]:
                 print("------Backend output:------")
@@ -77,7 +77,7 @@ class Backend:
                 print("---------------------------")
             return self.handle_error(err, fname, info)
 
-    def handle_success(self, out) -> ExitStatus:
+    def handle_success(self, out, info) -> ExitStatus:
         print(out.decode(), file=stderr)
         return ExitStatus.SUCCESS
 
@@ -194,13 +194,23 @@ class Cadp(Backend):
         base_name = Path(fname).stem.upper()
         return code.replace("module HEADER is", f"module {base_name} is")
 
-    def handle_success(self, out) -> ExitStatus:
+    def handle_success(self, out, info) -> ExitStatus:
         out_str = out.decode()
         if "\nFALSE\n" in out_str:
-            print(out_str)  # Todo: actual cex translation
+            if "evaluator.bcg" in out_str:
+                cex = self.extract_trace()
+                print(cex)
+                print("Counterexample prefix:")
+                print(translate_cadp(cex, info))
+            else:
+                print(translate_cadp(out_str, info))
             return ExitStatus.FAILED
         else:
-            return super().handle_success(out)
+            return super().handle_success(out, info)
+
+    def extract_trace(self):
+        cmd = ["bcg_open", "evaluator.bcg", "executor", "100", "2"]
+        return check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
 
 
 ALL_BACKENDS = {clz.__name__.lower(): clz for clz in (Cbmc, Cseq, Esbmc, Cadp)}
