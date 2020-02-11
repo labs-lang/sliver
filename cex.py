@@ -1,4 +1,10 @@
 import re
+
+from pyparsing import (Word, alphanums, delimitedList, OneOrMore,
+                       Forward, Suppress, Group, ParserElement, Keyword,
+                       replaceWith, dblQuotedString, removeQuotes)
+from pyparsing import pyparsing_common as ppc
+
 from info import get_var
 
 
@@ -158,3 +164,69 @@ def _mapCPROVERstate(A, B, C, info):
             print(e)
             print(A, B, C, sep="\n")
             return ""
+
+
+def translate_cadp(cex, info):
+    def pprint_init_agent(args):
+        tid = args[1][0]
+        iface = args[2][1:]
+        agent = pprint_agent(info, tid)
+        init_iface = "".join(
+            f"""{agent}:{pprint_assign(info.i, int(k), "<-", v[0])}"""
+            for k, v in enumerate(iface))
+        if len(args) == 5:
+            return init_iface
+
+        lstig = args[3][1:]
+        init_iface += "".join(
+            f"""{agent}:{pprint_assign(info.lstig, int(k), "<~", v[1][0])}"""
+            for k, v in enumerate(lstig)
+        )
+        return init_iface
+
+    def pprint_init_env(args):
+        return "".join(
+            pprint_assign(info.e, int(k), "<--", v)
+            for k, v in enumerate(args[1:]))
+
+    lines = [l[9:-1] for l in cex.split('\n') if l.startswith("\"ACTION")]
+    inits = sorted(l for l in lines if l.startswith("AGENT"))
+    init_env = (l for l in lines if l.startswith("ENV"))
+    others = (l for l in lines
+              if not (l.startswith("AGENT") or l.startswith("ENV")))
+
+    ParserElement.setDefaultWhitespaceChars(' \t\n\x01\x02')
+    BOOLEAN = (
+        Keyword("TRUE").setParseAction(replaceWith(True)) |
+        Keyword("FALSE").setParseAction(replaceWith(False)))
+    NAME = Word(alphanums)
+    LPAR, RPAR = map(Suppress, "()")
+    RECORD = Forward()
+    RECORD <<= (NAME + LPAR +
+                delimitedList(Group(ppc.number() | BOOLEAN | RECORD)) + RPAR)
+
+    BANGNUM = (Suppress("!") + ppc.number)
+    ASGN = dblQuotedString.setParseAction(removeQuotes) + OneOrMore(BANGNUM)
+    STEP = ppc.number() | ASGN
+
+    result = [pprint_init_env(RECORD.parseString(l)) for l in init_env]
+    result.extend(pprint_init_agent(RECORD.parseString(l)) for l in inits)
+
+    agent = 0
+    for l in others:
+        step = STEP.parseString(l, parseAll=True)
+        if len(step) == 1:
+            agent = step[0]
+        else:
+            if step[0] == "E":
+                result.append(
+                    pprint_assign(info.e, int(step[1]), "<--", step[2]))
+            else:
+                ls, arrow = {
+                    "I": (info.i, "<-"),
+                    "L": (info.lstig, "<~")}[step[0]]
+                result.append(
+                    pprint_agent(info, agent) + ":" +
+                    pprint_assign(ls, int(step[2]), arrow, step[3]))
+
+    return "".join(l for l in result if l)
