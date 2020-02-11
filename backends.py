@@ -68,17 +68,20 @@ class Backend:
         try:
             if self.kwargs.get("verbose"):
                 print("Backend call:", " ".join(cmd), file=stderr)
-            out = check_output(cmd, stderr=STDOUT, cwd=self.cwd)
+            out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
+            self.verbose_output(out)
             return self.handle_success(out, info)
         except CalledProcessError as err:
-            if self.kwargs["verbose"]:
-                print("------Backend output:------")
-                print(err.output.decode())
-                print("---------------------------")
+            self.verbose_output(err.output.decode())
             return self.handle_error(err, fname, info)
 
+    def verbose_output(self, output):
+        if self.kwargs["verbose"]:
+            print("------Backend output:------")
+            print(output)
+            print("---------------------------")
+
     def handle_success(self, out, info) -> ExitStatus:
-        print(out.decode(), file=stderr)
         return ExitStatus.SUCCESS
 
     def handle_error(self, err, fname, info) -> ExitStatus:
@@ -195,15 +198,13 @@ class Cadp(Backend):
         return code.replace("module HEADER is", f"module {base_name} is")
 
     def handle_success(self, out, info) -> ExitStatus:
-        out_str = out.decode()
-        if "\nFALSE\n" in out_str:
-            if "evaluator.bcg" in out_str:
+        if "\nFALSE\n" in out:
+            if "evaluator.bcg" in out:
                 cex = self.extract_trace()
-                print(cex)
                 print("Counterexample prefix:")
                 print(translate_cadp(cex, info))
             else:
-                print(translate_cadp(out_str, info))
+                print(translate_cadp(out, info))
             return ExitStatus.FAILED
         else:
             return super().handle_success(out, info)
