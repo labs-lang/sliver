@@ -43,8 +43,12 @@ class Backend:
         self.kwargs = kwargs
 
     def cleanup(self, fname):
+        self._safe_remove((fname, ))
+
+    def _safe_remove(self, files):
         try:
-            os.remove(fname)
+            for f in files:
+                os.remove(f)
         except FileNotFoundError:
             pass
 
@@ -131,13 +135,13 @@ class Cseq(Backend):
         return ["-i", str(self.cwd / fname)]
 
     def cleanup(self, fname):
-        super().cleanup(fname)
         path = Path(fname)
-        for suffix in (".c", ".c.map", ".cbmc-assumptions.log"):
-            try:
-                os.remove(str(path.parent / ("_cs_" + path.stem + suffix)))
-            except FileNotFoundError:
-                pass
+        aux = (
+            str(path.parent / ("_cs_" + path.stem + suffix))
+            for suffix in (".c", ".c.map", ".cbmc-assumptions.log")
+        )
+        super()._safe_remove(aux)
+        super().cleanup(fname)
 
     def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode in (1, 10):
@@ -179,6 +183,12 @@ class Cadp(Backend):
         self.args.append(mcl)
         self.debug_args.append(mcl)
         return super().run(fname, info)
+
+    def cleanup(self, fname):
+        aux = (str(Path(self.cwd) / f) for f in
+               ("evaluator", "executor", "evaluator@1.o", "evaluator.bcg"))
+        super().cleanup(fname)
+        super()._safe_remove(aux)
 
     def preprocess(self, code, fname):
         base_name = Path(fname).stem.upper()
