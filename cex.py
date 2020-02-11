@@ -18,6 +18,7 @@ UNDEF = "16960"
 def pprint_agent(info, tid):
     return f"{info.spawn[int(tid)]} {tid}"
 
+
 def pprint_assign(lst, key, arrow, value):
     v = get_var(lst, key)
     if v.is_array:
@@ -123,7 +124,7 @@ def _mapCPROVERstate(A, B, C, info):
                 tid, k = is_attr.group(1), is_attr.group(2)
                 agent = pprint_agent(info, tid)
                 last_return = "attr"
-                return "{}{}".format(
+                return "{}:{}".format(
                     agent,
                     pprint_assign(info.i, int(k), "<-", keys["rvalue"]))
 
@@ -133,7 +134,7 @@ def _mapCPROVERstate(A, B, C, info):
                 agent = pprint_agent(info, tid)
                 last_return = "lstig"
                 last_agent = agent
-                return "{}{}".format(
+                return "{}:{}".format(
                     agent,
                     pprint_assign(info.lstig, int(k), "<~", keys["rvalue"]))
 
@@ -156,4 +157,4 @@ def _mapCPROVERstate(A, B, C, info):
             print('unable to parse state %s' % keys['State'])
             print(e)
             print(A, B, C, sep="\n")
-            return ""  # (A,B,C + '\n')
+            return ""
