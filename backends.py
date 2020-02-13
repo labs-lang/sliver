@@ -213,7 +213,7 @@ class Cadp(Backend):
                 out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
                 self.verbose_output(out, "Backend output")
                 print(f"====== Trace #{i+1} ======")
-                print(translate_cadp(out, info))
+                print(*translate_cadp(out, info), sep="", end="")
                 print(f"========================")
             return ExitStatus.SIM_SUCCESS
         except CalledProcessError as err:
@@ -235,9 +235,9 @@ class Cadp(Backend):
             if "evaluator.bcg" in out:
                 cex = self.extract_trace()
                 print("Counterexample prefix:")
-                print(translate_cadp(cex, info))
+                print(*translate_cadp(cex, info), sep="", end="")
             else:
-                print(translate_cadp(out, info))
+                print(*translate_cadp(out, info), sep="", end="")
             return ExitStatus.FAILED
         else:
             return super().handle_success(out, info)

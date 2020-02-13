@@ -5,9 +5,6 @@ from pyparsing import (Word, alphanums, delimitedList, OneOrMore,
                        replaceWith, dblQuotedString, removeQuotes)
 from pyparsing import pyparsing_common as ppc
 
-from info import get_var
-
-
 ATTR = re.compile(r"I\[([0-9]+)l?\]\[([0-9]+)l?\]")
 LSTIG = re.compile(r"Lvalue\[([0-9]+)l?\]\[([0-9]+)l?\]")
 LTSTAMP = re.compile(r"Ltstamp\[([0-9]+)l?\]\[([0-9]+)l?\]")
@@ -209,10 +206,10 @@ def translate_cadp(cex, info):
     MONITOR = (Keyword("MONITOR") + Suppress("!") + (BOOLEAN | QUOTES))
     STEP = ppc.number() | ASGN | MONITOR
 
-    result = ["<initialization>\n"]
-    result.extend(pprint_init_env(RECORD.parseString(l)) for l in init_env)
-    result.extend(pprint_init_agent(RECORD.parseString(l)) for l in inits)
-    result.append("<end initialization>\n")
+    yield "<initialization>\n"
+    yield from (pprint_init_env(RECORD.parseString(l)) for l in init_env)
+    yield from (pprint_init_agent(RECORD.parseString(l)) for l in inits)
+    yield "<end initialization>\n"
 
     sys_step = re.compile(r"(?:end )?(?:confirm|propagate)")
 
@@ -220,10 +217,9 @@ def translate_cadp(cex, info):
     for l in others:
         step = STEP.parseString(l, parseAll=True)
         if step[0] == "MONITOR" and step[1] == "deadlock":
-            result.append("<deadlock>\n")
+            yield "<deadlock>\n"
         elif step[0] == "MONITOR":
-            msg = f"""<property {"satisfied" if step[1] else "violated"}>\n"""
-            result.append(msg)
+            yield f"""<property {"satisfied" if step[1] else "violated"}>\n"""
         elif type(step[0]) is int:
             agent_id = step[0]
         elif step[0] in ("E", "I", "L"):
@@ -233,12 +229,10 @@ def translate_cadp(cex, info):
             else:
                 agent = pprint_agent(info, step[1])
                 pprint = info.pprint_assign(step[0], *step[2:4])
-            result.append(f"{agent}:\t{pprint}\n")
+            yield f"{agent}:\t{pprint}\n"
         elif sys_step.match(step[0]):
-            result.append(
+            yield (
                 f"<{pprint_agent(info, step[1])}: {step[0]} "
                 f"'{info.pprint_var(info.lstig, step[2])}'>\n")
         else:
-            result.append(f"<could not parse: {step}>\n")
-
-    return "".join(l for l in result if l)
+            yield f"<could not parse: {step}>\n"
