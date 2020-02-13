@@ -40,8 +40,7 @@ def generate_code(file, values, bound, fair, simulate, bv, sync, backend):
         out = backend.preprocess(out, fname)
         return out, fname, raw_info(call)
     except CalledProcessError as e:
-        print(e, file=sys.stderr)
-        return None, None, None
+        raise e
 
 
 def make_filename(file, values, bound, fair, sync, language):
@@ -88,10 +87,13 @@ VALUES -- assign values for parameterised specification (key=value)
 
     print("Encoding...", file=sys.stderr)
     backend = ALL_BACKENDS[backend_arg](__DIR, **kwargs)
-    code, fname, info = generate_code(
-        file, values, kwargs["steps"], fair,
-        simulate, kwargs["bv"], kwargs["sync"], backend)
-    if code is None:
+    try:
+        code, fname, info = generate_code(
+            file, values, kwargs["steps"], fair,
+            simulate, kwargs["bv"], kwargs["sync"], backend)
+    except CalledProcessError as e:
+        if kwargs.get("debug"):
+            print(e, file=sys.stderr)
         print(ExitStatus.format(ExitStatus.PARSING_ERROR))
         sys.exit(ExitStatus.PARSING_ERROR.value)
     info = info.decode().replace("\n", "|")[:-1]
