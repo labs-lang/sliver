@@ -43,7 +43,7 @@ HELPMSG = {
     "show": "Print C encoding and exit.",
 
     "simulate": (
-        "Number of simulation traces to analyze. "
+        "Number of simulation traces to generate. "
         "If 0, run in verification mode."),
 
     "steps": (

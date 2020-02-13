@@ -82,7 +82,7 @@ FILE -- path of LABS file to analyze
 VALUES -- assign values for parameterised specification (key=value)
 """
     if simulate and kwargs.get("steps", 0) == 0:
-        print("Must specify the length of simulation traces")
+        print("Must specify the length of simulation traces (--steps)")
         sys.exit(ExitStatus.INVALID_ARGS.value)
 
     print("Encoding...", file=sys.stderr)
