@@ -25,14 +25,6 @@ def pprint_agent(info, tid):
     return f"{info.spawn[int(tid)]} {tid}"
 
 
-def pprint_assign(lst, key, arrow, value):
-    v = get_var(lst, key)
-    if v.is_array:
-        return f"\t{v.name}[{key - v.index}] {arrow} {value}\n"
-    else:
-        return "\t{} {} {}\n".format(v.name, arrow, value)
-
-
 def translateCPROVER(cex, fname, info, offset=-1):
     with open(fname) as f:
         c_program = f.readlines()
@@ -130,9 +122,9 @@ def _mapCPROVERstate(A, B, C, info):
                 tid, k = is_attr.group(1), is_attr.group(2)
                 agent = pprint_agent(info, tid)
                 last_return = "attr"
-                return "{}:{}".format(
+                return "{}:\t{}\n".format(
                     agent,
-                    pprint_assign(info.i, int(k), "<-", keys["rvalue"]))
+                    info.pprint_assign("I", int(k), keys["rvalue"]))
 
             is_lstig = LSTIG.match(keys["lvalue"])
             if is_lstig and keys["rvalue"] != UNDEF:
@@ -140,9 +132,9 @@ def _mapCPROVERstate(A, B, C, info):
                 agent = pprint_agent(info, tid)
                 last_return = "lstig"
                 last_agent = agent
-                return "{}:{}".format(
+                return "{}:\t{}\n".format(
                     agent,
-                    pprint_assign(info.lstig, int(k), "<~", keys["rvalue"]))
+                    info.pprint_assign("L", int(k), keys["rvalue"]))
 
             if (keys["lvalue"].startswith("__LABS_step") and
                     keys["rvalue"] != last_step):
@@ -154,7 +146,7 @@ def _mapCPROVERstate(A, B, C, info):
             if is_env and keys["rvalue"] != UNDEF:
                 k = is_env.group(1)
                 last_return = "env"
-                return pprint_assign(info.e, int(k), "<--", keys["rvalue"])
+                return f"\t{info.pprint_assign('E', int(k), keys['rvalue'])}\n"
         except KeyError:
             return ""
         return ""
@@ -168,28 +160,34 @@ def _mapCPROVERstate(A, B, C, info):
 
 def translate_cadp(cex, info):
     def pprint_init_agent(args):
-        tid = args[1][0]
-        iface = args[2][1:]
+        tid, iface = args[1], args[2][1:]
         agent = pprint_agent(info, tid)
-        init_iface = "".join(
-            f"""{agent}:{pprint_assign(info.i, int(k), "<-", v[0])}"""
+        init = "".join(
+            f"{agent}:\t{info.pprint_assign('I', int(k), v)}\n"
             for k, v in enumerate(iface))
         if len(args) == 5:
-            return init_iface
+            return init
 
         lstig = args[3][1:]
-        init_iface += "".join(
-            f"""{agent}:{pprint_assign(info.lstig, int(k), "<~", v[1][0])}"""
+        init += "".join(
+            f"{agent}:\t{info.pprint_assign('L', int(k), v[1])},{v[2]}\n"
             for k, v in enumerate(lstig)
         )
-        return init_iface
+        return init
 
     def pprint_init_env(args):
         return "".join(
-            pprint_assign(info.e, int(k), "<--", v)
+            f"\t{info.pprint_assign('E', int(k), v)}\n"
             for k, v in enumerate(args[1:]))
 
-    lines = [l[9:-1] for l in cex.split('\n') if l.startswith("\"ACTION")]
+    def good_line(l):
+        if l.startswith("\"ACTION"):
+            return l[9:-1]
+        elif l.startswith("\"MONITOR"):
+            return l[1:-1]
+        else:
+            return None
+    lines = [good_line(l) for l in cex.split('\n') if good_line(l)]
     inits = sorted(l for l in lines if l.startswith("AGENT"))
     init_env = (l for l in lines if l.startswith("ENV"))
     others = (l for l in lines
@@ -203,30 +201,44 @@ def translate_cadp(cex, info):
     LPAR, RPAR = map(Suppress, "()")
     RECORD = Forward()
     RECORD <<= (NAME + LPAR +
-                delimitedList(Group(ppc.number() | BOOLEAN | RECORD)) + RPAR)
+                delimitedList((ppc.number() | BOOLEAN | Group(RECORD))) + RPAR)
 
     BANGNUM = (Suppress("!") + ppc.number)
-    ASGN = dblQuotedString.setParseAction(removeQuotes) + OneOrMore(BANGNUM)
-    STEP = ppc.number() | ASGN
+    QUOTES = dblQuotedString.setParseAction(removeQuotes)
+    ASGN = QUOTES + OneOrMore(BANGNUM)
+    MONITOR = (Keyword("MONITOR") + Suppress("!") + (BOOLEAN | QUOTES))
+    STEP = ppc.number() | ASGN | MONITOR
 
-    result = [pprint_init_env(RECORD.parseString(l)) for l in init_env]
+    result = ["<initialization>\n"]
+    result.extend(pprint_init_env(RECORD.parseString(l)) for l in init_env)
     result.extend(pprint_init_agent(RECORD.parseString(l)) for l in inits)
+    result.append("<end initialization>\n")
 
-    agent = 0
+    sys_step = re.compile(r"(?:end )?(?:confirm|propagate)")
+
+    agent_id = 0
     for l in others:
         step = STEP.parseString(l, parseAll=True)
-        if len(step) == 1:
-            agent = step[0]
-        else:
+        if step[0] == "MONITOR" and step[1] == "deadlock":
+            result.append("<deadlock>\n")
+        elif step[0] == "MONITOR":
+            msg = f"""<property {"satisfied" if step[1] else "violated"}>\n"""
+            result.append(msg)
+        elif type(step[0]) is int:
+            agent_id = step[0]
+        elif step[0] in ("E", "I", "L"):
             if step[0] == "E":
-                result.append(
-                    pprint_assign(info.e, int(step[1]), "<--", step[2]))
+                agent = pprint_agent(info, agent_id)
+                pprint = info.pprint_assign(*step[:3])
             else:
-                ls, arrow = {
-                    "I": (info.i, "<-"),
-                    "L": (info.lstig, "<~")}[step[0]]
-                result.append(
-                    pprint_agent(info, agent) + ":" +
-                    pprint_assign(ls, int(step[2]), arrow, step[3]))
+                agent = pprint_agent(info, step[1])
+                pprint = info.pprint_assign(step[0], *step[2:4])
+            result.append(f"{agent}:\t{pprint}\n")
+        elif sys_step.match(step[0]):
+            result.append(
+                f"<{pprint_agent(info, step[1])}: {step[0]} "
+                f"'{info.pprint_var(info.lstig, step[2])}'>\n")
+        else:
+            result.append(f"<could not parse: {step}>\n")
 
     return "".join(l for l in result if l)

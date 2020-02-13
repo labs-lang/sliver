@@ -97,8 +97,26 @@ class Info(object):
             e=[Variable(*v.split("=")) for v in envs.split(";") if v],
             props=props)
 
+    def pprint_var(self, store, key):
+        v = get_var(store, key)
+        if v.is_array:
+            return f"{v.name}[{key - v.index}]"
+        else:
+            return f"{v.name}"
+
+    def pprint_assign(self, where, key, value):
+        store, arrow = {
+            "E": (self.e, "<-"),
+            "I": (self.i, "<-"),
+            "L": (self.lstig, "<~")}[where]
+        return f"{self.pprint_var(store, key)} {arrow} {value}"
+        # v = get_var(store, key)
+        # if v.is_array:
+        #     return f"{v.name}[{key - v.index}] {arrow} {value}"
+        # else:
+        #     return f"{v.name} {arrow} {value}"
+
     def instrument(self):
-        # max_index = info["Comp"].num_agents() - 1
         def format(fmt, var, index):
             return ",".join(
                 fmt.format(TYPE, index + i, var.rnd_value())
