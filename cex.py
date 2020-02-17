@@ -197,12 +197,11 @@ def translate_cadp(cex, info):
     NAME = Word(alphanums)
     LPAR, RPAR = map(Suppress, "()")
     RECORD = Forward()
-    RECORD <<= (NAME + LPAR +
-                delimitedList((ppc.number() | BOOLEAN | Group(RECORD))) + RPAR)
+    OBJ = (ppc.number() | BOOLEAN | Group(RECORD))
+    RECORD <<= (NAME + LPAR + delimitedList(OBJ) + RPAR)
 
-    BANGNUM = (Suppress("!") + ppc.number)
     QUOTES = dblQuotedString.setParseAction(removeQuotes)
-    ASGN = QUOTES + OneOrMore(BANGNUM)
+    ASGN = QUOTES + OneOrMore(Suppress("!") + OBJ)
     MONITOR = (Keyword("MONITOR") + Suppress("!") + (BOOLEAN | QUOTES))
     STEP = ppc.number() | ASGN | MONITOR
 
@@ -222,14 +221,16 @@ def translate_cadp(cex, info):
             yield f"""<property {"satisfied" if step[1] else "violated"}>\n"""
         elif type(step[0]) is int:
             agent_id = step[0]
-        elif step[0] in ("E", "I", "L"):
-            if step[0] == "E":
-                agent = pprint_agent(info, agent_id)
-                pprint = info.pprint_assign(*step[:3])
-            else:
-                agent = pprint_agent(info, step[1])
-                pprint = info.pprint_assign(step[0], *step[2:4])
-            yield f"{agent}:\t{pprint}\n"
+        elif step[0] == "E":
+            agent = pprint_agent(info, agent_id)
+            yield f"{agent}:\t{info.pprint_assign(*step[:3])}\n"
+        elif step[0] == "I":
+            agent = pprint_agent(info, step[1])
+            yield f"{agent}:\t{info.pprint_assign(step[0], *step[2:4])}\n"
+        elif step[0] == "L":
+            agent = pprint_agent(info, step[1])
+            val = f"{step[3][1]},{step[3][2]}"
+            yield f"{agent}:\t{info.pprint_assign(step[0], step[2], val)}\n"
         elif sys_step.match(step[0]):
             yield (
                 f"<{pprint_agent(info, step[1])}: {step[0]} "
