@@ -47,10 +47,13 @@ def make_filename(file, values, bound, fair, sync, language):
     result = "_".join((
         # turn "file" into a valid identifier ([A-Za-z_][A-Za-z0-9_]+)
         re.sub(r'\W|^(?=\d)', '_', Path(file).stem),
-        str(bound), ("fair" if fair else "unfair"),
+        str(bound), ("fair" if fair else "unfair")))
+    options = [o for o in (
         ("sync" if sync else ""),
-        "".join(v.replace("=", "") for v in values))) + "." + language.value
-    return result.replace("__", "_")
+        "".join(v.replace("=", "") for v in values)) if o != ""]
+    if options:
+        result = f"{result}_{'_'.join(options)}"
+    return f"{result}.{language.value}"
 
 
 @click.command()
