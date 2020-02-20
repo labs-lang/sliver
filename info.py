@@ -106,7 +106,7 @@ class Info(object):
 
     def pprint_assign(self, where, key, value):
         store, arrow = {
-            "E": (self.e, "<-"),
+            "E": (self.e, "<--"),
             "I": (self.i, "<-"),
             "L": (self.lstig, "<~")}[where]
         return f"{self.pprint_var(store, key)} {arrow} {value}"
