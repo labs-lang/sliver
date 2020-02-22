@@ -121,6 +121,9 @@ VALUES -- assign values for parameterised specification (key=value)
             status = ExitStatus.KILLED
         finally:
             backend.cleanup(fname)
+            if status == ExitStatus.SUCCESS and simulate:
+                print("Done.")
+            else:
             print(ExitStatus.format(status))
             sys.exit(status.value)
 

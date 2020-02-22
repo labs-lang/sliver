@@ -15,7 +15,6 @@ class Language(Enum):
 
 class ExitStatus(Enum):
     SUCCESS = 0
-    SIM_SUCCESS = 0
     BACKEND_ERROR = 1
     INVALID_ARGS = 2
     PARSING_ERROR = 6
@@ -27,7 +26,6 @@ class ExitStatus(Enum):
     def format(code) -> str:
         return {
             ExitStatus.SUCCESS: "Verification succesful.",
-            ExitStatus.SIM_SUCCESS: "Done.",
             ExitStatus.BACKEND_ERROR: "Backend failed.",
             ExitStatus.INVALID_ARGS: "Invalid arguments.",
             ExitStatus.PARSING_ERROR: "Could not parse input file.",
@@ -215,7 +213,7 @@ class Cadp(Backend):
                 print(f"====== Trace #{i+1} ======")
                 print(*translate_cadp(out, info), sep="", end="")
                 print(f"========================")
-            return ExitStatus.SIM_SUCCESS
+            return ExitStatus.SUCCESS
         except CalledProcessError as err:
             self.verbose_output(err.output.decode(), "Backend output")
             return ExitStatus.BACKEND_ERROR
