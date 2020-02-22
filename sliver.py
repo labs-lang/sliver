@@ -78,7 +78,7 @@ def make_filename(file, values, bound, fair, sync, language):
 @click.option('--verbose', **DEFAULTS("verbose", default=False, is_flag=True))
 def main(file, backend_arg, fair, simulate, show, values, **kwargs):
     """
-* * *  SLiVER - Symbolic LAbS VERification. v1.3 (July 2019) * * *
+* * *  SLiVER - Symbolic LAbS VERification. v1.4 (February 2020) * * *
 
 FILE -- path of LABS file to analyze
 
@@ -124,7 +124,7 @@ VALUES -- assign values for parameterised specification (key=value)
             if status == ExitStatus.SUCCESS and simulate:
                 print("Done.")
             else:
-            print(ExitStatus.format(status))
+                print(ExitStatus.format(status))
             sys.exit(status.value)
 
 
