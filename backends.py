@@ -105,7 +105,10 @@ class Cbmc(Backend):
     def __init__(self, cwd, **kwargs):
         super().__init__(cwd, **kwargs)
         self.language = Language.C
-        self.command = os.environ.get("CBMC") or "cbmc"
+        cmd = str(cwd / "cbmc-simulator") \
+            if "Linux" in platform.system() \
+            else "cbmc"
+        self.command = os.environ.get("CBMC") or cmd
         self.args = []
         self.debug_args = ["--bounds-check", "--signed-overflow-check"]
 
