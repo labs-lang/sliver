@@ -2,7 +2,8 @@ import re
 
 from pyparsing import (Word, alphanums, delimitedList, OneOrMore,
                        Forward, Suppress, Group, ParserElement, Keyword,
-                       replaceWith, dblQuotedString, removeQuotes)
+                       replaceWith, dblQuotedString, removeQuotes,
+                       SkipTo, LineEnd, printables, Optional, StringEnd)
 from pyparsing import pyparsing_common as ppc
 
 ATTR = re.compile(r"I\[([0-9]+)l?\]\[([0-9]+)l?\]")
@@ -18,141 +19,104 @@ CONFIRM = re.compile(r"propagate_or_confirm=FALSE")
 UNDEF = "16960"
 
 
+BOOLEAN = (
+    Keyword("TRUE").setParseAction(replaceWith(True)) |
+    Keyword("FALSE").setParseAction(replaceWith(False)))
+
+
 def pprint_agent(info, tid):
     return f"{info.spawn[int(tid)]} {tid}"
 
 
 def translateCPROVER(cex, fname, info, offset=-1):
-    with open(fname) as f:
+    def pprint_assign(var, value, tid="", init=False):
+        def fmt(match, store_name, tid):
+            tid = match[1] if len(match.groups()) > 1 else tid
+            k = match[2] if len(match.groups()) > 1 else match[1]
+            agent = f"{pprint_agent(info, tid)}:" if tid else ""
+            assign = info.pprint_assign(store_name, int(k), value)
+            # endline = " " if not(init) and store_name == "L" else "\n"
+            return f"\n{agent}\t{assign}"
+        is_attr = ATTR.match(var)
+        if is_attr and info.i:
+            return fmt(is_attr, "I", tid)
+        is_env = ENV.match(var)
+        if is_env:
+            return fmt(is_env, "E", tid)
+        is_lstig = LSTIG.match(var)
+        if is_lstig:
+            return fmt(is_lstig, "L", tid)
+        is_ltstamp = LTSTAMP.match(var)
+        if is_ltstamp:
+            return f" [{value}]"
+        return None
+
+    STATE, FILE, FN, LINE, THREAD = (
+        Keyword(tk).suppress() for tk in
+        ("State", "file", "function", "line", "thread"))
+    LBRACE, RBRACE = map(Suppress, "{}")
+    SEP = Keyword("----------------------------------------------------")
+    STUFF = Word(printables)
+    INFO = FILE + STUFF + FN + STUFF +\
+        LINE + ppc.number() + THREAD + ppc.number()
+
+    TRACE_INFO = STATE + ppc.number() + INFO
+    VAR = Word(printables, excludeChars="=")
+    RECORD = Forward()
+    VAL = ((ppc.number() + Optional(Suppress("u"))) | BOOLEAN | Group(RECORD))
+    RECORD <<= (LBRACE + delimitedList(VAL) + RBRACE)
+
+    ASGN = VAR + Suppress("=") + VAL + SkipTo(LineEnd()).suppress()
+
+    TRACE = OneOrMore(Group(Group(TRACE_INFO) + SEP.suppress() + Group(ASGN)))
+
+    cex_start_pos = cex.find("Counterexample:") + 15
+    cex_end_pos = cex.find("Violated property:")
+    states = TRACE.parseString(cex[cex_start_pos:cex_end_pos])
+
+    inits = (
+        l[1] for l in states
+        if l[0][2] == "init" and not(LTSTAMP.match(l[1][0])))
+    others = [l[1] for l in states if l[0][2] != "init"]
+    yield "<initialization>"
+    for i in inits:
+        pprint = pprint_assign(*i, init=True)
+        if pprint:
+            yield pprint
+    yield "\n<end initialization>"
+
+    agent = ""
+    system = None
+    for i, (var, value) in enumerate(others):
+        if var == "__LABS_step":
+            if system:
+                yield f"\n<end {system}>"
+                system = None
+        elif var == "propagate_or_confirm":
+            system = "propagate" if value else "confirm"
+            yield f"\n<{pprint_agent(info, agent)}: {system} "
+        elif var == "guessedkey":
+            yield f"'{info.lstig[int(value)].name}'>"
+        elif var == "firstAgent":
+            agent = value
+        else:
+            if all((len(others) > i + 1, LSTIG.match(var),
+                    LTSTAMP.match(others[i + 1][0]))):
+                pprint = pprint_assign(var, value, agent, endline=" ")
+            else:
+                pprint = pprint_assign(var, value, agent)
+            if pprint:
+                yield pprint
+
+    prova = cex[cex_end_pos + 18:]
+    END_TRACE = INFO + Suppress(SkipTo(StringEnd()))
+    P_NAME = Suppress(SkipTo(",", include=True)) + Word(alphanums) + \
+        Suppress(SkipTo(StringEnd()))
+    prop = END_TRACE.parseString(prova)
+    with open(prop[0]) as f:
         c_program = f.readlines()
-    translatedcex = ''
-    lines = cex.split('\n')
-    k = 0  # cex[:cex.find('Trace for')].count('\n') + 1 + 1
-    separator = "----------------------------------------------------"
-
-    for k, ln in enumerate(lines):
-        # case 1: another transition to fetch
-        if ln.startswith('State ') and lines[k + 1] == separator:
-            A, B, C = ln, lines[k + 1], lines[k + 2]
-
-            # the part below the separator might be
-            # more than one line long..
-            j = 1
-            while (k + 2 + j < len(lines) and
-                    not lines[k + 2 + j].startswith('State ') and
-                    not lines[k + 2 + j].startswith('Violated property')):
-                C += lines[k + 2 + j]
-                j += 1
-
-            translatedcex += _mapCPROVERstate(A, B, C, info)
-
-        # case 2: final transation with property violation
-        elif ln.startswith('Violated property'):
-            Y = keys_of(lines[k + 1])
-            prop = c_program[int(Y["line"]) + offset]
-            try:
-                _, prop = c_program[int(Y["line"]) + offset].split("//")
-            except ValueError:
-                pass
-            translatedcex += """Violated property: {}\n""".format(prop)
-            break  # Stop converting after the 1st property has been violated
-
-        # case 3: violated property in simulation run
-        elif ln.startswith(">>>") and "violated" in ln:
-            translatedcex += ln + "\n"
-
-    if len(translatedcex) > 0:
-        translatedcex = "Counterexample:\n\n{}\n".format(translatedcex)
-
-    return translatedcex
-
-
-def keys_of(ln):
-    tokens = ln.split()
-    return {key: value for key, value in zip(tokens[0::2], tokens[1::2])}
-
-
-last_return = ""
-last_step = -1
-last_sys = []
-last_agent = -1
-
-
-def _mapCPROVERstate(A, B, C, info):
-
-    global last_return, last_step, last_sys, last_agent
-    '''
-    'Violated property:'
-    '  file _cs_lazy_unsafe.c line 318 function thread3_0'
-    '  assertion 0 != 0'
-    '  0 != 0'
-    '''
-    # Fetch values.
-    try:
-        # 1st line
-        keys = keys_of(A)
-        keys["lvalue"], rvalue = C.strip().split("=")
-        keys["rvalue"] = rvalue.split(" ")[0]
-
-        is_ltstamp = LTSTAMP.match(keys["lvalue"])
-        if is_ltstamp and last_return == "lstig":
-            last_return = "ltstamp"
-            return "({})\n".format(keys["rvalue"])
-
-        if PROPAGATE.match(C.strip()):
-            last_sys.append("propagate ")
-        elif CONFIRM.match(C.strip()):
-            last_sys.append("confirm ")
-        elif keys["lvalue"] == "guessedcomp":
-            tid = int(keys["rvalue"])
-            agent = f"from {pprint_agent(info, tid)}:"
-            last_sys.append(agent)
-        elif keys["lvalue"] == "guessedkey":
-            last_sys.append(info.lstig[int(keys["rvalue"])].name)
-            result = ("".join(last_sys) + "\n")
-            last_sys = []
-            return result
-
-        try:
-            is_attr = ATTR.match(keys["lvalue"])
-            if is_attr and keys["rvalue"] != UNDEF:
-                tid, k = is_attr.group(1), is_attr.group(2)
-                agent = pprint_agent(info, tid)
-                last_return = "attr"
-                return "{}:\t{}\n".format(
-                    agent,
-                    info.pprint_assign("I", int(k), keys["rvalue"]))
-
-            is_lstig = LSTIG.match(keys["lvalue"])
-            if is_lstig and keys["rvalue"] != UNDEF:
-                tid, k = is_lstig.group(1), is_lstig.group(2)
-                agent = pprint_agent(info, tid)
-                last_return = "lstig"
-                last_agent = agent
-                return "{}:\t{}\n".format(
-                    agent,
-                    info.pprint_assign("L", int(k), keys["rvalue"]))
-
-            if (keys["lvalue"].startswith("__LABS_step") and
-                    keys["rvalue"] != last_step):
-                last_return = "step"
-                last_step = keys["rvalue"].replace("u", "")
-                return "--step {}--\n".format(last_step)
-
-            is_env = ENV.match(keys["lvalue"])
-            if is_env and keys["rvalue"] != UNDEF:
-                k = is_env.group(1)
-                last_return = "env"
-                return f"\t{info.pprint_assign('E', int(k), keys['rvalue'])}\n"
-        except KeyError:
-            return ""
-        return ""
-
-    except Exception as e:
-            print('unable to parse state %s' % keys['State'])
-            print(e)
-            print(A, B, C, sep="\n")
-            return ""
+        prop = P_NAME.parseString(c_program[prop[2] - 1])
+        yield f"\n<property violated: '{prop[0]}'>\n"
 
 
 def translate_cadp(cex, info):
@@ -184,6 +148,7 @@ def translate_cadp(cex, info):
             return l[1:-1]
         else:
             return None
+
     lines = [good_line(l) for l in cex.split('\n') if good_line(l)]
     inits = sorted(l for l in lines if l.startswith("AGENT"))
     init_env = (l for l in lines if l.startswith("ENV"))
@@ -191,9 +156,6 @@ def translate_cadp(cex, info):
               if not (l.startswith("AGENT") or l.startswith("ENV")))
 
     ParserElement.setDefaultWhitespaceChars(' \t\n\x01\x02')
-    BOOLEAN = (
-        Keyword("TRUE").setParseAction(replaceWith(True)) |
-        Keyword("FALSE").setParseAction(replaceWith(False)))
     NAME = Word(alphanums)
     LPAR, RPAR = map(Suppress, "()")
     RECORD = Forward()

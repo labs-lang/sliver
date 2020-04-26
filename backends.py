@@ -124,7 +124,7 @@ class Cbmc(Backend):
     def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode == 10:
             out = err.output.decode("utf-8")
-            print(translateCPROVER(out, fname, info))
+            print(*translateCPROVER(out, fname, info), sep="", end="")
             return ExitStatus.FAILED
         elif err.returncode == 6:
             print("Backend failed with parsing error.", file=stderr)
@@ -163,7 +163,7 @@ class Cseq(Backend):
     def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode in (1, 10):
             out = err.output.decode("utf-8")
-            print(translateCPROVER(out, fname, info, 19))
+            print(*translateCPROVER(out, fname, info, 19), sep="", end="")
             return ExitStatus.FAILED
         elif err.returncode == 6:
             print("Backend failed with parsing error.", file=stderr)
