@@ -114,7 +114,7 @@ class Cbmc(Backend):
 
         CBMC_V, CBMC_SUBV = check_output(
             [self.command, "--version"],
-            cwd=cwd).decode().strip().split(".")
+            cwd=cwd).decode().strip().split(" ")[0].split(".")
         if not (int(CBMC_V) <= 5 and int(CBMC_SUBV) <= 4):
             additional_flags = ["--trace", "--stop-on-fail"]
             self.args.extend(additional_flags)
