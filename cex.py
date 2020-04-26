@@ -212,17 +212,14 @@ def translate_cadp(cex, info):
 
     sys_step = re.compile(r"(?:end )?(?:confirm|propagate)")
 
-    agent_id = 0
     for l in others:
         step = STEP.parseString(l, parseAll=True)
         if step[0] == "MONITOR" and step[1] == "deadlock":
             yield "<deadlock>\n"
         elif step[0] == "MONITOR":
             yield f"""<property {"satisfied" if step[1] else "violated"}>\n"""
-        elif type(step[0]) is int:
-            agent_id = step[0]
         elif step[0] == "E":
-            agent = pprint_agent(info, agent_id)
+            agent = pprint_agent(info, step[1])
             yield f"{agent}:\t{info.pprint_assign(*step[:3])}\n"
         elif step[0] == "I":
             agent = pprint_agent(info, step[1])
