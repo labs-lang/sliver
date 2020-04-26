@@ -40,7 +40,7 @@ HELPMSG = {
         "Parallel analysis: partition start"
     ),
 
-    "show": "Print C encoding and exit.",
+    "show": "Print emulation program and exit.",
 
     "simulate": (
         "Number of simulation traces to generate. "

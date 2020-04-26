@@ -111,6 +111,7 @@ VALUES -- assign values for parameterised specification (key=value)
             with open(fname, 'w') as out_file:
                 out_file.write(code)
         try:
+            status = None
             sim_or_verify = "Running simulation" if simulate else "Verifying"
             print(
                 "{} with backend {}...".format(sim_or_verify, backend_arg),
@@ -121,11 +122,12 @@ VALUES -- assign values for parameterised specification (key=value)
             status = ExitStatus.KILLED
         finally:
             backend.cleanup(fname)
-            if status == ExitStatus.SUCCESS and simulate:
-                print("Done.")
-            else:
-                print(ExitStatus.format(status))
-            sys.exit(status.value)
+            if status:
+                if status == ExitStatus.SUCCESS and simulate:
+                    print("Done.")
+                else:
+                    print(ExitStatus.format(status))
+                sys.exit(status.value)
 
 
 if __name__ == "__main__":
