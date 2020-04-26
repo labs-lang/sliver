@@ -48,11 +48,12 @@ class Backend:
         self._safe_remove((fname, ))
 
     def _safe_remove(self, files):
-        try:
-            for f in files:
+        for f in files:
+            try:
+                self.verbose_output(f"Removing {f}...", file=stderr)
                 os.remove(f)
-        except FileNotFoundError:
-            pass
+            except FileNotFoundError:
+                pass
 
     def filename_argument(self, fname):
         """Returns a CLI argument for the input file.
@@ -153,8 +154,8 @@ class Cseq(Backend):
     def cleanup(self, fname):
         path = Path(fname)
         aux = (
-            str(path.parent / ("_cs_" + path.stem + suffix))
-            for suffix in (".c", ".c.map", ".cbmc-assumptions.log")
+            str(path.parent / f"_cs_{path.stem}.{suffix}")
+            for suffix in ("c", "c.map", "cbmc-assumptions.log")
         )
         super()._safe_remove(aux)
         super().cleanup(fname)
@@ -224,8 +225,12 @@ class Cadp(Backend):
     def cleanup(self, fname):
         aux = (str(Path(self.cwd) / f) for f in
                ("evaluator", "executor", "evaluator@1.o", "evaluator.bcg"))
+        path = Path(fname)
+        aux2 = (str(path.parent / f"{path.stem}.{suffix}") for suffix in
+                ("err", "f", "h", "h.BAK", "lotos", "o", "t"))
         super().cleanup(fname)
         super()._safe_remove(aux)
+        super()._safe_remove(aux2)
 
     def preprocess(self, code, fname):
         base_name = Path(fname).stem.upper()
