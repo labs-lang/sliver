@@ -162,7 +162,7 @@ def translate_cadp(cex, info):
         init = "".join(
             f"{agent}:\t{info.pprint_assign('I', int(k), v)}\n"
             for k, v in enumerate(iface))
-        if len(args) == 5:
+        if len(args) == 4:
             return init
 
         lstig = args[3][1:]
