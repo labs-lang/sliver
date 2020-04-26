@@ -206,8 +206,8 @@ def translate_cadp(cex, info):
     STEP = ppc.number() | ASGN | MONITOR
 
     yield "<initialization>\n"
-    yield from (pprint_init_env(RECORD.parseString(l)) for l in init_env)
-    yield from (pprint_init_agent(RECORD.parseString(l)) for l in inits)
+    yield from (pprint_init_env(RECORD.parseString(l)) for l in init_env if l)
+    yield from (pprint_init_agent(RECORD.parseString(l)) for l in inits if l)
     yield "<end initialization>\n"
 
     sys_step = re.compile(r"(?:end )?(?:confirm|propagate)")

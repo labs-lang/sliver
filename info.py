@@ -109,7 +109,8 @@ class Info(object):
             "E": (self.e, "<--"),
             "I": (self.i, "<-"),
             "L": (self.lstig, "<~")}[where]
-        return f"{self.pprint_var(store, key)} {arrow} {value}"
+        return f"{self.pprint_var(store, key)} {arrow} {value}" if store else ""
+
         # v = get_var(store, key)
         # if v.is_array:
         #     return f"{v.name}[{key - v.index}] {arrow} {value}"
