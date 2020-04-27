@@ -3,7 +3,7 @@ import re
 from pyparsing import (Word, alphanums, delimitedList, OneOrMore,
                        Forward, Suppress, Group, ParserElement, Keyword,
                        replaceWith, dblQuotedString, removeQuotes,
-                       SkipTo, LineEnd, printables, Optional, StringEnd)
+                       SkipTo, LineEnd, printables, Optional, StringEnd, Each)
 from pyparsing import pyparsing_common as ppc
 
 ATTR = re.compile(r"I\[([0-9]+)l?\]\[([0-9]+)l?\]")
@@ -33,7 +33,7 @@ def translateCPROVER(cex, fname, info, offset=-1):
         def fmt(match, store_name, tid):
             tid = match[1] if len(match.groups()) > 1 else tid
             k = match[2] if len(match.groups()) > 1 else match[1]
-            agent = f"{pprint_agent(info, tid)}:" if tid else ""
+            agent = f"{pprint_agent(info, tid)}:" if tid != "" else ""
             assign = info.pprint_assign(store_name, int(k), value)
             # endline = " " if not(init) and store_name == "L" else "\n"
             return f"\n{agent}\t{assign}"
@@ -57,10 +57,12 @@ def translateCPROVER(cex, fname, info, offset=-1):
     LBRACE, RBRACE = map(Suppress, "{}")
     SEP = Keyword("----------------------------------------------------")
     STUFF = Word(printables)
-    INFO = FILE + STUFF + FN + STUFF +\
-        LINE + ppc.number() + THREAD + ppc.number()
+    INFO = (Optional(STATE + ppc.number().setResultsName("state")) &
+            (FILE + STUFF.setResultsName("file")) &
+            (FN + STUFF.setResultsName("function")) &
+            (LINE + ppc.number().setResultsName("line")) &
+            Optional(THREAD + ppc.number().setResultsName("thread")))
 
-    TRACE_INFO = STATE + ppc.number() + INFO
     VAR = Word(printables, excludeChars="=")
     RECORD = Forward()
     VAL = ((ppc.number() + Optional(Suppress("u"))) | BOOLEAN | Group(RECORD))
@@ -68,7 +70,7 @@ def translateCPROVER(cex, fname, info, offset=-1):
 
     ASGN = VAR + Suppress("=") + VAL + SkipTo(LineEnd()).suppress()
 
-    TRACE = OneOrMore(Group(Group(TRACE_INFO) + SEP.suppress() + Group(ASGN)))
+    TRACE = OneOrMore(Group(Group(INFO) + SEP.suppress() + Group(ASGN)))
 
     cex_start_pos = cex.find("Counterexample:") + 15
     cex_end_pos = cex.find("Violated property:")
@@ -76,8 +78,8 @@ def translateCPROVER(cex, fname, info, offset=-1):
 
     inits = (
         l[1] for l in states
-        if l[0][2] == "init" and not(LTSTAMP.match(l[1][0])))
-    others = [l[1] for l in states if l[0][2] != "init"]
+        if l[0]["function"] == "init" and not(LTSTAMP.match(l[1][0])))
+    others = [l[1] for l in states if l[0]["function"] != "init"]
     yield "<initialization>"
     for i in inits:
         pprint = pprint_assign(*i, init=True)
@@ -100,8 +102,8 @@ def translateCPROVER(cex, fname, info, offset=-1):
         elif var == "firstAgent":
             agent = value
         else:
-            if all((len(others) > i + 1, LSTIG.match(var),
-                    LTSTAMP.match(others[i + 1][0]))):
+            if (len(others) > i + 1 and LSTIG.match(var) and
+                    LTSTAMP.match(others[i + 1][0])):
                 pprint = pprint_assign(var, value, agent, endline=" ")
             else:
                 pprint = pprint_assign(var, value, agent)
@@ -109,14 +111,9 @@ def translateCPROVER(cex, fname, info, offset=-1):
                 yield pprint
 
     prova = cex[cex_end_pos + 18:]
-    END_TRACE = INFO + Suppress(SkipTo(StringEnd()))
-    P_NAME = Suppress(SkipTo(",", include=True)) + Word(alphanums) + \
-        Suppress(SkipTo(StringEnd()))
-    prop = END_TRACE.parseString(prova)
-    with open(prop[0]) as f:
-        c_program = f.readlines()
-        prop = P_NAME.parseString(c_program[prop[2] - 1])
-        yield f"\n<property violated: '{prop[0]}'>\n"
+    PROP = Suppress(INFO) + STUFF + Suppress(SkipTo(StringEnd()))
+    prop = PROP.parseString(prova)
+    yield f"\n<property violated: '{prop[0]}'>\n"
 
 
 def translate_cadp(cex, info):
