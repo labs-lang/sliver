@@ -3,14 +3,13 @@ LNT translation: disable stigmergies and/or environment when not needed
 SLiVER: fixed several bugs related to CADP backend
 SLiVER: added counterexample translations for CADP backend
 
-
 Version 1.3 - 2019-11 (internal release)
 LabsTranslate: General improvements to parser/code generator
 LabsTranslate: Fixed a bug when using external variables in array subscript
 LabsTranslate: Added LNT translation (experimental)
 LabsTranslate: Remove (some) redundant sub-predicates from "finally"/"always" assertions
 SLiVER: Added support to generate unbounded encodings
-SLivER: Updated bundled CSeq backend, improved support for parallel analysis
+SLiVER: Updated bundled CSeq backend, improved support for parallel analysis
 C translation: Disable stigmergy encoding when not needed
 C translation: General improvements
 
