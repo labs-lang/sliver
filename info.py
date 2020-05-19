@@ -74,7 +74,7 @@ else:
 
 
 class Info(object):
-    def __init__(self, spawn, e, props):
+    def __init__(self, spawn, e, props, raw=""):
         self.spawn = spawn
         self.i = {}
         self.lstig = {}
@@ -83,11 +83,12 @@ class Info(object):
             self.i.update(c.iface)
             self.lstig.update(c.lstig)
         self.e = e
+        self.raw = raw
 
     @staticmethod
     def parse(txt):
         if not txt:
-            return Info(Spawn({}), {})
+            raise ValueError("empty info")
         """Deserialize system info
         """
         lines = txt.split("|")
@@ -95,27 +96,23 @@ class Info(object):
         return Info(
             spawn=Spawn.parse(comps),
             e=[Variable(*v.split("=")) for v in envs.split(";") if v],
-            props=props)
+            props=props,
+            raw=txt)
 
     def pprint_var(self, store, key):
         v = get_var(store, key)
         if v.is_array:
-            return f"{v.name}[{key - v.index}]"
+            return "{}[{}]".format(v.name, key - v.index)
         else:
-            return f"{v.name}"
+            return v.name
 
     def pprint_assign(self, where, key, value):
         store, arrow = {
             "E": (self.e, "<--"),
             "I": (self.i, "<-"),
             "L": (self.lstig, "<~")}[where]
-        return f"{self.pprint_var(store, key)} {arrow} {value}" if store else ""
-
-        # v = get_var(store, key)
-        # if v.is_array:
-        #     return f"{v.name}[{key - v.index}] {arrow} {value}"
-        # else:
-        #     return f"{v.name} {arrow} {value}"
+        return "{} {} {}".format(self.pprint_var(store, key), arrow, value) \
+               if store else ""
 
     def instrument(self):
         def format(fmt, var, index):
@@ -142,7 +139,7 @@ class Info(object):
                 for n in range(low, up)
                 for x in agent.lstig.values())
         # Return the flattened list
-        return (x for l in out for x in l)
+        return (x for lst in out for x in lst)
 
 
 class Spawn:

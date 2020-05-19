@@ -138,8 +138,7 @@ class Cseq(Backend):
         super().__init__(cwd, **kwargs)
         self.language = Language.C
         self.command = os.environ.get("CSEQ") or str(cwd / "cseq" / "cseq.py")
-        # TODO change split
-        self.args = ["-l", "labs_parallel", "--split", "_I"]
+        self.args = ["-l", "labs_parallel"]
 
         for arg in ("steps", "cores", "from", "to"):
             if kwargs.get(arg) is not None:
@@ -147,6 +146,11 @@ class Cseq(Backend):
 
         self.debug_args = self.args
         self.cwd /= "cseq"
+
+    def verify(self, fname, info):
+        # TODO change split according to info
+        self.args += ["--split", "_I", "--info", info.raw]
+        return super().verify(fname, info)
 
     def filename_argument(self, fname):
         return ["-i", str(self.cwd / fname)]
