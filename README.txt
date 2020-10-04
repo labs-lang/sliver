@@ -1,6 +1,6 @@
 
-              SLiVER 1.2
-              June 2019
+              SLiVER 1.5
+              October 2020
 
 Symbolic LAbS VERifier
 
