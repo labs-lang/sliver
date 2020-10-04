@@ -113,9 +113,10 @@ class Cbmc(Backend):
         self.args = []
         self.debug_args = ["--bounds-check", "--signed-overflow-check"]
 
-        CBMC_V, CBMC_SUBV = check_output(
+        CBMC_V, *CBMC_SUBV = check_output(
             [self.command, "--version"],
             cwd=cwd).decode().strip().split(" ")[0].split(".")
+        CBMC_SUBV = CBMC_SUBV[0]
         if not (int(CBMC_V) <= 5 and int(CBMC_SUBV) <= 4):
             additional_flags = ["--trace", "--stop-on-fail"]
             self.args.extend(additional_flags)
