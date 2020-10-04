@@ -1,3 +1,13 @@
+Version 1.5 - 2020-10
+LabsTranslate: improve simplification of Boolean expressions
+LNT translation: general improvements
+LNT translation: adapted to new LNT syntax (CADP 2020-d and beyond)
+C translation: disable stigmergies and/or environment when not needed
+C translation: remove all preprocessor directives
+SLiVER: CBMC backend now compatible with cbmc > 5.10
+SLiVER: Improved cleanup of intermediate files
+SLiVER: Support CSeq-1.9
+
 Version 1.4 - 2020-02
 LNT translation: disable stigmergies and/or environment when not needed
 SLiVER: fixed several bugs related to CADP backend
@@ -9,12 +19,13 @@ LabsTranslate: Fixed a bug when using external variables in array subscript
 LabsTranslate: Added LNT translation (experimental)
 LabsTranslate: Remove (some) redundant sub-predicates from "finally"/"always" assertions
 SLiVER: Added support to generate unbounded encodings
-SLiVER: Updated bundled CSeq backend, improved support for parallel analysis
+SLivER: Updated bundled CSeq backend, improved support for parallel analysis
 C translation: Disable stigmergy encoding when not needed
 C translation: General improvements
 
+
 Version 1.2 - 2019-06
-Improved intermediate representation
+LabsTranslate: Improved intermediate representation
 
 Version 1.1 - 2018-11 (internal release)
 LabsTranslate: Improved/updated parser
