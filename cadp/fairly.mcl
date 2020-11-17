@@ -1,4 +1,4 @@
 library standard.mcl end_library
 
 
-FAIRLY("MONITOR !TRUE" or "MONITOR !\"deadlock\"")
+FAIRLY("MONITOR !TRUE" or "MONITOR !\"spurious\"")
