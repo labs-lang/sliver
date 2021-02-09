@@ -1,3 +1,8 @@
+Version 1.6 - 2021-01
+
+LNT translation: code generator now follows the new LNT syntax
+LNT translation: fix a CADP verification query
+
 Version 1.5 - 2020-10
 LabsTranslate: improve simplification of Boolean expressions
 LNT translation: general improvements

@@ -3,7 +3,8 @@
 
 SLiver is a tool for the analysis of multi-agent systems specified in the
 LAbS language [1]. At the moment, it support under-approximate analysis
-via bounded model checking, or analisys of the full state space via explicit-state model checking.
+via bounded model checking, or analisys of the full state space via
+explicit-state model checking.
 
 This page contains source code and binary releases of SLiVER for Linux x64 systems.
 
