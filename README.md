@@ -36,7 +36,7 @@ To install SLiVER, please follow the steps below:
 3. Download and extract the latest version of SLiVER from the [**Releases** page](https://github.com/labs-lang/sliver/releases)
 
 4. set execution (+x) permissions for `sliver.py`, `cseq/cseq.py`, `cbmc-simulator` 
-5. Invoking `./sliver.py --help` from the command line should now display basig usage directions.
+5. Invoking `./sliver.py --help` from the command line should now display basic usage directions.
 
 6. Follow `README.txt` for additional (release-specific) instructions.
 
