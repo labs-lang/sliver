@@ -3,7 +3,7 @@
 
 SLiver is a tool for the analysis of multi-agent systems specified in the
 LAbS language [1]. At the moment, it support under-approximate analysis
-via bounded model checking.
+via bounded model checking, or analisys of the full state space via explicit-state model checking.
 
 This page contains source code and binary releases of SLiVER for Linux x64 systems.
 
@@ -39,6 +39,10 @@ To install SLiVER, please follow the steps below:
 
 6. Follow `README.txt` for additional (release-specific) instructions.
 
+The COORDINATION paper [2] 
+[(PDF)](https://hal.inria.fr/hal-02890401/en)
+contains further usage information.
+
 ## Support
 
 If you encounter any issues while running SLiVER, please submit
@@ -47,3 +51,5 @@ an [issue](https://github.com/labs-lang/sliver/issues).
 ## Publications
 
 [1] R. De Nicola, L. Di Stefano, and O. Inverso, “Multi-Agent Systems with Virtual Stigmergy,” in: Mazzara M., Ober I., Salaün G. (eds) Software Technologies: Applications and Foundations. STAF 2018. Lecture Notes in Computer Science, vol 11176. Springer, 2018. [Link](https://link.springer.com/chapter/10.1007%2F978-3-030-04771-9_26)
+
+[2] L. Di Stefano, F. Lang, and W. Serwe, “Combining SLiVER with CADP to Analyze Multi-agent Systems,” in 22nd International Conference on Coordination Models and Languages (COORDINATION), Valletta, Malta, Jun. 2020, vol. 12134, pp. 370–385. [Link](https://link.springer.com/chapter/10.1007%2F978-3-030-50029-0_23) 
