@@ -40,7 +40,7 @@ To install SLiVER, please follow the steps below:
 
 6. Follow `README.txt` for additional (release-specific) instructions.
 
-The COORDINATION paper [2] 
+The COORDINATION paper [3] 
 [(PDF)](https://hal.inria.fr/hal-02890401/en)
 contains further usage information.
 
@@ -51,6 +51,10 @@ an [issue](https://github.com/labs-lang/sliver/issues).
 
 ## Publications
 
-[1] R. De Nicola, L. Di Stefano, and O. Inverso, “Multi-Agent Systems with Virtual Stigmergy,” in: Mazzara M., Ober I., Salaün G. (eds) Software Technologies: Applications and Foundations. STAF 2018. Lecture Notes in Computer Science, vol 11176. Springer, 2018. [Link](https://link.springer.com/chapter/10.1007%2F978-3-030-04771-9_26)
+[1] R. De Nicola, L. Di Stefano, and O. Inverso, “Multi-Agent Systems with Virtual Stigmergy,” in: Mazzara M., Ober I., Salaün G. (eds) Software Technologies: Applications and Foundations. STAF 2018. Lecture Notes in Computer Science, vol 11176. Springer, 2018. [Link](https://doi.org/10.1007/978-3-030-04771-9_26)
 
-[2] L. Di Stefano, F. Lang, and W. Serwe, “Combining SLiVER with CADP to Analyze Multi-agent Systems,” in 22nd International Conference on Coordination Models and Languages (COORDINATION), Valletta, Malta, Jun. 2020, vol. 12134, pp. 370–385. [Link](https://link.springer.com/chapter/10.1007%2F978-3-030-50029-0_23) 
+[2] R. De Nicola, L. Di Stefano, and O. Inverso, “Multi-agent systems with virtual stigmergy,” Sci. Comput. Program., vol. 187, p. 102345, 2020. [Link](https://doi.org/10.1016/j.scico.2019.102345)
+
+[3] L. Di Stefano, F. Lang, and W. Serwe, “Combining SLiVER with CADP to Analyze Multi-agent Systems,” in 22nd International Conference on Coordination Models and Languages (COORDINATION), Valletta, Malta, Jun. 2020, vol. 12134, pp. 370–385. [Link](https://doi.org/10.1007/978-3-030-50029-0_23)
+
+[4] L. Di Stefano, “Modelling and Verification of Multi-Agent Systems via Sequential Emulation,” PhD Thesis, Gran Sasso Science Institute, L’Aquila, Italy, 2020. [Link](https://iris.gssi.it/handle/20.500.12571/10181)
