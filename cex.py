@@ -1,6 +1,6 @@
 import re
 
-from pyparsing import (Word, alphanums, delimitedList, OneOrMore,
+from pyparsing import (Word, alphanums, delimitedList, OneOrMore, ZeroOrMore,
                        Forward, Suppress, Group, ParserElement, Keyword,
                        replaceWith, dblQuotedString, removeQuotes,
                        SkipTo, LineEnd, printables, Optional, StringEnd, Each)
@@ -138,19 +138,9 @@ def translate_cadp(cex, info):
             f"\t{info.pprint_assign('E', int(k), v)}\n"
             for k, v in enumerate(args[1:]))
 
-    def good_line(l):
-        if l.startswith("\"ACTION"):
-            return l[9:-1]
-        elif l.startswith("\"MONITOR"):
-            return l[1:-1]
-        else:
-            return None
-
-    lines = [good_line(l) for l in cex.split('\n') if good_line(l)]
-    inits = sorted(l for l in lines if l.startswith("AGENT"))
-    init_env = (l for l in lines if l.startswith("ENV"))
-    others = (l for l in lines
-              if not (l.startswith("AGENT") or l.startswith("ENV")))
+    lines = cex.split('\n')
+    first_line = [i+1 for i, l in enumerate(lines) if "<initial state>" in l][0]
+    lines = [l[1:-1] for l in lines[first_line:] if l and l[0] == '"']
 
     ParserElement.setDefaultWhitespaceChars(' \t\n\x01\x02')
     NAME = Word(alphanums)
@@ -160,36 +150,34 @@ def translate_cadp(cex, info):
     RECORD <<= (NAME + LPAR + delimitedList(OBJ) + RPAR)
 
     QUOTES = dblQuotedString.setParseAction(removeQuotes)
-    ASGN = QUOTES + OneOrMore(Suppress("!") + OBJ)
+    ASGN = NAME + ZeroOrMore(Suppress("!") + OBJ)
     MONITOR = (Keyword("MONITOR") + Suppress("!") + (BOOLEAN | QUOTES))
     STEP = ppc.number() | ASGN | MONITOR
 
     yield "<initialization>\n"
-    yield from (pprint_init_env(RECORD.parseString(l)) for l in init_env if l)
-    yield from (pprint_init_agent(RECORD.parseString(l)) for l in inits if l)
-    yield "<end initialization>\n"
-
-    sys_step = re.compile(r"(?:end )?(?:confirm|propagate)")
-
-    for l in others:
+    
+    for l in lines:
         step = STEP.parseString(l, parseAll=True)
-        if step[0] == "MONITOR" and step[1] == "deadlock":
+        if step[0] == "ENDINIT":
+            yield "<end initialization>\n"
+        elif step[0] == "MONITOR" and step[1] == "deadlock":
             yield "<deadlock>\n"
         elif step[0] == "MONITOR":
             yield f"""<property {"satisfied" if step[1] else "violated"}>\n"""
         elif step[0] == "E":
             agent = pprint_agent(info, step[1])
+            yield f"{step.asList()}"
             yield f"{agent}:\t{info.pprint_assign(*step[:3])}\n"
-        elif step[0] == "I":
+        elif step[0] == "ATTR":
             agent = pprint_agent(info, step[1])
-            yield f"{agent}:\t{info.pprint_assign(step[0], *step[2:4])}\n"
+            yield f"{agent}:\t{info.pprint_assign('I', *step[2:4])}\n"
         elif step[0] == "L":
             agent = pprint_agent(info, step[1])
-            val = f"{step[3][1]},{step[3][2]}"
-            yield f"{agent}:\t{info.pprint_assign(step[0], step[2], val)}\n"
-        elif sys_step.match(step[0]):
-            yield (
-                f"<{pprint_agent(info, step[1])}: {step[0]} "
-                f"'{info.pprint_var(info.lstig, step[2])}'>\n")
+            if len(step) > 4:
+                #This was a stigmergic message sent from another agent
+                yield f"{agent}:\t{info.pprint_assign('L', *step[2:4])}\t(from {pprint_agent(info, step[4])})\n"
+            else:
+                #This was an assignment from the agent itself
+                yield f"{agent}:\t{info.pprint_assign('L', *step[2:4])}\n"
         else:
             yield f"<could not parse: {step}>\n"
