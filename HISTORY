@@ -1,3 +1,10 @@
+Version 1.7 - 2021-07
+
+Parser: A new "nondeterministic value" operator `[n .. m]` is supported (LAbS-to-C only)
+Parser: link predicates now support "of 1", "of 2" in addition to the legacy syntax "of c1", "of c2"
+LNT translation: code generator now follows the new LNT syntax (CADP 2021-d)
+LNT translation: more efficient encoding of timestamps
+
 Version 1.6 - 2021-01
 
 LNT translation: code generator now follows the new LNT syntax
