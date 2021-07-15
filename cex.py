@@ -38,17 +38,19 @@ def translateCPROVER(cex, fname, info, offset=-1):
             # endline = " " if not(init) and store_name == "L" else "\n"
             return f"\n{agent}\t{assign}"
         is_attr = ATTR.match(var)
+        is_env = ENV.match(var)
+        is_lstig = LSTIG.match(var)
+        is_ltstamp = LTSTAMP.match(var)    
         if is_attr and info.i:
             return fmt(is_attr, "I", tid)
-        is_env = ENV.match(var)
-        if is_env:
+        elif is_env:
             return fmt(is_env, "E", tid)
-        is_lstig = LSTIG.match(var)
-        if is_lstig:
+        elif is_lstig:
             return fmt(is_lstig, "L", tid)
-        is_ltstamp = LTSTAMP.match(var)
-        if is_ltstamp:
+        elif is_ltstamp:
             return f" [{value}]"
+        else:
+            return f"cannot match {var}, {value}\n"
         return None
 
     STATE, FILE, FN, LINE, THREAD = (
