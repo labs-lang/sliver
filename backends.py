@@ -199,7 +199,22 @@ class Cadp(Backend):
         self.debug_args = ["evaluator", "-verbose", "-diag"]
         self.language = Language.LNT
 
+    def check_cadp(self):
+        try:
+            cmd = ["cadp_lib", "caesar"]
+            out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
+            return True
+        except CalledProcessError as err:
+            print(
+                "Error: CADP not found or invalid license file.",
+                "Please, visit https://cadp.inria.fr to obtain a valid license.",
+                sep='\n', file=stderr)
+            return False
+
+
     def verify(self, fname, info):
+        if not(self.check_cadp()):
+            return ExitStatus.BACKEND_ERROR
         mcl = "fairly.mcl" if info.properties[0] == "finally" else "never.mcl"
         mcl = str(Path("cadp") / Path(mcl))
         self.args.append(mcl)
@@ -207,6 +222,8 @@ class Cadp(Backend):
         return super().verify(fname, info)
 
     def simulate(self, fname, info, simulate):
+        if not(self.check_cadp()):
+            return ExitStatus.BACKEND_ERROR
         cmd = [
             "lnt.open", fname, "executor",
             str(self.kwargs.get("steps", 1)), "2"]
