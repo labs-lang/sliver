@@ -1,6 +1,6 @@
 
-              SLiVER 1.6
-              February 2021
+              SLiVER 1.7
+              July 2021
 
 Symbolic LAbS VERifier
 
@@ -26,7 +26,7 @@ cbmc-simulator    A build of CBMC 5.4
 
 To install SLiVER, please follow the steps below:
 
-    1. install Python 3.5 or higher
+    1. install Python 3.7 or higher
 
     2. create a directory, suppose this is called /workspace
 
@@ -46,12 +46,14 @@ The following command should instead report that a property is violated:
 
     ./sliver.py --steps 18 --fair examples/boids-aw.labs birds=4 delta=13 grid=10
 
-Use the --backend=<cbmc|cseq|esbmc> option to select a different
+Use the --backend=<cbmc|cseq|esbmc|cadp> option to select a different
 verification backend. 
-Please keep in mind that ESBMC support is still experimental, therefore:
+Please keep in mind that:
 
-  1. The esbmc executable is not provided as part of this package
-  2. Our counterexample translation only supports CBMC and CSeq.
+  1. We only bundled the CBMC executable as part of this package. Therefore,
+     cadp, cseq, or esbmc must be obtained separately.
+  2. Our counterexample translation does not support esbmc yet.
+
 
 Invoking the tool without options:
 
