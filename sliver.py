@@ -62,7 +62,7 @@ def make_filename(file, values, bound, fair, sync, language):
 @click.argument('values', nargs=-1)
 @click.option(
     '--backend', "backend_arg",
-    type=click.Choice(b for b in ALL_BACKENDS.keys()),
+    type=click.Choice(tuple(ALL_BACKENDS.keys())),
     default="cbmc", **DEFAULTS("backend"))
 @click.option('--debug', **DEFAULTS("debug", default=False, is_flag=True))
 @click.option('--fair/--no-fair', **DEFAULTS("fair", default=False))
