@@ -3,7 +3,7 @@ import re
 from pyparsing import (Word, alphanums, delimitedList, OneOrMore, ZeroOrMore,
                        Forward, Suppress, Group, ParserElement, Keyword,
                        replaceWith, dblQuotedString, removeQuotes,
-                       SkipTo, LineEnd, printables, Optional, StringEnd, Each)
+                       SkipTo, LineEnd, printables, Optional, StringEnd)
 from pyparsing import pyparsing_common as ppc
 
 ATTR = re.compile(r"I\[([0-9]+)l?\]\[([0-9]+)l?\]")
@@ -40,7 +40,7 @@ def translateCPROVER(cex, fname, info, offset=-1):
         is_attr = ATTR.match(var)
         is_env = ENV.match(var)
         is_lstig = LSTIG.match(var)
-        is_ltstamp = LTSTAMP.match(var)    
+        is_ltstamp = LTSTAMP.match(var)
         if is_attr and info.i:
             return fmt(is_attr, "I", tid)
         elif is_env:
@@ -51,7 +51,6 @@ def translateCPROVER(cex, fname, info, offset=-1):
             return f" [{value}]"
         else:
             return f"cannot match {var}, {value}\n"
-        return None
 
     STATE, FILE, FN, LINE, THREAD = (
         Keyword(tk).suppress() for tk in
@@ -79,9 +78,9 @@ def translateCPROVER(cex, fname, info, offset=-1):
     states = TRACE.parseString(cex[cex_start_pos:cex_end_pos])
 
     inits = (
-        l[1] for l in states
-        if l[0]["function"] == "init" and not(LTSTAMP.match(l[1][0])))
-    others = [l[1] for l in states if l[0]["function"] != "init"]
+        s[1] for s in states
+        if s[0]["function"] == "init" and not(LTSTAMP.match(s[1][0])))
+    others = [s[1] for s in states if s[0]["function"] != "init"]
     yield "<initialization>"
     for i in inits:
         pprint = pprint_assign(*i, init=True)
@@ -141,8 +140,8 @@ def translate_cadp(cex, info):
             for k, v in enumerate(args[1:]))
 
     lines = cex.split('\n')
-    first_line = [i+1 for i, l in enumerate(lines) if "<initial state>" in l][0]
-    lines = [l[1:-1] for l in lines[first_line:] if l and l[0] == '"']
+    first_line = [i+1 for i, l in enumerate(lines) if "<initial state>" in l][0]  # noqa: E501
+    lines = [l[1:-1] for l in lines[first_line:] if l and l[0] == '"']  # noqa: E501, E741
 
     ParserElement.setDefaultWhitespaceChars(' \t\n\x01\x02')
     NAME = Word(alphanums)
@@ -157,8 +156,8 @@ def translate_cadp(cex, info):
     STEP = ppc.number() | ASGN | MONITOR
 
     yield "<initialization>\n"
-    
-    for l in lines:
+
+    for l in lines:    # noqa: E741
         step = STEP.parseString(l, parseAll=True)
         if step[0] == "ENDINIT":
             yield "<end initialization>\n"
@@ -176,10 +175,10 @@ def translate_cadp(cex, info):
         elif step[0] == "L":
             agent = pprint_agent(info, step[1])
             if len(step) > 4:
-                #This was a stigmergic message sent from another agent
-                yield f"{agent}:\t{info.pprint_assign('L', *step[2:4])}\t(from {pprint_agent(info, step[4])})\n"
+                # This was a stigmergic message sent from another agent
+                yield f"{agent}:\t{info.pprint_assign('L', *step[2:4])}\t(from {pprint_agent(info, step[4])})\n"  # noqa: E501
             else:
-                #This was an assignment from the agent itself
+                # This was an assignment from the agent itself
                 yield f"{agent}:\t{info.pprint_assign('L', *step[2:4])}\n"
         else:
             yield f"<could not parse: {step}>\n"

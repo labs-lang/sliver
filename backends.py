@@ -40,6 +40,7 @@ class ExitStatus(Enum):
 
 
 class Backend:
+    """Base class representing a generic analysis backend."""
     def __init__(self, cwd, **kwargs):
         if "Linux" in platform.system():
             self.timeout_cmd = "/usr/bin/timeout"
@@ -65,13 +66,19 @@ class Backend:
         return [fname]
 
     def preprocess(self, code, fname):
+        """Preprocesses code so that it is compatible with the backend.
+        """
         return code
 
     def simulate(self, fname, info, simulate):
+        """Returns random executions of the program at fname.
+        """
         print("This backend does not support simulation.", file=stderr)
         return ExitStatus.BACKEND_ERROR
 
     def verify(self, fname, info):
+        """Verifies the correctness of the program at fname.
+        """
         args = self.debug_args if self.kwargs["debug"] else self.args
         cmd = [self.command, *self.filename_argument(fname), *args]
         if self.kwargs.get("timeout", 0) > 0:

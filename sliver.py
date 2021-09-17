@@ -16,6 +16,9 @@ __DIR = Path(__file__).parent.resolve()
 
 
 def generate_code(file, values, bound, fair, simulate, bv, sync, backend):
+    """Craft and execute a call to LabsTranslate
+    """
+    # This was needed in the old dotnet core 3 times
     env = {"LD_LIBRARY_PATH": "labs/libunwind"} \
         if "Linux" in platform.system() \
         else {}
@@ -89,6 +92,7 @@ VALUES -- assign values for parameterised specification (key=value)
         sys.exit(ExitStatus.INVALID_ARGS.value)
 
     print("Encoding...", file=sys.stderr)
+
     backend = ALL_BACKENDS[backend_arg](__DIR, **kwargs)
     try:
         code, fname, info = generate_code(

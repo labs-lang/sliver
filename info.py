@@ -63,16 +63,6 @@ class LabsExprVisitor(NodeVisitor):
             raise ValueError
 
 
-SYS = platform.system()
-
-if "Linux" in SYS:
-    env = {"LD_LIBRARY_PATH": "labs/libunwind"}
-    TIMEOUT_CMD = "/usr/bin/timeout"
-else:
-    env = {}
-    TIMEOUT_CMD = "/usr/local/bin/gtimeout"
-
-
 class Info(object):
     def __init__(self, spawn, e, props, raw=""):
         self.spawn = spawn
@@ -266,5 +256,6 @@ class Agent:
 
 
 def raw_info(call):
+    env = {"LD_LIBRARY_PATH": "labs/libunwind"} if "Linux" in platform.system() else {}    # noqa: E501
     call_info = call + ["--info"]
     return check_output(call_info, env=env)
