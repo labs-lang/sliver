@@ -8,6 +8,8 @@ from subprocess import check_output, CalledProcessError, STDOUT
 from sys import stderr, stdout
 
 from cex import translateCPROVER, translate_cadp
+from atlas.mcl import translate_property
+
 LanguageInfo = namedtuple("LanguageInfo", ["extension", "encoding"])
 
 
@@ -202,31 +204,33 @@ class Esbmc(Backend):
             "--no-unwinding-assertions", "--z3"]
 
 
-class Cadp(Backend):
+class CadpLegacy(Backend):
     def __init__(self, cwd, **kwargs):
         super().__init__(cwd, **kwargs)
         self.command = "lnt.open"
         self.args = ["evaluator", "-diag"]
         self.debug_args = ["evaluator", "-verbose", "-diag"]
-        self.language = Language.LNT
+        self.language = Language.LNT_LEGACY
 
     def check_cadp(self):
         try:
             cmd = ["cadp_lib", "caesar"]
-            out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
+            check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
             return True
-        except CalledProcessError as err:
+        except CalledProcessError:
             print(
-                "Error: CADP not found or invalid license file.",
-                "Please, visit https://cadp.inria.fr to obtain a valid license.",
+                "Error: CADP not found or invalid license file. ",
+                "Please, visit https://cadp.inria.fr "
+                "to obtain a valid license.",
                 sep='\n', file=stderr)
             return False
-
 
     def verify(self, fname, info):
         if not(self.check_cadp()):
             return ExitStatus.BACKEND_ERROR
-        mcl = "fairly.mcl" if info.properties[0] == "finally" else "never.mcl"
+        # TODO fix this for new --info output format
+        modality = info.properties[0].split()[0]
+        mcl = "fairly.mcl" if modality == "finally" else "never.mcl"
         mcl = str(Path("cadp") / Path(mcl))
         self.args.append(mcl)
         self.debug_args.append(mcl)
@@ -249,7 +253,7 @@ class Cadp(Backend):
                 self.verbose_output(out, "Backend output")
                 print(f"====== Trace #{i+1} ======")
                 print(*translate_cadp(out, info), sep="", end="")
-                print(f"========================")
+                print("========================")
             return ExitStatus.SUCCESS
         except CalledProcessError as err:
             self.verbose_output(err.output.decode(), "Backend output")
@@ -286,4 +290,24 @@ class Cadp(Backend):
         return check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
 
 
-ALL_BACKENDS = {clz.__name__.lower(): clz for clz in (Cbmc, Cseq, Esbmc, Cadp)}
+class Cadp(CadpLegacy):
+    def __init__(self, cwd, **kwargs):
+        super().__init__(cwd, **kwargs)
+        self.language = Language.LNT
+
+    def verify(self, fname, info):
+        print(info.properties)
+        print(translate_property(info))
+
+    def simulate(self, fname, info, simulate):
+        """To simulate we simply switch back to the legacy
+        translator (for now)
+        """
+        self.language = Language.LNT_LEGACY
+        super().simulate(fname, info, simulate)
+
+
+ALL_BACKENDS = {
+    **{clz.__name__.lower(): clz for clz in (Cbmc, Cseq, Esbmc, Cadp)},
+    "cadp-legacy": CadpLegacy
+}
