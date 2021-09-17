@@ -23,7 +23,7 @@ def generate_code(file, values, bound, fair, simulate, bv, sync, backend):
         __DIR / Path("labs/LabsTranslate"),
         "--file", file,
         "--bound", str(bound),
-        "--enc", backend.language.value]
+        "--enc", backend.language.value.encoding]
     flags = [
         (fair, "--fair"), (simulate, "--simulation"),
         (not bv, "--no-bitvector"), (sync, "--sync")
@@ -53,7 +53,7 @@ def make_filename(file, values, bound, fair, sync, language):
         "".join(v.replace("=", "") for v in values)) if o != ""]
     if options:
         result = f"{result}_{'_'.join(options)}"
-    return f"{result}.{language.value}"
+    return f"{result}.{language.value.extension}"
 
 
 @click.command()

@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 import os
 import platform
+from collections import namedtuple
 from enum import Enum
 from pathlib import Path
 from subprocess import check_output, CalledProcessError, STDOUT
 from sys import stderr, stdout
+
 from cex import translateCPROVER, translate_cadp
+LanguageInfo = namedtuple("LanguageInfo", ["extension", "encoding"])
 
 
 class Language(Enum):
-    C = "c"
-    LNT = "lnt"
+    C = LanguageInfo(extension="c", encoding="c")
+    LNT = LanguageInfo(extension="lnt", encoding="lnt")
+    LNT_LEGACY = LanguageInfo(extension="lnt", encoding="lnt-legacy")
 
 
 class ExitStatus(Enum):
