@@ -186,9 +186,10 @@ class Variable:
     """Representation of a single variable
     """
 
-    def __init__(self, index, name, init):
+    def __init__(self, index, name, init, store="e"):
         self.index = int(index)
         self.size = 1
+        self.store = store
         visitor = LabsExprVisitor(self.index)
         if "[" in name:
             self.name, size = name.split("[")
@@ -251,13 +252,13 @@ class Agent:
             for txt in iface.split(";"):
                 splitted = txt.split("=")
                 index, text = splitted[0], splitted[1:]
-                self.iface[int(index)] = Variable(int(index), *text)
+                self.iface[int(index)] = Variable(int(index), *text, "i")
 
         if lstig != "":
             for txt in lstig.split(";"):
                 splitted = txt.split("=")
                 index, text = splitted[0], splitted[1:]
-                self.lstig[int(index)] = Variable(int(index), *text)
+                self.lstig[int(index)] = Variable(int(index), *text, "lstig")
 
     def __str__(self):
         return self.name
