@@ -26,8 +26,7 @@ def pprint(node):
     if isinstance(node, OfNode):
         return f"{node.var} of {node.agent}"
     if isinstance(node, BinOp):
-        op = "mod" if node.op == "%" else node.op
-        return f"({pprint(node.e1)} {op} {pprint(node.e2)})"
+        return f"({pprint(node.e1)} {node.op} {pprint(node.e2)})"
     elif isinstance(node, BuiltIn):
         return f"{node.fn}({', '.join(pprint(a) for a in node.args)})"
     elif isinstance(node, Nary):
