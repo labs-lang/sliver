@@ -294,16 +294,31 @@ class Cadp(CadpLegacy):
     def __init__(self, cwd, **kwargs):
         super().__init__(cwd, **kwargs)
         self.language = Language.LNT
+        self.args = ["evaluator4", "-diag"]
+        self.debug_args = ["evaluator4", "-verbose", "-diag"]
+
+    def _mcl_fname(self, fname):
+        return f"{fname}.mcl"
 
     def verify(self, fname, info):
-        print(translate_property(info))
+        mcl = translate_property(info)
+        mcl_fname = self._mcl_fname(fname)
+        with open(mcl_fname, "w") as f:
+            f.write(mcl)
+        self.args.append(mcl_fname)
+        self.debug_args.append(mcl_fname)
+        return Backend.verify(self, fname, info)
 
     def simulate(self, fname, info, simulate):
-        """To simulate we simply switch back to the legacy
+        """To simulate, we simply switch back to the legacy
         translator (for now)
         """
         self.language = Language.LNT_LEGACY
         super().simulate(fname, info, simulate)
+
+    def cleanup(self, fname):
+        super().cleanup(fname)
+        super()._safe_remove([self._mcl_fname(fname)])
 
 
 ALL_BACKENDS = {
