@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 from atlas.atlas import get_formula, pprint
+from info import Variable
 
 
 def sprint_predicate(params, body):
@@ -10,36 +11,70 @@ macro Predicate({", ".join(params)}) =
 end_macro
 """
 
+def BOX(s):
+    return f"[{s}]"
 
-def sprint_assign(varname, binds_to="v"):
+
+def DIAMOND(s):
+    return f"<{s}>"
+
+
+def sprint_assign(varname, info, binds_to="v"):
     var, agent_id = varname.rsplit("_", 1)
-    return f"""{{assign !{agent_id} !"{var}" ?{binds_to}:Int ...}}"""
+    var_info = info.lookup_var(var)
+    label = "attr" if var_info.store == "i" else var_info.store
+    return f"""{{{label} !{agent_id} !{var_info.index} ?{binds_to}:Int ...}}"""
 
 
 def irrelevant(var, varnames):
     return " and ".join(f"""({var} <> "{v}")""" for v in varnames)
 
 
-def preprocess(params, prefix):
+def preprocess(params, prefix, info):
     varnames = set(p.rsplit("_", 1)[0] for p in params)
-    inits = [sprint_assign(p, f"{prefix}_{p}") for p in params]
+    inits = [sprint_assign(p, info, f"{prefix}_{p}") for p in params]
     nu_params = [f"{p}:Int={prefix}_{p}" for p in params]
     return varnames, inits, nu_params
 
 
-def update_clauses(params, fn, box_or_diamond):
+def update_clauses(params, info, fn, box_or_diamond):
     def params_replace(params, index, repl):
         return [p if i != index else repl for i, p in enumerate(params)]
-    left = box_or_diamond
-    right = {"[": "]", "<": ">"}[left]
     return (
-        f"{left}{sprint_assign(p)}{right} "
+        f"{box_or_diamond(sprint_assign(p, info))}"
         f"{fn}({', '.join(params_replace(params, i, 'v'))})"
         for i, p in enumerate(params))
 
 
-def sprint_reach(params):
-    varnames, args_list, args = preprocess(params, "args")
+def sprint_irrelevant(varnames, info, fn, box_or_diamond):
+    """Print a clause matching "irrelevant" transitions
+    (i.e., those that do not affect satisfaction of Predicate).
+    """
+    def filter_(vs):
+        return " and ".join(f"""(x <> {v.index})""" for v in vs)
+
+    var_infos = [info.lookup_var(v) for v in varnames]
+    labels = set("attr" if v.store == "i" else v.store for v in var_infos)
+    other_actions = " and ".join(f"(not {{{lbl} ...}})" for lbl in labels)
+    attrs = {
+        s: [v for v in var_infos if v.store == s]
+        for s in ("i", "lstig", "e")}
+    result = ""
+    if labels:
+        result += other_actions
+    if attrs["i"]:
+        result += f" or {{attr ?any ?x:Nat ... where ({filter_(attrs['i'])})}}"  # noqa: E501
+    if attrs["lstig"]:
+        result += f" or {{lstig ?any ?x:Nat ... where ({filter_(attrs['lstig'])})}}"  # noqa: E501
+    if attrs["e"]:
+        result += f" or {{e ?any ?x:Nat ... where ({filter_(attrs['e'])})}}"  # noqa: E501
+    if labels:
+        print(f"({box_or_diamond(result)} {fn})")
+        return f"({box_or_diamond(result)} {fn})"
+
+
+def sprint_reach(params, info):
+    varnames, args_list, args = preprocess(params, "args", info)
 
     mcl_or = "\n    or\n    "
 
@@ -50,15 +85,22 @@ mu R ({", ".join(args)}) . (
     or
     ((<"SPURIOUS"> true) and ([not "SPURIOUS"] false))
     or
-    <not {{assign ...}} or {{assign ?any ?x:string ... where ({irrelevant("x", varnames)})}}> R({", ".join(params)}) 
+    {sprint_irrelevant(varnames, info, f"R({', '.join(params)})", DIAMOND)}
     or
-    {mcl_or.join(update_clauses(params, "R", "<"))})
+    {mcl_or.join(update_clauses(params, info, "R", DIAMOND))})
 end_macro
 """
 
 
-def sprint_invariant(params, name="Predicate", short_circuit=None):
-    varnames, inits, nu_params = preprocess(params, "init")
+def sprint_call(params, info, name):
+    _, inits, _ = preprocess(params, "init", info)
+    return f"""
+[{" . ".join(inits)}]
+{name}({", ".join(params)})
+"""
+
+def sprint_invariant(params, info, name="Predicate", short_circuit=None):
+    varnames, inits, nu_params = preprocess(params, "init", info)
 
     mcl_and = "\n    and\n    "
     short_circuit = (
@@ -70,13 +112,12 @@ def sprint_invariant(params, name="Predicate", short_circuit=None):
 [{" . ".join(inits)}]
 nu Inv ({", ".join(nu_params)}) . (
     {name}({", ".join(params)})
+    and (
+    {short_circuit}{"(" if short_circuit else ""}
+    {sprint_irrelevant(varnames, info, f"Inv({', '.join(params)})", BOX)}
     and
-    (
-    {short_circuit}
-    ([not {{assign ...}} or {{assign ?any ?x:string ... where ({irrelevant("x", varnames)})}}] Inv({", ".join(params)})
-    and
-    {mcl_and.join(update_clauses(params, "Inv", "["))}))
-)
+    {mcl_and.join(update_clauses(params, info, "Inv", BOX))}))
+{")" if short_circuit else ""})
 """
 
 
@@ -87,13 +128,16 @@ def translate_property(info):
     formula, new_vars, modality = get_formula(info)
     result = sprint_predicate(sorted(new_vars), pprint(formula))
     if modality == "always":
-        result += sprint_invariant(sorted(new_vars))
-    elif modality in ("finally", "fairly"):
-        result += sprint_reach(sorted(new_vars))
-        result += sprint_invariant(sorted(new_vars), "Reach", short_circuit="Predicate")  # noqa: E501
-    elif modality in ("fairly_inf"):
-        result += sprint_reach(sorted(new_vars))
-        result += sprint_invariant(sorted(new_vars), "Reach")  # noqa: E501
+        result += sprint_invariant(sorted(new_vars), info)
+    elif modality == "finally":
+        result += sprint_reach(sorted(new_vars), info)
+        result += sprint_call(sorted(new_vars), info, "Reach")
+    elif modality == "fairly":
+        result += sprint_reach(sorted(new_vars), info)
+        result += sprint_invariant(sorted(new_vars), info, "Reach", short_circuit="Predicate")  # noqa: E501
+    elif modality == "fairly_inf":
+        result += sprint_reach(sorted(new_vars), info)
+        result += sprint_invariant(sorted(new_vars), info, "Reach")  # noqa: E501
     else:
         raise Exception(f"Unrecognized modality {modality}")
 
