@@ -296,7 +296,6 @@ class Cadp(CadpLegacy):
         self.language = Language.LNT
 
     def verify(self, fname, info):
-        print(info.properties)
         print(translate_property(info))
 
     def simulate(self, fname, info, simulate):
