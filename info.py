@@ -89,6 +89,23 @@ class Info(object):
             props=props,
             raw=txt)
 
+    def lookup_var(self, name):
+        """Finds a variable by name"""
+        def _lookup(store):
+            match = [store[x] for x in store if store[x].name == name] or None
+            return match[0] if match else None
+
+        match = _lookup(self.e)
+        if match:
+            return match
+        match = _lookup(self.i)
+        if match:
+            return match
+        match = _lookup(self.lstig)
+        if match:
+            return match
+        raise KeyError
+
     def pprint_var(self, store, key):
         v = get_var(store, key)
         if v.is_array:
