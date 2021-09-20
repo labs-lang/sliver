@@ -72,7 +72,7 @@ class Info(object):
         for c in spawn.values():
             self.i.update(c.iface)
             self.lstig.update(c.lstig)
-        self.e = e
+        self.e = {i: v for i, v in enumerate(e)}
         self.raw = raw
 
     @staticmethod
@@ -117,7 +117,7 @@ class Info(object):
             ]
 
         TYPE = "short"
-        out = [fmt("E", x) for x in self.e]
+        out = [fmt("E", x) for x in self.e.values()]
         for (low, up), agent in self.spawn.items():
             i_length = len(agent.iface)
             out.extend(
