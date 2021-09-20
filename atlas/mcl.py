@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
-from atlas.atlas import get_formula, pprint
-from info import Variable
+from itertools import repeat
+from atlas.atlas import get_formula, OfNode, BinOp, Nary, BuiltIn
 
 
 def sprint_predicate(params, body):
@@ -10,6 +10,7 @@ macro Predicate({", ".join(params)}) =
     {body}
 end_macro
 """
+
 
 def BOX(s):
     return f"[{s}]"
@@ -22,7 +23,7 @@ def DIAMOND(s):
 def sprint_assign(varname, info, binds_to="v"):
     var, agent_id = varname.rsplit("_", 1)
     var_info = info.lookup_var(var)
-    label = "attr" if var_info.store == "i" else var_info.store
+    label = "ATTR" if var_info.store == "i" else var_info.store.upper()
     return f"""{{{label} !{agent_id} !{var_info.index} ?{binds_to}:Int ...}}"""
 
 
@@ -33,7 +34,7 @@ def irrelevant(var, varnames):
 def preprocess(params, prefix, info):
     varnames = set(p.rsplit("_", 1)[0] for p in params)
     inits = [sprint_assign(p, info, f"{prefix}_{p}") for p in params]
-    nu_params = [f"{p}:Int={prefix}_{p}" for p in params]
+    nu_params = [f"{p}:Int:={prefix}_{p}" for p in params]
     return varnames, inits, nu_params
 
 
@@ -98,8 +99,13 @@ def sprint_call(params, info, name):
 {name}({", ".join(params)})
 """
 
+
 def sprint_invariant(params, info, name="Predicate", short_circuit=None):
     varnames, inits, nu_params = preprocess(params, "init", info)
+    # We must capture irrelevant initializations,
+    # otherwise we will get a vacuous pass
+    irrelevants = f"{sprint_irrelevant(varnames,info, '', lambda x: x)}*"  # noqa: E501
+    inits = [x for y in zip(repeat(irrelevants), inits) for x in y]
 
     mcl_and = "\n    and\n    "
     short_circuit = (
@@ -111,13 +117,32 @@ def sprint_invariant(params, info, name="Predicate", short_circuit=None):
 [{" . ".join(inits)}]
 nu Inv ({", ".join(nu_params)}) . (
     {name}({", ".join(params)})
-    and (
+    and
     {short_circuit}{"(" if short_circuit else ""}
     {sprint_irrelevant(varnames, info, f"Inv({', '.join(params)})", BOX)}
     and
-    {mcl_and.join(update_clauses(params, info, "Inv", BOX))}))
+    {mcl_and.join(update_clauses(params, info, "Inv", BOX))}
 {")" if short_circuit else ""})
 """
+
+
+def pprint_mcl(node):
+    if isinstance(node, OfNode):
+        # Should never happen, since node should be the result
+        # of get_formula() and thus have no quantified variables.
+        raise Exception(f"Unexpected {node}")
+    if isinstance(node, BinOp):
+        op = {
+            "%": "mod",
+            "!=": "<>"
+        }.get(node.op) or node.op
+        return f"({pprint_mcl(node.e1)} {op} {pprint_mcl(node.e2)})"
+    elif isinstance(node, BuiltIn):
+        return f"{node.fn}({', '.join(pprint_mcl(a) for a in node.args)})"
+    elif isinstance(node, Nary):
+        return "({})".format(f" {node.fn} ".join(pprint_mcl(a) for a in node.args))  # noqa: E501
+    else:
+        return node
 
 
 def translate_property(info):
@@ -125,7 +150,7 @@ def translate_property(info):
     and translate it into MCL.
     """
     formula, new_vars, modality = get_formula(info)
-    result = sprint_predicate(sorted(new_vars), pprint(formula))
+    result = sprint_predicate(sorted(new_vars), pprint_mcl(formula))
     if modality == "always":
         result += sprint_invariant(sorted(new_vars), info)
     elif modality == "finally":
