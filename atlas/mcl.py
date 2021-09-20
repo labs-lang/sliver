@@ -69,7 +69,6 @@ def sprint_irrelevant(varnames, info, fn, box_or_diamond):
     if attrs["e"]:
         result += f" or {{e ?any ?x:Nat ... where ({filter_(attrs['e'])})}}"  # noqa: E501
     if labels:
-        print(f"({box_or_diamond(result)} {fn})")
         return f"({box_or_diamond(result)} {fn})"
 
 
