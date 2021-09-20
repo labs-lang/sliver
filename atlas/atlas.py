@@ -4,17 +4,17 @@ from collections import namedtuple
 
 from pyparsing import (
     alphanums, alphas, Combine, delimitedList, Forward, Group, infixNotation,
-    Keyword, oneOf, opAssoc, Suppress, Word)
+    Keyword, oneOf, opAssoc, Optional, Suppress, Word)
 from pyparsing import pyparsing_common as ppc
 
-LPAR, RPAR, COMMA = map(Suppress, "(),")
+LPAR, RPAR, LBRAK, RBRAK, COMMA = map(Suppress, "()[],")
 kws = oneOf("and or not id true false forall exists")
 BUILTIN = oneOf("abs max min not")
 VARNAME = Word(alphas.lower(), alphanums + "_").ignore(kws)
 TYPENAME = Word(alphas.upper(), alphanums + "_").ignore(kws)
 
 # AST nodes for ATLAS properties
-OfNode = namedtuple("Of", ["var", "agent"])
+OfNode = namedtuple("Of", ["var", "offset", "agent"])
 BinOp = namedtuple("BinOp", ["e1", "op", "e2"])
 BuiltIn = namedtuple("BuiltIn", ["fn", "args"])
 Nary = namedtuple("Nary", ["fn", "args"])
@@ -38,10 +38,11 @@ def pprint(node):
 
 EXPR = Forward()
 BEXPR = Forward()
+OFFSET = LBRAK + EXPR + RBRAK
 
 EXPRATOM = (
     ppc.signed_integer |
-    (VARNAME + Keyword("of").suppress() + VARNAME).setParseAction(lambda toks: OfNode(*toks)) |  # noqa: E501
+    (VARNAME + Optional(OFFSET, default=None) + Keyword("of").suppress() + VARNAME).setParseAction(lambda toks: OfNode(*toks)) |  # noqa: E501
     (Combine(BUILTIN + LPAR) + Group(delimitedList(EXPR)) + RPAR).setParseAction(lambda toks: BuiltIn(*toks))  # noqa: E501
 )
 
@@ -107,7 +108,7 @@ def remove_quant(formula, quant, var, agents):
 
 
 def get_formula(info):
-    """Extract the 1st property in info.properties and 
+    """Extract the 1st property in info.properties and
     turn it into a propositional formula (via quantifier elimination.)
 
     Return: the propositional formula, the set of variables introduced
