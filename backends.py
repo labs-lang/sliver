@@ -319,14 +319,14 @@ class Cadp(CadpMonitor):
             f.write(mcl)
         self.args.append(mcl_fname)
         self.debug_args.append(mcl_fname)
+        self.verbose_output(mcl, "MCL property", file=stderr)
         return Backend.verify(self, fname, info)
 
-    def simulate(self, fname, info, simulate):
-        """To simulate, we simply switch back to the legacy
-        translator (for now)
-        """
-        self.language = Language.LNT_LEGACY
-        super().simulate(fname, info, simulate)
+    def handle_success(self, out, info) -> ExitStatus:
+        result = super().handle_success(out, info)
+        if "\nFALSE\n" in out and "evaluator.bcg" not in out:
+            print("<property violated>")
+        return result
 
     def cleanup(self, fname):
         super().cleanup(fname)
