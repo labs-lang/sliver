@@ -23,7 +23,9 @@ def DIAMOND(s):
 def sprint_assign(varname, info, binds_to="v"):
     var, agent_id = varname.rsplit("_", 1)
     var_info = info.lookup_var(var)
-    label = "ATTR" if var_info.store == "i" else var_info.store.upper()
+    label = {
+        "i": "ATTR", "lstig": "L", "e": "E"
+    }[var_info.store]
     return f"""{{{label} !{agent_id} !{var_info.index} ?{binds_to}:Int ...}}"""
 
 
@@ -42,8 +44,8 @@ def update_clauses(params, info, fn, box_or_diamond):
     def params_replace(params, index, repl):
         return [p if i != index else repl for i, p in enumerate(params)]
     return (
-        f"{box_or_diamond(sprint_assign(p, info))}"
-        f"{fn}({', '.join(params_replace(params, i, 'v'))})"
+        f"({box_or_diamond(sprint_assign(p, info))}"
+        f"{fn}({', '.join(params_replace(params, i, 'v'))}))"
         for i, p in enumerate(params))
 
 
