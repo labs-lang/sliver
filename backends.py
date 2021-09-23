@@ -16,7 +16,7 @@ LanguageInfo = namedtuple("LanguageInfo", ["extension", "encoding"])
 class Language(Enum):
     C = LanguageInfo(extension="c", encoding="c")
     LNT = LanguageInfo(extension="lnt", encoding="lnt")
-    LNT_LEGACY = LanguageInfo(extension="lnt", encoding="lnt-legacy")
+    LNT_MONITOR = LanguageInfo(extension="lnt", encoding="lnt-monitor")
 
 
 class ExitStatus(Enum):
@@ -204,13 +204,17 @@ class Esbmc(Backend):
             "--no-unwinding-assertions", "--z3"]
 
 
-class CadpLegacy(Backend):
+class CadpMonitor(Backend):
+    """The CADP-based workflow presented in the paper
+    "Combining SLiVER with CADP to Analyze Multi-agent Systems"
+    (COORDINATION, 2020).
+    """
     def __init__(self, cwd, **kwargs):
         super().__init__(cwd, **kwargs)
         self.command = "lnt.open"
         self.args = ["evaluator", "-diag"]
         self.debug_args = ["evaluator", "-verbose", "-diag"]
-        self.language = Language.LNT_LEGACY
+        self.language = Language.LNT_MONITOR
 
     def check_cadp(self):
         try:
@@ -290,10 +294,18 @@ class CadpLegacy(Backend):
         return check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
 
 
-class Cadp(CadpLegacy):
+class Cadp(CadpMonitor):
+    """The CADP-based workflow presented in the paper
+    "Verifying temporal properties of stigmergic collective systems using CADP"
+    (ISoLA, 2021).
+    """
     def __init__(self, cwd, **kwargs):
         super().__init__(cwd, **kwargs)
-        self.language = Language.LNT
+        # Fall back to "monitor" ancoding for simulation
+        self.language = (
+            Language.LNT_MONITOR
+            if kwargs.get("steps")
+            else Language.LNT)
         self.args = ["evaluator4", "-diag"]
         self.debug_args = ["evaluator4", "-verbose", "-diag"]
 
@@ -323,5 +335,5 @@ class Cadp(CadpLegacy):
 
 ALL_BACKENDS = {
     **{clz.__name__.lower(): clz for clz in (Cbmc, Cseq, Esbmc, Cadp)},
-    "cadp-legacy": CadpLegacy
+    "cadp-monitor": CadpMonitor
 }
