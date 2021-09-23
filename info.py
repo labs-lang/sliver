@@ -109,7 +109,7 @@ class Info(object):
     def pprint_var(self, store, key):
         v = get_var(store, key)
         if v.is_array:
-            return "{}[{}]".format(v.name, key - v.index)
+            return f"{v.name}[{key - v.index}]"
         else:
             return v.name
 

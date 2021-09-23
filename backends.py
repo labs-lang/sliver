@@ -234,7 +234,6 @@ class CadpMonitor(Backend):
     def verify(self, fname, info):
         if not(self.check_cadp()):
             return ExitStatus.BACKEND_ERROR
-        # TODO fix this for new --info output format
         modality = info.properties[0].split()[0]
         mcl = "fairly.mcl" if modality == "finally" else "never.mcl"
         mcl = str(Path("cadp") / Path(mcl))

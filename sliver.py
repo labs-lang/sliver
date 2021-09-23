@@ -118,7 +118,7 @@ VALUES -- assign values for parameterised specification (key=value)
             status = None
             sim_or_verify = "Running simulation" if simulate else "Verifying"
             print(
-                "{} with backend {}...".format(sim_or_verify, backend_arg),
+                f"{sim_or_verify} with backend {backend_arg}...",
                 file=sys.stderr)
             status = (backend.simulate(fname, info, simulate) if simulate else
                       backend.verify(fname, info))

@@ -14,13 +14,13 @@ def get(kwargs: Dict, arg: Args):
     return kwargs[arg.value]
 
 
-LONGDESCR = """
-* * * {} - {} v{} ({}) * * *
+LONGDESCR = f"""
+* * * {__title__.lower()} - {__summary__} v{__version__} ({__date__}) * * *
 
 FILE -- path of LABS file to analyze
 
 VALUES -- assign values for parameterised specification (key=value)
-""".format(__title__.lower(), __summary__, __version__, __date__)
+"""
 
 HELPMSG = {
     "backend": "Backend to use in verification mode.",
