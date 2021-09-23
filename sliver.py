@@ -81,7 +81,7 @@ def make_filename(file, values, bound, fair, sync, language):
 @click.option('--verbose', **DEFAULTS("verbose", default=False, is_flag=True))
 def main(file, backend_arg, fair, simulate, show, values, **kwargs):
     """
-* * *  SLiVER - Symbolic LAbS VERification. v1.7 (July 2021) * * *
+* * *  The SLiVER LAbS VERification tool. v2.0-PREVIEW (September 2021) * * *
 
 FILE -- path of LABS file to analyze
 
