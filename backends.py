@@ -95,7 +95,7 @@ class Backend:
             return self.handle_error(err, fname, info)
 
     def verbose_output(self, output, decorate=None, file=stdout):
-        if self.kwargs.get("verbose"):
+        if self.kwargs.get("verbose") or self.kwargs.get("debug"):
             if decorate:
                 print(
                     f"------{decorate}:------",
