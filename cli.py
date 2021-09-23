@@ -47,7 +47,7 @@ HELPMSG = {
         "If 0, run in verification mode."),
 
     "steps": (
-        "Number of system evolutions."
+        "Number of system evolutions. "
         "If 0, generate an unbounded system."),
 
     "sync": "Force synchronous stigmergy messages.",

@@ -29,15 +29,17 @@ class ExitStatus(Enum):
     KILLED = 130
 
     @staticmethod
-    def format(code) -> str:
+    def format(code, simulate=False) -> str:
+        task = "Simulation" if simulate else "Verification"
         return {
-            ExitStatus.SUCCESS: "Verification succesful.",
+            ExitStatus.SUCCESS:
+                "Done." if simulate else "Verification successful.",
             ExitStatus.BACKEND_ERROR: "Backend failed.",
             ExitStatus.INVALID_ARGS: "Invalid arguments.",
             ExitStatus.PARSING_ERROR: "Could not parse input file.",
-            ExitStatus.FAILED: "Verification failed.",
-            ExitStatus.TIMEOUT: "Verification stopped (timeout).",
-            ExitStatus.KILLED: "\nVerification stopped (keyboard interrupt)."
+            ExitStatus.FAILED: f"{task} failed.",
+            ExitStatus.TIMEOUT: f"{task} stopped (timeout).",
+            ExitStatus.KILLED: f"\n{task} stopped (keyboard interrupt)."
         }.get(code, f"Unexpected exit code {code.value}")
 
 

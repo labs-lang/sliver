@@ -101,7 +101,7 @@ VALUES -- assign values for parameterised specification (key=value)
     except CalledProcessError as e:
         if kwargs.get("debug"):
             print(e, file=sys.stderr)
-        print(ExitStatus.format(ExitStatus.PARSING_ERROR))
+        print(ExitStatus.format(ExitStatus.PARSING_ERROR, simulate))
         sys.exit(ExitStatus.PARSING_ERROR.value)
     info = info.decode().replace("\n", "|")[:-1]
     if kwargs.get("debug"):
@@ -130,7 +130,7 @@ VALUES -- assign values for parameterised specification (key=value)
                 if status == ExitStatus.SUCCESS and simulate:
                     print("Done.")
                 else:
-                    print(ExitStatus.format(status))
+                    print(ExitStatus.format(status, simulate))
                 sys.exit(status.value)
 
 
