@@ -67,10 +67,9 @@ def make_filename(file, values, bound, fair, sync, language):
 @click.version_option(__version__, prog_name=__title__.lower())
 @click.argument('file', required=True, type=click.Path(exists=True))
 @click.argument('values', nargs=-1)
-@click.option(
-    '--backend', "backend_arg",
-    type=click.Choice(tuple(ALL_BACKENDS.keys())),
-    default="cbmc", **DEFAULTS("backend"))
+@click.option('--backend', "backend_arg",
+              type=click.Choice(tuple(ALL_BACKENDS.keys())),
+              default="cbmc", **DEFAULTS("backend"))
 @click.option('--debug', **DEFAULTS("debug", default=False, is_flag=True))
 @click.option('--fair/--no-fair', **DEFAULTS("fair", default=False))
 @click.option('--bv/--no-bv', **DEFAULTS("bitvector", default=True))
@@ -86,7 +85,7 @@ def make_filename(file, values, bound, fair, sync, language):
 @click.option('--no-properties', **DEFAULTS("no-properties", default=False, is_flag=True))  # noqa: E501
 @click.option('--property', **DEFAULTS("property"))  # noqa: E501
 def main(file, backend_arg, fair, simulate, show, values, **kwargs):
-    """
+    """\b
 * * *  The SLiVER LAbS VERification tool. v2.0-PREVIEW (September 2021) * * *
 
 FILE -- path of LABS file to analyze
