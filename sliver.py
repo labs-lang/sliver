@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import logging
 import sys
 from subprocess import CalledProcessError
 from pathlib import Path
@@ -11,6 +12,7 @@ from backends import ALL_BACKENDS, ExitStatus
 from __about__ import __title__, __version__
 
 __DIR = Path(__file__).parent.resolve()
+log = logging.getLogger("sliver")
 
 
 @click.command()
@@ -46,29 +48,31 @@ VALUES -- assign values for parameterised specification (key=value)
         print("Must specify the length of simulation traces (--steps)")
         sys.exit(ExitStatus.INVALID_ARGS.value)
 
-    print("Encoding...", file=sys.stderr)
-    print(kwargs)
+    logging.basicConfig(
+        format="[%(levelname)s:%(name)s] %(message)s",
+        level=logging.DEBUG if kwargs["verbose"] else logging.INFO
+    )
+
+    log.info("Encoding...")
+
+    log.debug(f"{backend_arg=}, {simulate=}, {show=}, {kwargs=}")
     backend = ALL_BACKENDS[backend_arg](__DIR, **kwargs)
     try:
         fname, info = backend.generate_code(file, simulate, show)
     except CalledProcessError as e:
-        if kwargs.get("debug"):
-            print(e, file=sys.stderr)
+        log.debug(e)
         print(ExitStatus.format(ExitStatus.PARSING_ERROR, simulate))
         sys.exit(ExitStatus.PARSING_ERROR.value)
     if fname and show:
-        sys.exit(0)
+        sys.exit(ExitStatus.SUCCESS.value)
     info = info.decode().replace("\n", "|")[:-1]
-    if kwargs.get("debug"):
-        print("[DEBUG]", info, file=sys.stderr)
+    log.debug(f"{info=}")
     info = Info.parse(info)
     if fname:
         try:
             status = None
             sim_or_verify = "Running simulation" if simulate else "Verifying"
-            print(
-                f"{sim_or_verify} with backend {backend_arg}...",
-                file=sys.stderr)
+            log.info(f"{sim_or_verify} with backend {backend_arg}...")
             status = (backend.simulate(fname, info, simulate) if simulate else
                       backend.verify(fname, info))
         except KeyboardInterrupt:

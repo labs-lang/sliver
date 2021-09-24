@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import logging
 import os
 import platform
 import re
@@ -6,13 +7,13 @@ from collections import namedtuple
 from enum import Enum
 from pathlib import Path
 from subprocess import check_output, CalledProcessError, STDOUT
-from sys import stderr, stdout
 
 from info import raw_info
 from cex import translateCPROVER, translate_cadp
 from atlas.mcl import translate_property
 
 LanguageInfo = namedtuple("LanguageInfo", ["extension", "encoding"])
+log = logging.getLogger('backend')
 
 
 class Language(Enum):
@@ -62,7 +63,7 @@ class Backend:
     def _safe_remove(self, files):
         for f in files:
             try:
-                self.verbose_output(f"Removing {f}...", file=stderr)
+                log.debug(f"Removing {f}...")
                 os.remove(f)
             except FileNotFoundError:
                 pass
@@ -132,7 +133,7 @@ class Backend:
     def simulate(self, fname, info, simulate):
         """Returns random executions of the program at fname.
         """
-        print("This backend does not support simulation.", file=stderr)
+        print("This backend does not support simulation.")
         return ExitStatus.BACKEND_ERROR
 
     def verify(self, fname, info):
@@ -143,7 +144,7 @@ class Backend:
         if self.kwargs.get("timeout", 0) > 0:
             cmd = [self.timeout_cmd, str(self.kwargs["timeout"]), *cmd]
         try:
-            self.verbose_output(f"Backend call: {' '.join(cmd)}", file=stderr)
+            log.debug(f"Executing {' '.join(cmd)}")
             out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
             self.verbose_output(out, "Backend output")
             return self.handle_success(out, info)
@@ -151,16 +152,14 @@ class Backend:
             self.verbose_output(err.output.decode(), "Backend output")
             return self.handle_error(err, fname, info)
 
-    def verbose_output(self, output, decorate=None, file=stdout):
-        if self.kwargs.get("verbose") or self.kwargs.get("debug"):
-            if decorate:
-                print(
-                    f"------{decorate}:------",
-                    output,
-                    "---------------------------",
-                    sep="\n", file=file)
-            else:
-                print(output, file=file)
+    def verbose_output(self, output, decorate=None):
+        if decorate:
+            log.debug(f"""
+------{decorate}:------
+{output}
+---------------------------""")
+        else:
+            log.debug(output)
 
     def handle_success(self, out, info) -> ExitStatus:
         return ExitStatus.SUCCESS
@@ -198,7 +197,7 @@ class Cbmc(Backend):
             print(*translateCPROVER(out, fname, info), sep="", end="")
             return ExitStatus.FAILED
         elif err.returncode == 6:
-            print("Backend failed with parsing error.", file=stderr)
+            print("Backend failed with parsing error.")
             return ExitStatus.BACKEND_ERROR
         else:
             return super().handle_error(err, fname, info)
@@ -241,7 +240,7 @@ class Cseq(Backend):
             print(*translateCPROVER(out, fname, info, 19), sep="", end="")
             return ExitStatus.FAILED
         elif err.returncode == 6:
-            print("Backend failed with parsing error.", file=stderr)
+            log.info("Backend failed with parsing error.")
             return ExitStatus.BACKEND_ERROR
         else:
             return super().handle_error(err, fname, info)
@@ -278,12 +277,11 @@ class CadpMonitor(Backend):
             cmd = ["cadp_lib", "caesar"]
             check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
             return True
-        except CalledProcessError:
-            print(
-                "Error: CADP not found or invalid license file. ",
+        except (CalledProcessError, FileNotFoundError):
+            log.error(
+                "CADP not found or invalid license file. "
                 "Please, visit https://cadp.inria.fr "
-                "to obtain a valid license.",
-                sep='\n', file=stderr)
+                "to obtain a valid license.")
             return False
 
     def verify(self, fname, info):
@@ -307,8 +305,7 @@ class CadpMonitor(Backend):
 
         try:
             for i in range(simulate):
-                self.verbose_output(
-                    f"Backend call: {' '.join(cmd)}", file=stderr)
+                self.verbose_output(f"Executing {' '.join(cmd)}")
                 out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
                 self.verbose_output(out, "Backend output")
                 print(f"====== Trace #{i+1} ======")
@@ -369,13 +366,15 @@ class Cadp(CadpMonitor):
         return f"{fname}.mcl"
 
     def verify(self, fname, info):
+        if not(self.check_cadp()):
+            return ExitStatus.BACKEND_ERROR
         mcl = translate_property(info)
         mcl_fname = self._mcl_fname(fname)
         with open(mcl_fname, "w") as f:
             f.write(mcl)
         self.args.append(mcl_fname)
         self.debug_args.append(mcl_fname)
-        self.verbose_output(mcl, "MCL property", file=stderr)
+        self.verbose_output(mcl, "MCL property")
         return Backend.verify(self, fname, info)
 
     def handle_success(self, out, info) -> ExitStatus:
