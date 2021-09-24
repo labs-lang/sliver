@@ -15,7 +15,8 @@ from __about__ import __title__, __version__
 __DIR = Path(__file__).parent.resolve()
 
 
-def generate_code(file, values, bound, fair, simulate, bv, sync, backend):
+def generate_code(file, values, bound, fair, simulate, bv, sync, backend,
+                  prop, no_properties):
     """Craft and execute a call to LabsTranslate
     """
     # This was needed in the old dotnet core 3 times
@@ -29,12 +30,15 @@ def generate_code(file, values, bound, fair, simulate, bv, sync, backend):
         "--enc", backend.language.value.encoding]
     flags = [
         (fair, "--fair"), (simulate, "--simulation"),
-        (not bv, "--no-bitvector"), (sync, "--sync")
+        (not bv, "--no-bitvector"), (sync, "--sync"),
+        (prop, "--property"), (prop, prop),
+        (no_properties, "--no-properties")
     ]
     call.extend(b for a, b in flags if a)
 
     if values:
         call.extend(["--values", *values])
+
 
     try:
         out = check_output(call, env=env).decode("utf-8")
@@ -79,6 +83,8 @@ def make_filename(file, values, bound, fair, sync, language):
 @click.option('--from', **DEFAULTS("from", type=int))
 @click.option('--to', **DEFAULTS("to", type=int))
 @click.option('--verbose', **DEFAULTS("verbose", default=False, is_flag=True))
+@click.option('--no-properties', **DEFAULTS("no-properties", default=False, is_flag=True))  # noqa: E501
+@click.option('--property', **DEFAULTS("property"))  # noqa: E501
 def main(file, backend_arg, fair, simulate, show, values, **kwargs):
     """
 * * *  The SLiVER LAbS VERification tool. v2.0-PREVIEW (September 2021) * * *
@@ -97,7 +103,8 @@ VALUES -- assign values for parameterised specification (key=value)
     try:
         code, fname, info = generate_code(
             file, values, kwargs["steps"], fair,
-            simulate, kwargs["bv"], kwargs["sync"], backend)
+            simulate, kwargs["bv"], kwargs["sync"], backend,
+            kwargs["property"], kwargs["no_properties"])
     except CalledProcessError as e:
         if kwargs.get("debug"):
             print(e, file=sys.stderr)

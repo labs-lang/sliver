@@ -37,6 +37,9 @@ HELPMSG = {
 
     "from": "Parallel analysis: partition start.",
 
+    "property": "Property to consider, others will be ignored.",
+    
+    "no-properties": "Ignore all properties.",
 
     "show": "Print emulation program and exit.",
 
