@@ -15,7 +15,7 @@ def get(kwargs: Dict, arg: Args):
 
 
 LONGDESCR = f"""
-* * * {__title__.lower()} - {__summary__} v{__version__} ({__date__}) * * *
+* * * {__title__.lower()}. {__summary__} v{__version__} ({__date__}) * * *
 
 FILE -- path of LABS file to analyze
 
@@ -25,10 +25,9 @@ VALUES -- assign values for parameterised specification (key=value)
 HELPMSG = {
     "backend": "Backend to use in verification mode.",
 
-    "bitvector":
-        "Enable bitvector optimization where supported",
+    "bitvector": "Enable bitvector optimization where supported.",
 
-    "cores": "Number of CPU cores for parallel analysis",
+    "cores": "Number of CPU cores for parallel analysis.",
 
     "debug": "Enable additional checks in the backend.",
 
@@ -36,9 +35,8 @@ HELPMSG = {
 
     "fair": "Enforce fair interleaving of components.",
 
-    "from": (
-        "Parallel analysis: partition start"
-    ),
+    "from": "Parallel analysis: partition start.",
+
 
     "show": "Print emulation program and exit.",
 
@@ -53,12 +51,10 @@ HELPMSG = {
     "sync": "Force synchronous stigmergy messages.",
 
     "timeout": (
-        "Configure time limit (seconds)."
+        "Configure time limit (seconds). "
         "Set to 0 to disable timeout."),
 
-    "to": (
-        "Parallel analysis: partition end."
-    ),
+    "to": "Parallel analysis: partition end.",
 
     "verbose": "Print additional messages from the backend."
 }
