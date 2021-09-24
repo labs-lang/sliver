@@ -1,66 +1,16 @@
 #!/usr/bin/env python3
-import platform
 import sys
-import re
-from subprocess import check_output, CalledProcessError
+from subprocess import CalledProcessError
 from pathlib import Path
 
 import click
 
-from info import raw_info, Info
+from info import Info
 from cli import DEFAULTS
 from backends import ALL_BACKENDS, ExitStatus
 from __about__ import __title__, __version__
 
 __DIR = Path(__file__).parent.resolve()
-
-
-def generate_code(file, values, bound, fair, simulate, bv, sync, backend,
-                  prop, no_properties):
-    """Craft and execute a call to LabsTranslate
-    """
-    # This was needed in the old dotnet core 3 times
-    env = {"LD_LIBRARY_PATH": "labs/libunwind"} \
-        if "Linux" in platform.system() \
-        else {}
-    call = [
-        __DIR / Path("labs/LabsTranslate"),
-        "--file", file,
-        "--bound", str(bound),
-        "--enc", backend.language.value.encoding]
-    flags = [
-        (fair, "--fair"), (simulate, "--simulation"),
-        (not bv, "--no-bitvector"), (sync, "--sync"),
-        (prop, "--property"), (prop, prop),
-        (no_properties, "--no-properties")
-    ]
-    call.extend(b for a, b in flags if a)
-
-    if values:
-        call.extend(["--values", *values])
-
-
-    try:
-        out = check_output(call, env=env).decode("utf-8")
-        fname = str(__DIR / make_filename(
-            file, values, bound, fair, sync, backend.language))
-        out = backend.preprocess(out, fname)
-        return out, fname, raw_info(call)
-    except CalledProcessError as e:
-        raise e
-
-
-def make_filename(file, values, bound, fair, sync, language):
-    result = "_".join((
-        # turn "file" into a valid identifier ([A-Za-z_][A-Za-z0-9_]+)
-        re.sub(r'\W|^(?=\d)', '_', Path(file).stem),
-        str(bound), ("fair" if fair else "unfair")))
-    options = [o for o in (
-        ("sync" if sync else ""),
-        "".join(v.replace("=", "") for v in values)) if o != ""]
-    if options:
-        result = f"{result}_{'_'.join(options)}"
-    return f"{result}.{language.value.extension}"
 
 
 @click.command()
@@ -84,7 +34,7 @@ def make_filename(file, values, bound, fair, sync, language):
 @click.option('--verbose', **DEFAULTS("verbose", default=False, is_flag=True))
 @click.option('--no-properties', **DEFAULTS("no-properties", default=False, is_flag=True))  # noqa: E501
 @click.option('--property', **DEFAULTS("property"))  # noqa: E501
-def main(file, backend_arg, fair, simulate, show, values, **kwargs):
+def main(file, backend_arg, simulate, show, **kwargs):
     """\b
 * * *  The SLiVER LAbS VERification tool. v2.0-PREVIEW (September 2021) * * *
 
@@ -97,29 +47,22 @@ VALUES -- assign values for parameterised specification (key=value)
         sys.exit(ExitStatus.INVALID_ARGS.value)
 
     print("Encoding...", file=sys.stderr)
-
+    print(kwargs)
     backend = ALL_BACKENDS[backend_arg](__DIR, **kwargs)
     try:
-        code, fname, info = generate_code(
-            file, values, kwargs["steps"], fair,
-            simulate, kwargs["bv"], kwargs["sync"], backend,
-            kwargs["property"], kwargs["no_properties"])
+        fname, info = backend.generate_code(file, simulate, show)
     except CalledProcessError as e:
         if kwargs.get("debug"):
             print(e, file=sys.stderr)
         print(ExitStatus.format(ExitStatus.PARSING_ERROR, simulate))
         sys.exit(ExitStatus.PARSING_ERROR.value)
+    if fname and show:
+        sys.exit(0)
     info = info.decode().replace("\n", "|")[:-1]
     if kwargs.get("debug"):
         print("[DEBUG]", info, file=sys.stderr)
     info = Info.parse(info)
     if fname:
-        if show:
-            print(code)
-            sys.exit(0)
-        else:
-            with open(fname, 'w') as out_file:
-                out_file.write(code)
         try:
             status = None
             sim_or_verify = "Running simulation" if simulate else "Verifying"

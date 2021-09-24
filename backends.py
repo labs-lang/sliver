@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 import os
 import platform
+import re
 from collections import namedtuple
 from enum import Enum
 from pathlib import Path
 from subprocess import check_output, CalledProcessError, STDOUT
 from sys import stderr, stdout
 
+from info import raw_info
 from cex import translateCPROVER, translate_cadp
 from atlas.mcl import translate_property
 
@@ -52,6 +54,7 @@ class Backend:
             self.timeout_cmd = "/usr/local/bin/gtimeout"
         self.cwd = cwd
         self.kwargs = kwargs
+        self.temp_files = []
 
     def cleanup(self, fname):
         self._safe_remove((fname, ))
@@ -63,6 +66,58 @@ class Backend:
                 os.remove(f)
             except FileNotFoundError:
                 pass
+
+    def generate_code(self, file, simulate, show):
+        bound, fair, sync = (
+            str(self.kwargs["steps"]),
+            self.kwargs["fair"],
+            self.kwargs["sync"]
+        )
+
+        def make_filename():
+            result = "_".join((
+                # turn "file" into a valid identifier ([A-Za-z_][A-Za-z0-9_]+)
+                re.sub(r'\W|^(?=\d)', '_', Path(file).stem),
+                str(bound), ("fair" if fair else "unfair")))
+            options = [o for o in (
+                ("sync" if self.kwargs["sync"] else ""),
+                "".join(v.replace("=", "") for v in values)) if o != ""]
+            if options:
+                result = f"{result}_{'_'.join(options)}"
+            return f"{result}.{self.language.value.extension}"
+
+        call = [
+            self.cwd / "labs" / "LabsTranslate",
+            "--file", file,
+            "--bound", bound,
+            "--enc", self.language.value.encoding]
+        flags = [
+            (fair, "--fair"),
+            (simulate, "--simulation"),
+            (not self.kwargs["bv"], "--no-bitvector"),
+            (sync, "--sync"),
+            (self.kwargs["property"], "--property"),
+            (self.kwargs["property"], self.kwargs["property"]),
+            (self.kwargs["no_properties"], "--no-properties")]
+        call.extend(b for a, b in flags if a)
+
+        values = self.kwargs.get("values")
+        if values:
+            call.extend(["--values", *values])
+        try:
+            out = check_output(call).decode("utf-8")
+            fname = str(self.cwd / make_filename())
+            out = self.preprocess(out, fname)
+            if show:
+                print(out)
+                return fname, None
+            else:
+                with open(fname, 'w') as out_file:
+                    out_file.write(out)
+                return fname, raw_info(call)
+
+        except CalledProcessError as e:
+            raise e
 
     def filename_argument(self, fname):
         """Returns a CLI argument for the input file.
