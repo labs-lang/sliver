@@ -58,7 +58,11 @@ class Backend:
         self.temp_files = []
 
     def cleanup(self, fname):
-        self._safe_remove((fname, ))
+        if self.kwargs.get("keep_files"):
+            for f in self.temp_files:
+                log.info(f"Keeping {f}")
+        else:
+            self._safe_remove(self.temp_files)
 
     def _safe_remove(self, files):
         for f in files:
@@ -115,6 +119,7 @@ class Backend:
             else:
                 with open(fname, 'w') as out_file:
                     out_file.write(out)
+                self.temp_files.append(fname)
                 return fname, raw_info(call)
 
         except CalledProcessError as e:
@@ -322,9 +327,9 @@ class CadpMonitor(Backend):
         path = Path(fname)
         aux2 = (str(path.parent / f"{path.stem}.{suffix}") for suffix in
                 ("err", "f", "h", "h.BAK", "lotos", "o", "t"))
-        super().cleanup(fname)
         super()._safe_remove(aux)
         super()._safe_remove(aux2)
+        super().cleanup(fname)
 
     def preprocess(self, code, fname):
         base_name = Path(fname).stem.upper()
@@ -372,6 +377,7 @@ class Cadp(CadpMonitor):
         mcl_fname = self._mcl_fname(fname)
         with open(mcl_fname, "w") as f:
             f.write(mcl)
+        self.temp_files.append(mcl_fname)
         self.args.append(mcl_fname)
         self.debug_args.append(mcl_fname)
         self.verbose_output(mcl, "MCL property")
@@ -385,7 +391,6 @@ class Cadp(CadpMonitor):
 
     def cleanup(self, fname):
         super().cleanup(fname)
-        super()._safe_remove([self._mcl_fname(fname)])
 
 
 ALL_BACKENDS = {

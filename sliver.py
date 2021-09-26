@@ -35,7 +35,8 @@ log = logging.getLogger("sliver")
 @click.option('--to', **DEFAULTS("to", type=int))
 @click.option('--verbose', **DEFAULTS("verbose", default=False, is_flag=True))
 @click.option('--no-properties', **DEFAULTS("no-properties", default=False, is_flag=True))  # noqa: E501
-@click.option('--property', **DEFAULTS("property"))  # noqa: E501
+@click.option('--property', **DEFAULTS("property"))
+@click.option('--keep-files', **DEFAULTS("keep_files", default=False, is_flag=True))  # noqa: E501
 def main(file, backend_arg, simulate, show, **kwargs):
     """\b
 * * *  The SLiVER LAbS VERification tool. v2.0-PREVIEW (September 2021) * * *
