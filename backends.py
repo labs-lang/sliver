@@ -313,9 +313,10 @@ class CadpMonitor(Backend):
                 self.verbose_output(f"Executing {' '.join(cmd)}")
                 out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
                 self.verbose_output(out, "Backend output")
-                print(f"====== Trace #{i+1} ======")
+                header = f"====== Trace #{i+1} ======"
+                print(header)
                 print(*translate_cadp(out, info), sep="", end="")
-                print("========================")
+                print(f'{"" :=<{len(header)}}')
             return ExitStatus.SUCCESS
         except CalledProcessError as err:
             self.verbose_output(err.output.decode(), "Backend output")

@@ -73,6 +73,8 @@ VALUES -- assign values for parameterised specification (key=value)
         try:
             status = None
             sim_or_verify = "Running simulation" if simulate else "Verifying"
+            if not simulate and kwargs.get("property"):
+                sim_or_verify += f""" '{kwargs.get("property")}'"""
             log.info(f"{sim_or_verify} with backend {backend_arg}...")
             status = (backend.simulate(fname, info, simulate) if simulate else
                       backend.verify(fname, info))
