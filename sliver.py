@@ -71,7 +71,12 @@ VALUES -- assign values for parameterised specification (key=value)
     info = Info.parse(info)
     if fname:
         try:
-            status = None
+            status = (
+                ExitStatus.SUCCESS if simulate
+                else backend.check_property_support(info))
+            if status != ExitStatus.SUCCESS:
+                sys.exit(status.value)
+
             sim_or_verify = "Running simulation" if simulate else "Verifying"
             if not simulate and kwargs.get("property"):
                 sim_or_verify += f""" '{kwargs.get("property")}'"""

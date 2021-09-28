@@ -56,6 +56,7 @@ class Backend:
         self.cwd = cwd
         self.kwargs = kwargs
         self.temp_files = []
+        self.modalities = tuple()
 
     def cleanup(self, fname):
         if self.kwargs.get("keep_files"):
@@ -71,6 +72,14 @@ class Backend:
                 os.remove(f)
             except FileNotFoundError:
                 pass
+
+    def check_property_support(self, info):
+        for p in info.properties:
+            modality = p.split()[0]
+        if modality not in self.modalities:
+            log.error(f"""Backend '{self.name}' does not support "{modality}" modality.""")  # noqa: E501
+            return ExitStatus.BACKEND_ERROR
+        return ExitStatus.SUCCESS
 
     def generate_code(self, file, simulate, show):
         bound, fair, sync = (
@@ -179,6 +188,8 @@ class Backend:
 class Cbmc(Backend):
     def __init__(self, cwd, **kwargs):
         super().__init__(cwd, **kwargs)
+        self.name = "cbmc"
+        self.modalities = ("always", "finally")
         self.language = Language.C
         cmd = str(cwd / "cbmc-simulator") \
             if "Linux" in platform.system() \
@@ -211,6 +222,8 @@ class Cbmc(Backend):
 class Cseq(Backend):
     def __init__(self, cwd, **kwargs):
         super().__init__(cwd, **kwargs)
+        self.name = "cseq"
+        self.modalities = ("always", "finally")
         self.language = Language.C
         self.command = os.environ.get("CSEQ") or str(cwd / "cseq" / "cseq.py")
         self.args = ["-l", "labs_parallel"]
@@ -254,6 +267,8 @@ class Cseq(Backend):
 class Esbmc(Backend):
     def __init__(self, cwd, **kwargs):
         super().__init__(cwd, **kwargs)
+        self.name = "esbmc"
+        self.modalities = ("always", "finally")
         self.language = Language.C
         self.command = os.environ.get("ESBMC") or "esbmc"
         self.args = [
@@ -272,6 +287,8 @@ class CadpMonitor(Backend):
     """
     def __init__(self, cwd, **kwargs):
         super().__init__(cwd, **kwargs)
+        self.name = "cadp-monitor"
+        self.modalities = ("always", "finally")
         self.command = "lnt.open"
         self.args = ["evaluator", "-diag"]
         self.debug_args = ["evaluator", "-verbose", "-diag"]
@@ -365,6 +382,8 @@ class Cadp(CadpMonitor):
             Language.LNT_MONITOR
             if kwargs.get("steps")
             else Language.LNT)
+        self.name = "cadp"
+        self.modalities = ("always", "fairly", "fairly_inf", "finally")
         self.args = ["evaluator4", "-diag"]
         self.debug_args = ["evaluator4", "-verbose", "-diag"]
 
