@@ -256,7 +256,8 @@ class Cseq(Backend):
         path = Path(fname)
         aux = (
             str(path.parent / f"_cs_{path.stem}.{suffix}")
-            for suffix in ("c", "c.map", "cbmc-assumptions.log")
+            for suffix in (
+                "c", "c.map", "cbmc-assumptions.log", "c.cbmc-assumptions.log")
         )
         self._safe_remove(aux)
         super().cleanup(fname)
