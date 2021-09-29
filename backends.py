@@ -47,12 +47,13 @@ class ExitStatus(Enum):
 
 class Backend:
     """Base class representing a generic analysis backend."""
-    def __init__(self, cwd, **kwargs):
+    def __init__(self, base_dir, **kwargs):
         if "Linux" in platform.system():
             self.timeout_cmd = "/usr/bin/timeout"
         else:
             self.timeout_cmd = "/usr/local/bin/gtimeout"
-        self.cwd = cwd
+        self.base_dir = base_dir
+        self.cwd = base_dir
         self.kwargs = kwargs
         self.temp_files = []
         self.modalities = tuple()
@@ -101,7 +102,7 @@ class Backend:
             return f"{result}.{self.language.value.extension}"
 
         call = [
-            self.cwd / "labs" / "LabsTranslate",
+            self.base_dir / "labs" / "LabsTranslate",
             "--file", file,
             "--bound", bound,
             "--enc", self.language.value.encoding]
