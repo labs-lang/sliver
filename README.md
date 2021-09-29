@@ -1,9 +1,9 @@
 
-# SLiVER (Symbolic LAbS VERifier)
+# The SLiVER LAbS VERification tool
 
-SLiver is a tool for the analysis of multi-agent systems specified in the
+SLiVER is a tool for the analysis of multi-agent systems specified in the
 LAbS language [1]. At the moment, it support under-approximate analysis
-via bounded model checking, or analisys of the full state space via
+via bounded model checking, or analysis of the full state space via
 explicit-state model checking.
 
 This page contains source code and binary releases of SLiVER for Linux x64 systems.
@@ -13,29 +13,33 @@ This page contains source code and binary releases of SLiVER for Linux x64 syste
 Typically, a SLiVER release will contain the following files and directories:
 
 |Filename|Description
-|-------------------|----------------------------------|
-|cbmc-simulator     |CBMC5.4 binary|
-|cseq/              |CSeq core framework|
-|examples/          |Example LAbS specifications|
-|HISTORY            |Change log|
-|labs/              |LAbS parser and translator|
-|LICENSE            |The software license for SLiVER|
-|README.txt         |Release-specific instructions|
-|sliver.py          |SLiVER command-line front-end|
-|*.py               |SLiVER support files| 
-|*other files*      |Python libraries used by SLiVER|
+|---------------------|----------------------------------|
+|`atlas/`, `cadp/`    |Files used by CADP backends|
+|`cbmc-simulator`     |CBMC5.4 binary|
+|`cseq/`              |CSeq analysis tool|
+|`examples/`          |Example LAbS specifications|
+|`labs/`              |LAbS parser and translator|
+|`HISTORY`            |Change log|
+|`LICENSE`            |The software license for SLiVER|
+|`LICENSE_cbmc`       |The software license for CBMC|
+|`README.md`          |This document|
+|`README.txt`         |Release-specific instructions|
+|`sliver.py`          |SLiVER command-line front-end|
+|`*.py`               |SLiVER support files| 
+|*other files and directories*      |Python libraries used by SLiVER|
 
 ## Installation and usage
 
 To install SLiVER, please follow the steps below:
 
-1. install Python 3.5 or higher.
+1. install Python 3.8 or higher.
     
 2. (Optional) Install Python 2.7 (required by the bundled CSeq backend).
 
 3. Download and extract the latest version of SLiVER from the [**Releases** page](https://github.com/labs-lang/sliver/releases)
 
 4. set execution (+x) permissions for `sliver.py`, `cseq/cseq.py`, `cbmc-simulator` 
+
 5. Invoking `./sliver.py --help` from the command line should now display basic usage directions.
 
 6. Follow `README.txt` for additional (release-specific) instructions.
@@ -58,3 +62,5 @@ an [issue](https://github.com/labs-lang/sliver/issues).
 [3] L. Di Stefano, F. Lang, and W. Serwe, “Combining SLiVER with CADP to Analyze Multi-agent Systems,” in 22nd International Conference on Coordination Models and Languages (COORDINATION). LNCS, vol. 12134. Springer, 2020. [Link](https://doi.org/10.1007/978-3-030-50029-0_23)
 
 [4] L. Di Stefano, “Modelling and Verification of Multi-Agent Systems via Sequential Emulation,” PhD Thesis, Gran Sasso Science Institute, L’Aquila, Italy, 2020. [Link](https://iris.gssi.it/handle/20.500.12571/10181)
+
+[5] L. Di Stefano and F. Lang, “Verifying temporal properties of stigmergic collective systems using CADP,” in 10th International Symposium On Leveraging Applications of Formal Methods, Verification and Validation (ISoLA), LNCS, vol. 13036. Springer, 2021 (To appear).
