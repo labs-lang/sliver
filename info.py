@@ -107,7 +107,7 @@ class Info(object):
     def pprint_var(self, store, key):
         v = get_var(store, key)
         if v.is_array:
-            return f"{v.name}[{key - v.index}]"
+            return "{}[{}]".format(v.name, key - v.index)
         else:
             return v.name
 
@@ -267,13 +267,13 @@ class Agent:
             for txt in iface.split(";"):
                 splitted = txt.split("=")
                 index, text = splitted[0], splitted[1:]
-                self.iface[int(index)] = Variable(int(index), *text, "i")
+                self.iface[int(index)] = Variable(int(index), *text, store="i")
 
         if lstig != "":
             for txt in lstig.split(";"):
                 splitted = txt.split("=")
                 index, text = splitted[0], splitted[1:]
-                self.lstig[int(index)] = Variable(int(index), *text, "lstig")
+                self.lstig[int(index)] = Variable(int(index), *text, store="lstig")  # noqa: E501
 
     def __str__(self):
         return self.name
