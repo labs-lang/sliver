@@ -40,17 +40,14 @@ def translateCPROVER(cex, fname, info, offset=-1):
         is_attr = ATTR.match(var)
         is_env = ENV.match(var)
         is_lstig = LSTIG.match(var)
-        is_ltstamp = LTSTAMP.match(var)
         if is_attr and info.i:
             return fmt(is_attr, "I", tid)
         elif is_env:
             return fmt(is_env, "E", tid)
         elif is_lstig:
             return fmt(is_lstig, "L", tid)
-        elif is_ltstamp:
-            return f" [{value}]"
         else:
-            return f"cannot match {var}, {value}\n"
+            return ""
 
     STATE, FILE, FN, LINE, THREAD = (
         Keyword(tk).suppress() for tk in
@@ -58,11 +55,14 @@ def translateCPROVER(cex, fname, info, offset=-1):
     LBRACE, RBRACE = map(Suppress, "{}")
     SEP = Keyword("----------------------------------------------------")
     STUFF = Word(printables)
-    INFO = (Optional(STATE + ppc.number().setResultsName("state")) &
-            (FILE + STUFF.setResultsName("file")) &
-            (FN + STUFF.setResultsName("function")) &
-            (LINE + ppc.number().setResultsName("line")) &
-            Optional(THREAD + ppc.number().setResultsName("thread")))
+    ASSUMPTION = Keyword("Assumption:").suppress() + SkipTo(STATE)
+    INFO = (
+        Optional(STATE + ppc.number().setResultsName("state")) &
+        (FILE + STUFF.setResultsName("file")) &
+        (FN + STUFF.setResultsName("function")) &
+        (LINE + ppc.number().setResultsName("line")) &
+        Optional(THREAD + ppc.number().setResultsName("thread"))
+    ).ignore(ASSUMPTION)
 
     VAR = Word(printables, excludeChars="=")
     RECORD = Forward()
@@ -75,12 +75,14 @@ def translateCPROVER(cex, fname, info, offset=-1):
 
     cex_start_pos = cex.find("Counterexample:") + 15
     cex_end_pos = cex.find("Violated property:")
-    states = TRACE.parseString(cex[cex_start_pos:cex_end_pos])
+    states = TRACE.parseString(cex[cex_start_pos:cex_end_pos], parseAll=True)
 
     inits = (
         s[1] for s in states
         if s[0]["function"] == "init" and not(LTSTAMP.match(s[1][0])))
-    others = [s[1] for s in states if s[0]["function"] != "init"]
+    others = [
+        (s[0]["function"], *s[1]) for s in states
+        if s[0]["function"] not in ("init", "__CPROVER_initialize")]
     yield "<initialization>"
     for i in inits:
         pprint = pprint_assign(*i, init=True)
@@ -90,17 +92,15 @@ def translateCPROVER(cex, fname, info, offset=-1):
 
     agent = ""
     system = None
-    for i, (var, value) in enumerate(others):
+    for i, (func, var, value) in enumerate(others):
         if var == "__LABS_step":
             if system:
                 yield f"\n<end {system}>"
                 system = None
-        elif var == "propagate_or_confirm":
-            system = "propagate" if value else "confirm"
-            yield f"\n<{pprint_agent(info, agent)}: {system} "
         elif var == "guessedkey":
-            yield f"'{info.lstig[int(value)].name}'>"
-        elif var == "firstAgent":
+            system = func
+            yield f"\n<{pprint_agent(info, agent)}: {func} '{info.lstig[int(value)].name}'>"  # noqa: E501
+        elif var in ("firstAgent", "guessedcomp"):
             agent = value
         else:
             if (len(others) > i + 1 and LSTIG.match(var) and
