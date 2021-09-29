@@ -3,8 +3,6 @@
 """Functions and classes to obtain and represent structured information
 about a LAbS system
 """
-import platform
-from subprocess import check_output
 from random import choice
 from ast import NodeVisitor, parse
 
@@ -279,9 +277,3 @@ class Agent:
 
     def __str__(self):
         return self.name
-
-
-def raw_info(call):
-    env = {"LD_LIBRARY_PATH": "labs/libunwind"} if "Linux" in platform.system() else {}    # noqa: E501
-    call_info = call + ["--info"]
-    return check_output(call_info, env=env)

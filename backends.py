@@ -6,9 +6,8 @@ import re
 from collections import namedtuple
 from enum import Enum
 from pathlib import Path
-from subprocess import check_output, CalledProcessError, STDOUT
+from subprocess import PIPE, run, check_output, CalledProcessError, STDOUT
 
-from info import raw_info
 from cex import translateCPROVER, translate_cadp
 from atlas.mcl import translate_property
 
@@ -87,6 +86,7 @@ class Backend:
             self.kwargs["fair"],
             self.kwargs["sync"]
         )
+        run_args = {"stdout": PIPE, "stderr": PIPE, "check": True}
 
         def make_filename():
             result = "_".join((
@@ -119,17 +119,25 @@ class Backend:
         if values:
             call.extend(["--values", *values])
         try:
-            out = check_output(call).decode("utf-8")
+            info = None
+            if not show:
+                log.debug(f"Gathering information on {file}...")
+                call_info = call + ["--info"]
+                info_call = run(call_info, **run_args)
+                info = info_call.stdout.decode()
+
+            cmd = run(call, **run_args)
+            out = cmd.stdout.decode()
             fname = str(self.cwd / make_filename())
             out = self.preprocess(out, fname)
             if show:
                 print(out)
-                return fname, None
             else:
+                log.debug(f"Writing emulation program to {fname}...")
                 with open(fname, 'w') as out_file:
                     out_file.write(out)
                 self.temp_files.append(fname)
-                return fname, raw_info(call)
+            return fname, info
 
         except CalledProcessError as e:
             raise e
@@ -249,7 +257,7 @@ class Cseq(Backend):
             str(path.parent / f"_cs_{path.stem}.{suffix}")
             for suffix in ("c", "c.map", "cbmc-assumptions.log")
         )
-        super()._safe_remove(aux)
+        self._safe_remove(aux)
         super().cleanup(fname)
 
     def handle_error(self, err: CalledProcessError, fname, info):
@@ -345,8 +353,8 @@ class CadpMonitor(Backend):
         path = Path(fname)
         aux2 = (str(path.parent / f"{path.stem}.{suffix}") for suffix in
                 ("err", "f", "h", "h.BAK", "lotos", "o", "t"))
-        super()._safe_remove(aux)
-        super()._safe_remove(aux2)
+        self._safe_remove(aux)
+        self._safe_remove(aux2)
         super().cleanup(fname)
 
     def preprocess(self, code, fname):
@@ -395,6 +403,7 @@ class Cadp(CadpMonitor):
             return ExitStatus.BACKEND_ERROR
         mcl = translate_property(info)
         mcl_fname = self._mcl_fname(fname)
+        log.debug(f"Writing MCL query to {mcl_fname}...")
         with open(mcl_fname, "w") as f:
             f.write(mcl)
         self.temp_files.append(mcl_fname)
@@ -410,6 +419,7 @@ class Cadp(CadpMonitor):
         return result
 
     def cleanup(self, fname):
+        self._safe_remove((self.cwd / "evaluator4", ))
         super().cleanup(fname)
 
 

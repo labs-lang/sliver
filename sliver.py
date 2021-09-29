@@ -56,19 +56,26 @@ VALUES -- assign values for parameterised specification (key=value)
 
     log.info("Encoding...")
 
-    log.debug(f"{backend_arg=}, {simulate=}, {show=}, {kwargs=}")
+    sprint_kwargs = ", ".join(f"{k}={v}" for k, v in kwargs.items())
+    log.debug(f"CLI options: {backend_arg=}, {simulate=}, {show=}, {sprint_kwargs}")  # noqa: E501
     backend = ALL_BACKENDS[backend_arg](__DIR, **kwargs)
     try:
         fname, info = backend.generate_code(file, simulate, show)
     except CalledProcessError as e:
         log.debug(e)
-        print(ExitStatus.format(ExitStatus.PARSING_ERROR, simulate))
-        sys.exit(ExitStatus.PARSING_ERROR.value)
+        err_msg = e.stderr.decode()
+        log.error(err_msg)
+        sliver_return = (
+            ExitStatus.INVALID_ARGS if err_msg.startswith("Property")
+            else ExitStatus.PARSING_ERROR)
+        print(ExitStatus.format(sliver_return, simulate))
+        sys.exit(sliver_return.value)
     if fname and show:
         sys.exit(ExitStatus.SUCCESS.value)
-    info = info.decode().replace("\n", "|")[:-1]
+    info = info.replace("\n", "|")[:-1]
     log.debug(f"{info=}")
     info = Info.parse(info)
+    status = None
     if fname:
         try:
             status = (
