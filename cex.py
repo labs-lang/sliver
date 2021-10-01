@@ -81,7 +81,7 @@ def translateCPROVER(cex, fname, info, offset=-1):
         s[1] for s in states
         if s[0]["function"] == "init" and not(LTSTAMP.match(s[1][0])))
     others = [
-        (s[0]["function"], *s[1]) for s in states
+        (s[0]["function"], s[0]["line"], *s[1]) for s in states
         if s[0]["function"] not in ("init", "__CPROVER_initialize")]
     yield "<initialization>"
     for i in inits:
@@ -92,7 +92,8 @@ def translateCPROVER(cex, fname, info, offset=-1):
 
     agent = ""
     system = None
-    for i, (func, var, value) in enumerate(others):
+    last_line = None
+    for i, (func, line, var, value) in enumerate(others):
         if var == "__LABS_step":
             if system:
                 yield f"\n<end {system}>"
@@ -102,12 +103,11 @@ def translateCPROVER(cex, fname, info, offset=-1):
             yield f"\n<{pprint_agent(info, agent)}: {func} '{info.lstig[int(value)].name}'>"  # noqa: E501
         elif var in ("firstAgent", "guessedcomp"):
             agent = value
-        else:
-            if (len(others) > i + 1 and LSTIG.match(var) and
-                    LTSTAMP.match(others[i + 1][0])):
-                pprint = pprint_assign(var, value, agent, endline=" ")
-            else:
-                pprint = pprint_assign(var, value, agent)
+        # If multiple assignments correspond to the same line, it's because
+        # we assigned to an array and CBMC is printing out the whole thing
+        elif last_line != line:
+            pprint = pprint_assign(var, value, agent)
+            last_line = line
             if pprint:
                 yield pprint
 
