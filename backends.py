@@ -221,6 +221,12 @@ class Cbmc(Backend):
             self.args.extend(additional_flags)
             self.debug_args.extend(additional_flags)
 
+    def verify(self, fname, info):
+        if not self.kwargs.get("steps"):
+            log.error("Backend 'cbmc' requires --steps N with N>0.")
+            return ExitStatus.INVALID_ARGS
+        return super().verify(fname, info)
+
     def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode == 10:
             out = err.output.decode("utf-8")
