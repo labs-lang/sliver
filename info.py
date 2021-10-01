@@ -66,7 +66,7 @@ class Info(object):
         self.spawn = spawn
         self.i = {}
         self.lstig = {}
-        self.properties = props.split(";")
+        self.properties = tuple(p for p in props.split(";") if p)
         for c in spawn.values():
             self.i.update(c.iface)
             self.lstig.update(c.lstig)
