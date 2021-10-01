@@ -76,9 +76,9 @@ class Backend:
     def check_property_support(self, info):
         for p in info.properties:
             modality = p.split()[0]
-        if modality not in self.modalities:
-            log.error(f"""Backend '{self.name}' does not support "{modality}" modality.""")  # noqa: E501
-            return ExitStatus.BACKEND_ERROR
+            if modality not in self.modalities:
+                log.error(f"""Backend '{self.name}' does not support "{modality}" modality.""")  # noqa: E501
+                return ExitStatus.BACKEND_ERROR
         return ExitStatus.SUCCESS
 
     def generate_code(self, file, simulate, show):
