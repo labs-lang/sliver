@@ -82,10 +82,11 @@ class Backend:
         return ExitStatus.SUCCESS
 
     def generate_code(self, file, simulate, show):
-        bound, fair, sync = (
+        bound, bv, fair, sync = (
             str(self.kwargs["steps"]),
-            self.kwargs["fair"],
-            self.kwargs["sync"]
+            self.kwargs.get("bv", False),
+            self.kwargs.get("fair", False),
+            self.kwargs.get("sync", False)
         )
         run_args = {"stdout": PIPE, "stderr": PIPE, "check": True}
 
@@ -95,7 +96,7 @@ class Backend:
                 re.sub(r'\W|^(?=\d)', '_', Path(file).stem),
                 str(bound), ("fair" if fair else "unfair")))
             options = [o for o in (
-                ("sync" if self.kwargs["sync"] else ""),
+                ("sync" if sync else ""),
                 "".join(v.replace("=", "") for v in values)) if o != ""]
             if options:
                 result = f"{result}_{'_'.join(options)}"
@@ -109,7 +110,7 @@ class Backend:
         flags = [
             (fair, "--fair"),
             (simulate, "--simulation"),
-            (not self.kwargs["bv"], "--no-bitvector"),
+            (not bv, "--no-bitvector"),
             (sync, "--sync"),
             (self.kwargs["property"], "--property"),
             (self.kwargs["property"], self.kwargs["property"]),
@@ -172,6 +173,7 @@ class Backend:
             self.verbose_output(out, "Backend output")
             return self.handle_success(out, info)
         except CalledProcessError as err:
+            log.debug(err)
             self.verbose_output(err.output.decode(), "Backend output")
             return self.handle_error(err, fname, info)
 
