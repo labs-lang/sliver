@@ -1,29 +1,40 @@
+Version 2.0 - 2021-10
+
+LNT translation: the "cadp" backend uses a new property translation workflow. The old workflow is still available as "cadp-monitor"
+Parser: Fixed a bug with arrays in link predicates and properties
+Parser: Basic support for a new "raw function call" process `$call(...)`
+SLiVER: Updated dependencies (pyparsing and click)
+SLiVER: Better reporting, especially with `--verbose`
+SLiVER: New CLI options `--property` and `--no-properties` for property selection
+SLiVER: New CLI options `--keep-files` 
+SLiVER: Fixed a bug in CSeq backend's parallel analysis which occasionally led to deadlocks
+
 Version 1.7 - 2021-07
 
 Parser: A new "nondeterministic value" operator `[n .. m]` is supported (LAbS-to-C only)
-Parser: link predicates now support "of 1", "of 2" in addition to the legacy syntax "of c1", "of c2"
-LNT translation: code generator now follows the new LNT syntax (CADP 2021-d)
-LNT translation: more efficient encoding of timestamps
+Parser: Link predicates now support "of 1", "of 2" in addition to the legacy syntax "of c1", "of c2"
+LNT translation: Code generator now follows the new LNT syntax (CADP 2021-d)
+LNT translation: More efficient encoding of timestamps
 
 Version 1.6 - 2021-01
 
-LNT translation: code generator now follows the new LNT syntax
-LNT translation: fix a CADP verification query
+LNT translation: Code generator now follows the new LNT syntax (CADP 2021-a)
+LNT translation: Fix a CADP verification query
 
 Version 1.5 - 2020-10
-LabsTranslate: improve simplification of Boolean expressions
-LNT translation: general improvements
-LNT translation: adapted to new LNT syntax (CADP 2020-d and beyond)
-C translation: disable stigmergies and/or environment when not needed
-C translation: remove all preprocessor directives
+LabsTranslate: Improve simplification of Boolean expressions
+LNT translation: General improvements
+LNT translation: Adapted to new LNT syntax (CADP 2020-d and beyond)
+C translation: Disable stigmergies and/or environment when not needed
+C translation: Remove all preprocessor directives
 SLiVER: CBMC backend now compatible with cbmc > 5.10
 SLiVER: Improved cleanup of intermediate files
 SLiVER: Support CSeq-1.9
 
 Version 1.4 - 2020-02
-LNT translation: disable stigmergies and/or environment when not needed
-SLiVER: fixed several bugs related to CADP backend
-SLiVER: added counterexample translations for CADP backend
+LNT translation: Disable stigmergies and/or environment when not needed
+SLiVER: Fixed several bugs related to CADP backend
+SLiVER: Added counterexample translations for CADP backend
 
 Version 1.3 - 2019-11 (internal release)
 LabsTranslate: General improvements to parser/code generator
@@ -31,18 +42,17 @@ LabsTranslate: Fixed a bug when using external variables in array subscript
 LabsTranslate: Added LNT translation (experimental)
 LabsTranslate: Remove (some) redundant sub-predicates from "finally"/"always" assertions
 SLiVER: Added support to generate unbounded encodings
-SLivER: Updated bundled CSeq backend, improved support for parallel analysis
+SLiVER: Updated bundled CSeq backend, improved support for parallel analysis
 C translation: Disable stigmergy encoding when not needed
 C translation: General improvements
-
 
 Version 1.2 - 2019-06
 LabsTranslate: Improved intermediate representation
 
 Version 1.1 - 2018-11 (internal release)
 LabsTranslate: Improved/updated parser
-C translation: general improvements
-C translation: support for generating __CPROVER_bitvector[] typedefs
+C translation: General improvements
+C translation: Support for generating __CPROVER_bitvector[] typedefs
 
 Version 1.0 - 2018-05
 Initial release of SLiVER

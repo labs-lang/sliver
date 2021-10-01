@@ -39,7 +39,7 @@ log = logging.getLogger("sliver")
 @click.option('--keep-files', **DEFAULTS("keep_files", default=False, is_flag=True))  # noqa: E501
 def main(file, backend_arg, simulate, show, **kwargs):
     """\b
-* * *  The SLiVER LAbS VERification tool. v2.0-PREVIEW (September 2021) * * *
+* * *  The SLiVER LAbS VERification tool. v2.0 (October 2021) * * *
 
 FILE -- path of LABS file to analyze
 
