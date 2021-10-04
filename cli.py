@@ -14,7 +14,7 @@ class Args(Enum):
     CORES_FROM = "from"
     KEEP_FILES = "keep_files"
     PROPERTY = "property"
-    NO_PROPERTIES = "no-properties"
+    NO_PROPERTIES = "no_properties"
     SHOW = "show"
     SIMULATE = "simulate"
     STEPS = "steps"
