@@ -8,7 +8,7 @@ import click
 
 from info import Info
 from cli import CLICK, Args, CliArgs
-from backends import ALL_BACKENDS, ExitStatus
+from backends import ALL_BACKENDS, ExitStatus, SliverError
 from __about__ import __title__, __version__
 
 __DIR = Path(__file__).parent.resolve()
@@ -67,16 +67,10 @@ VALUES -- assign values for parameterised specification (key=value)
     log.debug(f"CLI options: {file=}, {sprint_cli}")
     backend = ALL_BACKENDS[backend_arg](__DIR, cli)
     try:
+        backend.do_checks()
         fname, info = backend.generate_code(file, simulate, show)
-    except CalledProcessError as e:
-        log.debug(e)
-        err_msg = e.stderr.decode()
-        log.error(err_msg)
-        sliver_return = (
-            ExitStatus.INVALID_ARGS if err_msg.startswith("Property")
-            else ExitStatus.PARSING_ERROR)
-        print(ExitStatus.format(sliver_return, simulate))
-        sys.exit(sliver_return.value)
+    except SliverError as err:
+        err.handle(log=log, quit=True)
     if fname and show:
         sys.exit(ExitStatus.SUCCESS.value)
     info = info.replace("\n", "|")[:-1]
@@ -85,13 +79,7 @@ VALUES -- assign values for parameterised specification (key=value)
     status = None
     if fname:
         try:
-            status = (
-                ExitStatus.SUCCESS if simulate
-                else backend.check_property_support(info))
-            if status != ExitStatus.SUCCESS:
-                sys.exit(status.value)
-
-            status = None
+            backend.do_checks(fname, info)
             sim_or_verify = "Running simulation" if simulate else "Verifying"
             if not simulate and cli[Args.PROPERTY]:
                 sim_or_verify += f""" '{cli[Args.PROPERTY]}'"""
@@ -100,13 +88,13 @@ VALUES -- assign values for parameterised specification (key=value)
                       backend.verify(fname, info))
         except KeyboardInterrupt:
             status = ExitStatus.KILLED
+        except SliverError as err:
+            err.handle(quiet=True, quit=False)
+            status = err.status
         finally:
             backend.cleanup(fname)
             if status:
-                if status == ExitStatus.SUCCESS and simulate:
-                    print("Done.")
-                else:
-                    print(ExitStatus.format(status, simulate))
+                print(ExitStatus.format(status, simulate))
                 sys.exit(status.value)
 
 

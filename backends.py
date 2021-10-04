@@ -3,17 +3,24 @@ import logging
 import os
 import platform
 import re
-from collections import namedtuple
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from subprocess import PIPE, run, check_output, CalledProcessError, STDOUT
+import sys
 
 from cli import Args
-from cex import STEP, translateCPROVER, translate_cadp
+from cex import translateCPROVER, translate_cadp
 from atlas.mcl import translate_property
 
-LanguageInfo = namedtuple("LanguageInfo", ["extension", "encoding"])
+# LanguageInfo = namedtuple("LanguageInfo", ["extension", "encoding"])
 log = logging.getLogger('backend')
+
+
+@dataclass
+class LanguageInfo:
+    extension: str
+    encoding: str
 
 
 class Language(Enum):
@@ -46,6 +53,27 @@ class ExitStatus(Enum):
         }.get(code, f"Unexpected exit code {code.value}")
 
 
+@dataclass
+class SliverError(BaseException):
+    status: ExitStatus
+    message: str = ""
+    log_message: str = ""
+
+    def handle(self, log=log, quit=False, quiet=False, simulate=False):
+        if self.log_message:
+            log.error(self.log_message)
+        if self.message:
+            print(self.message)
+        if not quiet:
+            print(ExitStatus.format(self.status, simulate))
+        if quit:
+            sys.exit(self.status.value)
+
+
+def _require(arg, cli, msg=None, fn=lambda _: True):
+    pass
+
+
 class Backend:
     """Base class representing a generic analysis backend."""
     def __init__(self, base_dir, cli):
@@ -74,13 +102,24 @@ class Backend:
             except FileNotFoundError:
                 pass
 
+    def do_checks(self, fname=None, info=None):
+        if not self.cli[Args.SIMULATE]:
+            properties = None if info is None else info.properties
+            if self.cli[Args.NO_PROPERTIES] or (info and not properties):
+                log.info("No property to verify!")
+                raise SliverError(status=ExitStatus.SUCCESS)
+            if info:
+                self.check_property_support(info)
+
     def check_property_support(self, info):
         for p in info.properties:
             modality = p.split()[0]
             if modality not in self.modalities:
-                log.error(f"""Backend '{self.name}' does not support "{modality}" modality.""")  # noqa: E501
-                return ExitStatus.BACKEND_ERROR
-        return ExitStatus.SUCCESS
+                raise SliverError(
+                    status=ExitStatus.BACKEND_ERROR,
+                    log_message=f"""Backend '{self.name}' does not support "{modality}" modality."""  # noqa: E501
+                )
+        return
 
     def generate_code(self, file, simulate, show):
         bound, bv, fair, sync, values = (
@@ -143,8 +182,14 @@ class Backend:
             return fname, info
 
         except CalledProcessError as e:
-            log.debug(e)
-            raise e
+            log.error(e)
+            msg = e.stderr.decode()
+            status = (
+                ExitStatus.INVALID_ARGS if msg.startswith("Property")
+                else ExitStatus.PARSING_ERROR)
+            raise SliverError(status=status, log_message=msg)
+            
+
 
     def preprocess(self, code, fname):
         """Preprocesses code so that it is compatible with the backend.
@@ -163,15 +208,14 @@ class Backend:
         if self.cli[Args.NO_PROPERTIES] or not info.properties:
             log.info("No property to verify!")
             return ExitStatus.SUCCESS
-        args = self.debug_args if self.kwargs["debug"] else self.args
-        cmd = [self.command, *self.filename_argument(fname), *args]
-        if self.kwargs.get("timeout", 0) > 0:
-            cmd = [self.timeout_cmd, str(self.kwargs["timeout"]), *cmd]
+
+        cmd = self.get_cmdline(fname, info)
         if self.cli[Args.TIMEOUT] > 0:
             cmd = [self.timeout_cmd, str(self.cli[Args.TIMEOUT]), *cmd]
         try:
-            log.debug(f"Executing {' '.join(cmd)}")
+            log.info(f"Executing {' '.join(cmd)}")
             out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
+            
             self.verbose_output(out, "Backend output")
             return self.handle_success(out, info)
         except CalledProcessError as err:
@@ -204,21 +248,22 @@ class Cbmc(Backend):
         self.name = "cbmc"
         self.modalities = ("always", "finally")
         self.language = Language.C
-        cmd = str(cwd / "cbmc-simulator") \
-            if "Linux" in platform.system() \
-            else "cbmc"
-        self.command = os.environ.get("CBMC") or cmd
-        self.args = []
-        self.debug_args = ["--bounds-check", "--signed-overflow-check"]
 
+    def get_cmdline(self, fname, _):
+        cmd = [os.environ.get("CBMC") or (
+            str(self.cwd / "cbmc-simulator")
+            if "Linux" in platform.system()
+            else "cbmc")]
         CBMC_V, *CBMC_SUBV = check_output(
-            [self.command, "--version"],
-            cwd=cwd).decode().strip().split(" ")[0].split(".")
+            [cmd[0], "--version"],
+            cwd=self.cwd).decode().strip().split(" ")[0].split(".")
         CBMC_SUBV = CBMC_SUBV[0]
         if not (int(CBMC_V) <= 5 and int(CBMC_SUBV) <= 4):
-            additional_flags = ["--trace", "--stop-on-fail"]
-            self.args.extend(additional_flags)
-            self.debug_args.extend(additional_flags)
+            cmd += ["--trace", "--stop-on-fail"]
+        if self.cli[Args.DEBUG]:
+            cmd += ["--bounds-check", "--signed-overflow-check"]
+        cmd.append(fname)
+        return cmd
 
     def verify(self, fname, info):
         if not self.cli[Args.STEPS]:
@@ -239,28 +284,33 @@ class Cbmc(Backend):
 
 
 class Cseq(Backend):
-    def __init__(self, cwd, **kwargs):
-        super().__init__(cwd, **kwargs)
+    def __init__(self, cwd, cli):
+        super().__init__(cwd, cli)
         self.name = "cseq"
         self.modalities = ("always", "finally")
         self.language = Language.C
-        self.command = os.environ.get("CSEQ") or str(cwd / "cseq" / "cseq.py")
-        self.args = ["-l", "labs_parallel"]
-
-        for arg in ("steps", "cores", "from", "to"):
-            if kwargs.get(arg) is not None:
-                self.args.extend((f"--{arg}", str(kwargs[arg])))
-
-        self.debug_args = self.args
         self.cwd /= "cseq"
 
-    def verify(self, fname, info):
-        # TODO change split according to info
-        self.args += ["--split", "_I", "--info", info.raw]
-        return super().verify(fname, info)
+    def get_cmdline(self, fname, info):
+        result = [
+            os.environ.get("CSEQ") or str(self.cwd / "cseq" / "cseq.py"),
+            "-l", "labs_parallel",
+            "-i", fname
+        ]
 
-    def filename_argument(self, fname):
-        return ["-i", str(self.cwd / fname)]
+        args = (
+            ("--steps", self.cli[Args.STEPS]),
+            ("--cores", self.cli[Args.CORES]),
+            ("--from", self.cli[Args.CORES_FROM]),
+            ("--to", self.cli[Args.CORES_TO])
+        )
+        args = ((a[0], str(a[1])) for a in args if a[1] is not None)
+        for arg in args:
+            if arg[1] is not None:
+                result.extend(arg)
+        # TODO change split according to info
+        result += ["--split", "_I", "--info", info.raw]
+        return result
 
     def cleanup(self, fname):
         path = Path(fname)
@@ -290,14 +340,16 @@ class Esbmc(Backend):
         self.name = "esbmc"
         self.modalities = ("always", "finally")
         self.language = Language.C
-        self.command = os.environ.get("ESBMC") or "esbmc"
-        self.args = [
-            "--no-bounds-check", "--no-div-by-zero-check",
+
+    def get_cmdline(self, fname, _):
+        cmd = [
+            os.environ.get("ESBMC") or "esbmc", fname,
             "--no-pointer-check", "--no-align-check",
-            "--no-unwinding-assertions", "--z3"]
-        self.debug_args = [
-            "--no-pointer-check", "--no-align-check",
-            "--no-unwinding-assertions", "--z3"]
+            "--no-unwinding-assertions", "--z3"
+        ]
+        if not self.cli[Args.DEBUG]:
+            cmd.extend(("--no-bounds-check", "--no-div-by-zero-check"))
+        return cmd
 
 
 class CadpMonitor(Backend):
@@ -309,35 +361,30 @@ class CadpMonitor(Backend):
         super().__init__(cwd, cli)
         self.name = "cadp-monitor"
         self.modalities = ("always", "finally")
-        self.command = "lnt.open"
-        self.args = ["evaluator", "-diag"]
-        self.debug_args = ["evaluator", "-verbose", "-diag"]
         self.language = Language.LNT_MONITOR
 
     def check_cadp(self):
         try:
             cmd = ["cadp_lib", "caesar"]
-            check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
+            check_output(cmd, stderr=STDOUT, cwd=self.cwd)
             return True
         except (CalledProcessError, FileNotFoundError):
-            log.error(
-                "CADP not found or invalid license file. "
-                "Please, visit https://cadp.inria.fr "
-                "to obtain a valid license.")
-            return False
+            raise SliverError(
+                status=ExitStatus.BACKEND_ERROR,
+                log_message=(
+                    "CADP not found or invalid license file. "
+                    "Please, visit https://cadp.inria.fr "
+                    "to obtain a valid license."))
 
-    def verify(self, fname, info):
-        if not(self.check_cadp()):
-            return ExitStatus.BACKEND_ERROR
-        if self.cli[Args.NO_PROPERTIES] or not info.properties:
-            log.info("No property to verify!")
-            return ExitStatus.SUCCESS
+    def get_cmdline(self, fname, info):
+        cmd = ["lnt.open", fname, "evaluator", "-diag"]
+        if self.cli[Args.DEBUG]:
+            cmd.append("-verbose")
         modality = info.properties[0].split()[0]
         mcl = "fairly.mcl" if modality == "finally" else "never.mcl"
         mcl = str(Path("cadp") / Path(mcl))
-        self.args.append(mcl)
-        self.debug_args.append(mcl)
-        return super().verify(fname, info)
+        cmd.append(mcl)
+        return cmd
 
     def simulate(self, fname, info, simulate):
         if not(self.check_cadp()):
@@ -409,12 +456,17 @@ class Cadp(CadpMonitor):
         self.args = ["evaluator4", "-diag"]
         self.debug_args = ["evaluator4", "-verbose", "-diag"]
 
+    def get_cmdline(self, fname, _):
+        cmd = ["lnt.open", fname, "evaluator4", "-diag"]
+        if self.cli[Args.DEBUG]:
+            cmd.append("-verbose")
+        cmd.append(self._mcl_fname(fname))
+        return cmd
+
     def _mcl_fname(self, fname):
         return f"{fname}.mcl"
 
     def verify(self, fname, info):
-        if not(self.check_cadp()):
-            return ExitStatus.BACKEND_ERROR
         if self.cli[Args.NO_PROPERTIES] or not info.properties:
             log.info("No property to verify!")
             return ExitStatus.SUCCESS
@@ -424,8 +476,6 @@ class Cadp(CadpMonitor):
         with open(mcl_fname, "w") as f:
             f.write(mcl)
         self.temp_files.append(mcl_fname)
-        self.args.append(mcl_fname)
-        self.debug_args.append(mcl_fname)
         self.verbose_output(mcl, "MCL property")
         return Backend.verify(self, fname, info)
 
