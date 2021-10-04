@@ -1,17 +1,28 @@
 #!/usr/bin/env python3
 
+from collections import UserDict
 from enum import Enum
 from __about__ import __date__, __summary__, __title__, __version__
-from typing import Dict
 
 
 class Args(Enum):
     BACKEND = "backend"
     BV = "bv"
-
-
-def get(kwargs: Dict, arg: Args):
-    return kwargs[arg.value]
+    CORES = "cores"
+    DEBUG = "debug"
+    FAIR = "fair"
+    CORES_FROM = "from"
+    KEEP_FILES = "keep_files"
+    PROPERTY = "property"
+    NO_PROPERTIES = "no-properties"
+    SHOW = "show"
+    SIMULATE = "simulate"
+    STEPS = "steps"
+    SYNC = "sync"
+    TIMEOUT = "timeout"
+    CORES_TO = "to"
+    VALUES = "values"
+    VERBOSE = "verbose"
 
 
 LONGDESCR = f"""
@@ -23,51 +34,77 @@ VALUES -- assign values for parameterised specification (key=value)
 """
 
 HELPMSG = {
-    "backend": "Backend to use in verification mode.",
+    Args.BACKEND: "Backend to use in verification mode.",
 
-    "bitvector": "Enable bitvector optimization where supported.",
+    Args.BV: "Enable bitvector optimization where supported.",
 
-    "cores": "Number of CPU cores for parallel analysis.",
+    Args.CORES: "Number of CPU cores for parallel analysis.",
 
-    "debug": "Enable additional checks in the backend.",
+    Args.DEBUG: "Enable additional checks in the backend.",
 
-    "lang": "Target language for the code generator.",
+    Args.FAIR: "Enforce fair interleaving of components.",
 
-    "fair": "Enforce fair interleaving of components.",
+    Args.CORES_FROM: "Parallel analysis: partition start.",
 
-    "from": "Parallel analysis: partition start.",
+    Args.KEEP_FILES: "Do not remove intermediate files.",
 
-    "keep_files": "Do not remove intermediate files.",
+    Args.PROPERTY: "Property to consider, others will be ignored.",
 
-    "property": "Property to consider, others will be ignored.",
+    Args.NO_PROPERTIES: "Ignore all properties.",
 
-    "no-properties": "Ignore all properties.",
+    Args.SHOW: "Print emulation program and exit.",
 
-    "show": "Print emulation program and exit.",
-
-    "simulate": (
+    Args.SIMULATE: (
         "Number of simulation traces to generate. "
         "If 0, run in verification mode."),
 
-    "steps": (
+    Args.STEPS: (
         "Number of system evolutions. "
         "If 0, generate an unbounded system."),
 
-    "sync": "Force synchronous stigmergy messages.",
+    Args.SYNC: "Force synchronous stigmergy messages.",
 
-    "timeout": (
+    Args.TIMEOUT: (
         "Configure time limit (seconds). "
         "Set to 0 to disable timeout."),
 
-    "to": "Parallel analysis: partition end.",
+    Args.CORES_TO: "Parallel analysis: partition end.",
 
-    "verbose": "Print additional messages from the backend."
+    Args.VALUES: "assign values for parameterised specification (key=value)",
+
+    Args.VERBOSE: "Print additional messages from the backend."
+}
+
+DEFAULTS = {
+    Args.BACKEND: "cbmc",
+    Args.BV: True,
+    Args.CORES: 1,
+    Args.DEBUG: False,
+    Args.FAIR: False,
+    Args.CORES_FROM: None,
+    Args.KEEP_FILES: False,
+    Args.PROPERTY: None,
+    Args.NO_PROPERTIES: False,
+    Args.SHOW: False,
+    Args.SIMULATE: 0,
+    Args.STEPS: 0,
+    Args.SYNC: False,
+    Args.TIMEOUT: 0,
+    Args.CORES_TO: None,
+    Args.VALUES: tuple(),
+    Args.VERBOSE: False
 }
 
 
-def DEFAULTS(name, **kwargs):
+def CLICK(name, **kwargs):
     return {
         "help": HELPMSG[name],
         "show_default": True,
+        **({"default": DEFAULTS[name]} if DEFAULTS[name] is not None else {}),
         **kwargs
     }
+
+
+class CliArgs(UserDict):
+    def __getitem__(self, key: Args):
+        return self.data.get(key.value, DEFAULTS[key])

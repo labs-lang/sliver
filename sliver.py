@@ -7,7 +7,7 @@ from pathlib import Path
 import click
 
 from info import Info
-from cli import DEFAULTS
+from cli import CLICK, Args, CliArgs
 from backends import ALL_BACKENDS, ExitStatus
 from __about__ import __title__, __version__
 
@@ -19,25 +19,25 @@ log = logging.getLogger("sliver")
 @click.version_option(__version__, prog_name=__title__.lower())
 @click.argument('file', required=True, type=click.Path(exists=True))
 @click.argument('values', nargs=-1)
-@click.option('--backend', "backend_arg",
+@click.option('--backend',
               type=click.Choice(tuple(ALL_BACKENDS.keys())),
-              default="cbmc", **DEFAULTS("backend"))
-@click.option('--debug', **DEFAULTS("debug", default=False, is_flag=True))
-@click.option('--fair/--no-fair', **DEFAULTS("fair", default=False))
-@click.option('--bv/--no-bv', **DEFAULTS("bitvector", default=True))
-@click.option('--simulate', **DEFAULTS("simulate", default=0, type=int))
-@click.option('--show', **DEFAULTS("show", default=False, is_flag=True))
-@click.option('--steps', **DEFAULTS("steps", default=0, type=int))
-@click.option('--sync/--no-sync', **DEFAULTS("sync", default=False))
-@click.option('--timeout', **DEFAULTS("timeout", default=0, type=int))
-@click.option('--cores', **DEFAULTS("cores", default=4, type=int))
-@click.option('--from', **DEFAULTS("from", type=int))
-@click.option('--to', **DEFAULTS("to", type=int))
-@click.option('--verbose', **DEFAULTS("verbose", default=False, is_flag=True))
-@click.option('--no-properties', **DEFAULTS("no-properties", default=False, is_flag=True))  # noqa: E501
-@click.option('--property', **DEFAULTS("property"))
-@click.option('--keep-files', **DEFAULTS("keep_files", default=False, is_flag=True))  # noqa: E501
-def main(file, backend_arg, simulate, show, **kwargs):
+              **CLICK(Args.BACKEND))
+@click.option('--debug', **CLICK(Args.DEBUG, is_flag=True))
+@click.option('--fair/--no-fair', **CLICK(Args.FAIR))
+@click.option('--bv/--no-bv', **CLICK(Args.BV))
+@click.option('--simulate', **CLICK(Args.SIMULATE, type=int))
+@click.option('--show', **CLICK(Args.SHOW, is_flag=True))
+@click.option('--steps', **CLICK(Args.STEPS, type=int))
+@click.option('--sync/--no-sync', **CLICK(Args.SYNC))
+@click.option('--timeout', **CLICK(Args.TIMEOUT, type=int))
+@click.option('--cores', **CLICK(Args.CORES, type=int))
+@click.option('--from', **CLICK(Args.CORES_FROM, type=int))
+@click.option('--to', **CLICK(Args.CORES_TO, type=int))
+@click.option('--verbose', **CLICK(Args.VERBOSE, is_flag=True))
+@click.option('--no-properties', **CLICK(Args.NO_PROPERTIES, is_flag=True))
+@click.option('--property', **CLICK(Args.PROPERTY))
+@click.option('--keep-files', **CLICK(Args.KEEP_FILES, is_flag=True))
+def main(file, **kwargs):
     """\b
 * * *  The SLiVER LAbS VERification tool. v2.0 (October 2021) * * *
 
@@ -45,20 +45,27 @@ FILE -- path of LABS file to analyze
 
 VALUES -- assign values for parameterised specification (key=value)
 """
-    if simulate and kwargs.get("steps", 0) == 0:
-        print("Must specify the length of simulation traces (--steps)")
-        sys.exit(ExitStatus.INVALID_ARGS.value)
+    cli = CliArgs(kwargs)
+    backend_arg, simulate, show = (
+        cli[Args.BACKEND],
+        cli[Args.SIMULATE],
+        cli[Args.SHOW])
 
     logging.basicConfig(
         format="[%(levelname)s:%(name)s] %(message)s",
-        level=logging.DEBUG if kwargs["verbose"] else logging.INFO
+        level=logging.DEBUG if cli[Args.VERBOSE] else logging.INFO
     )
+
+    if simulate and cli[Args.STEPS] == 0:
+        log.error(ExitStatus.format(ExitStatus.INVALID_ARGS))
+        print("Must specify the length of simulation traces (--steps)")
+        sys.exit(ExitStatus.INVALID_ARGS.value)
 
     log.info("Encoding...")
 
-    sprint_kwargs = ", ".join(f"{k}={v}" for k, v in kwargs.items())
-    log.debug(f"CLI options: {backend_arg=}, {simulate=}, {show=}, {sprint_kwargs}")  # noqa: E501
-    backend = ALL_BACKENDS[backend_arg](__DIR, **kwargs)
+    sprint_cli = ", ".join(f"{k}={v}" for k, v in cli.data.items())
+    log.debug(f"CLI options: {file=}, {sprint_cli}")
+    backend = ALL_BACKENDS[backend_arg](__DIR, cli)
     try:
         fname, info = backend.generate_code(file, simulate, show)
     except CalledProcessError as e:
@@ -84,9 +91,10 @@ VALUES -- assign values for parameterised specification (key=value)
             if status != ExitStatus.SUCCESS:
                 sys.exit(status.value)
 
+            status = None
             sim_or_verify = "Running simulation" if simulate else "Verifying"
-            if not simulate and kwargs.get("property"):
-                sim_or_verify += f""" '{kwargs.get("property")}'"""
+            if not simulate and cli[Args.PROPERTY]:
+                sim_or_verify += f""" '{cli[Args.PROPERTY]}'"""
             log.info(f"{sim_or_verify} with backend {backend_arg}...")
             status = (backend.simulate(fname, info, simulate) if simulate else
                       backend.verify(fname, info))

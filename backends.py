@@ -8,7 +8,8 @@ from enum import Enum
 from pathlib import Path
 from subprocess import PIPE, run, check_output, CalledProcessError, STDOUT
 
-from cex import translateCPROVER, translate_cadp
+from cli import Args
+from cex import STEP, translateCPROVER, translate_cadp
 from atlas.mcl import translate_property
 
 LanguageInfo = namedtuple("LanguageInfo", ["extension", "encoding"])
@@ -47,19 +48,19 @@ class ExitStatus(Enum):
 
 class Backend:
     """Base class representing a generic analysis backend."""
-    def __init__(self, base_dir, **kwargs):
+    def __init__(self, base_dir, cli):
         if "Linux" in platform.system():
             self.timeout_cmd = "/usr/bin/timeout"
         else:
             self.timeout_cmd = "/usr/local/bin/gtimeout"
+        self.cli = cli
         self.base_dir = base_dir
         self.cwd = base_dir
-        self.kwargs = kwargs
         self.temp_files = []
         self.modalities = tuple()
 
-    def cleanup(self, fname):
-        if self.kwargs.get("keep_files"):
+    def cleanup(self, _):
+        if self.cli[Args.KEEP_FILES]:
             for f in self.temp_files:
                 log.info(f"Keeping {f}")
         else:
@@ -82,11 +83,12 @@ class Backend:
         return ExitStatus.SUCCESS
 
     def generate_code(self, file, simulate, show):
-        bound, bv, fair, sync = (
-            str(self.kwargs["steps"]),
-            self.kwargs.get("bv", False),
-            self.kwargs.get("fair", False),
-            self.kwargs.get("sync", False)
+        bound, bv, fair, sync, values = (
+            str(self.cli[Args.STEPS]),
+            self.cli[Args.BV],
+            self.cli[Args.FAIR],
+            self.cli[Args.SYNC],
+            self.cli[Args.VALUES]
         )
         run_args = {"stdout": PIPE, "stderr": PIPE, "check": True}
 
@@ -112,12 +114,11 @@ class Backend:
             (simulate, "--simulation"),
             (not bv, "--no-bitvector"),
             (sync, "--sync"),
-            (self.kwargs["property"], "--property"),
-            (self.kwargs["property"], self.kwargs["property"]),
-            (self.kwargs["no_properties"], "--no-properties")]
+            (self.cli[Args.PROPERTY], "--property"),
+            (self.cli[Args.PROPERTY], self.cli[Args.PROPERTY]),
+            (self.cli[Args.NO_PROPERTIES], "--no-properties")]
         call.extend(b for a, b in flags if a)
 
-        values = self.kwargs.get("values")
         if values:
             call.extend(["--values", *values])
         try:
@@ -142,12 +143,8 @@ class Backend:
             return fname, info
 
         except CalledProcessError as e:
+            log.debug(e)
             raise e
-
-    def filename_argument(self, fname):
-        """Returns a CLI argument for the input file.
-        """
-        return [fname]
 
     def preprocess(self, code, fname):
         """Preprocesses code so that it is compatible with the backend.
@@ -163,13 +160,15 @@ class Backend:
     def verify(self, fname, info):
         """Verifies the correctness of the program at fname.
         """
-        if self.kwargs.get("no_properties") or not info.properties:
+        if self.cli[Args.NO_PROPERTIES] or not info.properties:
             log.info("No property to verify!")
             return ExitStatus.SUCCESS
         args = self.debug_args if self.kwargs["debug"] else self.args
         cmd = [self.command, *self.filename_argument(fname), *args]
         if self.kwargs.get("timeout", 0) > 0:
             cmd = [self.timeout_cmd, str(self.kwargs["timeout"]), *cmd]
+        if self.cli[Args.TIMEOUT] > 0:
+            cmd = [self.timeout_cmd, str(self.cli[Args.TIMEOUT]), *cmd]
         try:
             log.debug(f"Executing {' '.join(cmd)}")
             out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
@@ -200,8 +199,8 @@ class Backend:
 
 
 class Cbmc(Backend):
-    def __init__(self, cwd, **kwargs):
-        super().__init__(cwd, **kwargs)
+    def __init__(self, cwd, cli):
+        super().__init__(cwd, cli)
         self.name = "cbmc"
         self.modalities = ("always", "finally")
         self.language = Language.C
@@ -222,7 +221,7 @@ class Cbmc(Backend):
             self.debug_args.extend(additional_flags)
 
     def verify(self, fname, info):
-        if not self.kwargs.get("steps"):
+        if not self.cli[Args.STEPS]:
             log.error("Backend 'cbmc' requires --steps N with N>0.")
             return ExitStatus.INVALID_ARGS
         return super().verify(fname, info)
@@ -286,8 +285,8 @@ class Cseq(Backend):
 
 
 class Esbmc(Backend):
-    def __init__(self, cwd, **kwargs):
-        super().__init__(cwd, **kwargs)
+    def __init__(self, cwd, cli):
+        super().__init__(cwd, cli)
         self.name = "esbmc"
         self.modalities = ("always", "finally")
         self.language = Language.C
@@ -306,8 +305,8 @@ class CadpMonitor(Backend):
     "Combining SLiVER with CADP to Analyze Multi-agent Systems"
     (COORDINATION, 2020).
     """
-    def __init__(self, cwd, **kwargs):
-        super().__init__(cwd, **kwargs)
+    def __init__(self, cwd, cli):
+        super().__init__(cwd, cli)
         self.name = "cadp-monitor"
         self.modalities = ("always", "finally")
         self.command = "lnt.open"
@@ -330,7 +329,7 @@ class CadpMonitor(Backend):
     def verify(self, fname, info):
         if not(self.check_cadp()):
             return ExitStatus.BACKEND_ERROR
-        if self.kwargs.get("no_properties") or not info.properties:
+        if self.cli[Args.NO_PROPERTIES] or not info.properties:
             log.info("No property to verify!")
             return ExitStatus.SUCCESS
         modality = info.properties[0].split()[0]
@@ -345,9 +344,9 @@ class CadpMonitor(Backend):
             return ExitStatus.BACKEND_ERROR
         cmd = [
             "lnt.open", fname, "executor",
-            str(self.kwargs.get("steps", 1)), "2"]
-        if self.kwargs.get("timeout", 0) > 0:
-            cmd = [self.timeout_cmd, str(self.kwargs["timeout"]), *cmd]
+            str(self.cli[Args.STEPS]), "2"]
+        if self.cli[Args.TIMEOUT]:
+            cmd = [self.timeout_cmd, str(self.cli[Args.TIMEOUT]), *cmd]
 
         try:
             for i in range(simulate):
@@ -364,10 +363,9 @@ class CadpMonitor(Backend):
             return ExitStatus.BACKEND_ERROR
 
     def cleanup(self, fname):
-        aux = (str(Path(self.cwd) / f) for f in
+        aux = (Path(self.cwd) / f for f in
                ("evaluator", "executor", "evaluator@1.o", "evaluator.bcg"))
-        path = Path(fname)
-        aux2 = (str(path.parent / f"{path.stem}.{suffix}") for suffix in
+        aux2 = (Path(self.cwd) / f"{Path(fname).stem}.{suffix}" for suffix in
                 ("err", "f", "h", "h.BAK", "lotos", "o", "t"))
         self._safe_remove(aux)
         self._safe_remove(aux2)
@@ -399,12 +397,12 @@ class Cadp(CadpMonitor):
     "Verifying temporal properties of stigmergic collective systems using CADP"
     (ISoLA, 2021).
     """
-    def __init__(self, cwd, **kwargs):
-        super().__init__(cwd, **kwargs)
+    def __init__(self, cwd, cli):
+        super().__init__(cwd, cli)
         # Fall back to "monitor" ancoding for simulation
         self.language = (
             Language.LNT_MONITOR
-            if kwargs.get("steps")
+            if self.cli[Args.SIMULATE]
             else Language.LNT)
         self.name = "cadp"
         self.modalities = ("always", "fairly", "fairly_inf", "finally")
@@ -417,7 +415,7 @@ class Cadp(CadpMonitor):
     def verify(self, fname, info):
         if not(self.check_cadp()):
             return ExitStatus.BACKEND_ERROR
-        if self.kwargs.get("no_properties") or not info.properties:
+        if self.cli[Args.NO_PROPERTIES] or not info.properties:
             log.info("No property to verify!")
             return ExitStatus.SUCCESS
         mcl = translate_property(info)
