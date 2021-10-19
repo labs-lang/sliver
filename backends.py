@@ -293,7 +293,7 @@ class Cseq(Backend):
 
     def get_cmdline(self, fname, info):
         result = [
-            os.environ.get("CSEQ") or str(self.cwd / "cseq" / "cseq.py"),
+            os.environ.get("CSEQ") or str(self.cwd / "cseq.py"),
             "-l", "labs_parallel",
             "-i", fname
         ]
@@ -313,9 +313,8 @@ class Cseq(Backend):
         return result
 
     def cleanup(self, fname):
-        path = Path(fname)
         aux = (
-            str(path.parent / f"_cs_{path.stem}.{suffix}")
+            str(self.cwd / f"_cs_{Path(fname).stem}.{suffix}")
             for suffix in (
                 "c", "c.map", "cbmc-assumptions.log", "c.cbmc-assumptions.log")
         )
