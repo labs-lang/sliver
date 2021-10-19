@@ -17,6 +17,10 @@ from atlas.mcl import translate_property
 log = logging.getLogger('backend')
 
 
+def log_call(cmd):
+    log.debug(f"Executing {' '.join(str(x) for x in cmd)}")
+
+
 @dataclass
 class LanguageInfo:
     extension: str
@@ -56,26 +60,28 @@ class ExitStatus(Enum):
 @dataclass
 class SliverError(BaseException):
     status: ExitStatus
-    message: str = ""
-    log_message: str = ""
+    stdout: str = ""
+    error_message: str = ""
+    info_message: str = ""
 
     def handle(self, log=log, quit=False, quiet=False, simulate=False):
-        if self.log_message:
-            log.error(self.log_message)
-        if self.message:
-            print(self.message)
+        if self.info_message:
+            log.info(self.info_message)
+        if self.error_message:
+            log.error(self.error_message)
+        if self.stdout:
+            print(self.stdout)
         if not quiet:
             print(ExitStatus.format(self.status, simulate))
         if quit:
             sys.exit(self.status.value)
 
 
-def _require(arg, cli, msg=None, fn=lambda _: True):
-    pass
-
-
 class Backend:
     """Base class representing a generic analysis backend."""
+
+    _run_args = {"stdout": PIPE, "stderr": PIPE, "check": True}
+
     def __init__(self, base_dir, cli):
         if "Linux" in platform.system():
             self.timeout_cmd = "/usr/bin/timeout"
@@ -102,14 +108,24 @@ class Backend:
             except FileNotFoundError:
                 pass
 
-    def do_checks(self, fname=None, info=None):
+    def check_cli(self):
+        if not self.cli[Args.SIMULATE] and self.cli[Args.NO_PROPERTIES]:
+            raise SliverError(
+                status=ExitStatus.SUCCESS,
+                info_message="No property to verify!"
+            )
+        if self.cli[Args.SIMULATE] and self.cli[Args.STEPS] == 0:
+            raise SliverError(
+                status=ExitStatus.INVALID_ARGS,
+                error_message="--simulate requires --steps N (with N>0)."
+            )
+
+    def check_info(self, info):
         if not self.cli[Args.SIMULATE]:
-            properties = None if info is None else info.properties
-            if self.cli[Args.NO_PROPERTIES] or (info and not properties):
+            if self.cli[Args.NO_PROPERTIES] or not info.properties:
                 log.info("No property to verify!")
                 raise SliverError(status=ExitStatus.SUCCESS)
-            if info:
-                self.check_property_support(info)
+            self.check_property_support(info)
 
     def check_property_support(self, info):
         for p in info.properties:
@@ -117,86 +133,92 @@ class Backend:
             if modality not in self.modalities:
                 raise SliverError(
                     status=ExitStatus.BACKEND_ERROR,
-                    log_message=f"""Backend '{self.name}' does not support "{modality}" modality."""  # noqa: E501
+                    error_message=f"""Backend '{self.name}' does not support "{modality}" modality."""  # noqa: E501
                 )
         return
 
-    def generate_code(self, file, simulate, show):
-        bound, bv, fair, sync, values = (
+    def make_slug(self):
+        bound, fair, sync, values = (
             str(self.cli[Args.STEPS]),
-            self.cli[Args.BV],
             self.cli[Args.FAIR],
             self.cli[Args.SYNC],
             self.cli[Args.VALUES]
         )
-        run_args = {"stdout": PIPE, "stderr": PIPE, "check": True}
+        result = "_".join((
+            # turn "file" into a valid identifier ([A-Za-z_][A-Za-z0-9_]+)
+            re.sub(r'\W|^(?=\d)', '_', Path(self.cli.file).stem),
+            str(bound), ("fair" if fair else "unfair")))
+        options = [o for o in (
+            ("sync" if sync else ""),
+            "".join(v.replace("=", "") for v in values)) if o != ""]
+        if options:
+            result = f"{result}_{'_'.join(options)}"
+        return f"{result}.{self.language.value.extension}"
 
-        def make_filename():
-            result = "_".join((
-                # turn "file" into a valid identifier ([A-Za-z_][A-Za-z0-9_]+)
-                re.sub(r'\W|^(?=\d)', '_', Path(file).stem),
-                str(bound), ("fair" if fair else "unfair")))
-            options = [o for o in (
-                ("sync" if sync else ""),
-                "".join(v.replace("=", "") for v in values)) if o != ""]
-            if options:
-                result = f"{result}_{'_'.join(options)}"
-            return f"{result}.{self.language.value.extension}"
-
+    def _labs_cmdline(self):
         call = [
             self.base_dir / "labs" / "LabsTranslate",
-            "--file", file,
-            "--bound", bound,
+            "--file", self.cli.file,
+            "--bound", str(self.cli[Args.STEPS]),
             "--enc", self.language.value.encoding]
         flags = [
-            (fair, "--fair"),
-            (simulate, "--simulation"),
-            (not bv, "--no-bitvector"),
-            (sync, "--sync"),
+            (self.cli[Args.FAIR], "--fair"),
+            (self.cli[Args.SIMULATE], "--simulation"),
+            (not self.cli[Args.BV], "--no-bitvector"),
+            (self.cli[Args.SYNC], "--sync"),
             (self.cli[Args.PROPERTY], "--property"),
             (self.cli[Args.PROPERTY], self.cli[Args.PROPERTY]),
             (self.cli[Args.NO_PROPERTIES], "--no-properties")]
         call.extend(b for a, b in flags if a)
 
-        if values:
-            call.extend(["--values", *values])
+        if self.cli[Args.VALUES]:
+            call.extend(["--values", *self.cli[Args.VALUES]])
+        return call
+
+    def get_info(self):
         try:
-            info = None
-            if not show:
-                log.debug(f"Gathering information on {file}...")
-                call_info = call + ["--info"]
-                info_call = run(call_info, **run_args)
-                info = info_call.stdout.decode()
-
-            cmd = run(call, **run_args)
-            out = cmd.stdout.decode()
-            fname = str(self.cwd / make_filename())
-            out = self.preprocess(out, fname)
-            if show:
-                print(out)
-            else:
-                log.debug(f"Writing emulation program to {fname}...")
-                with open(fname, 'w') as out_file:
-                    out_file.write(out)
-                self.temp_files.append(fname)
-            return fname, info
-
+            call_info = self._labs_cmdline() + ["--info"]
+            log_call(call_info)
+            info_call = run(call_info, **self._run_args)
+            return info_call.stdout.decode()
         except CalledProcessError as e:
             log.error(e)
             msg = e.stderr.decode()
             status = (
                 ExitStatus.INVALID_ARGS if msg.startswith("Property")
                 else ExitStatus.PARSING_ERROR)
-            raise SliverError(status=status, log_message=msg)
-            
+            raise SliverError(status=status, error_message=msg)
 
+    def generate_code(self):
+        call = self._labs_cmdline()
+        try:
+            log_call(call)
+            cmd = run(call, **self._run_args)
+            out = cmd.stdout.decode()
+            fname = str(self.base_dir / self.make_slug())
+            out = self.preprocess(out, fname)
+            if self.cli[Args.SHOW]:
+                print(out)
+            else:
+                log.debug(f"Writing emulation program to {fname}...")
+                with open(fname, 'w') as out_file:
+                    out_file.write(out)
+                self.temp_files.append(fname)
+            return fname
+        except CalledProcessError as e:
+            log.error(e)
+            msg = e.stderr.decode()
+            status = (
+                ExitStatus.INVALID_ARGS if msg.startswith("Property")
+                else ExitStatus.PARSING_ERROR)
+            raise SliverError(status=status, error_message=msg)
 
     def preprocess(self, code, fname):
         """Preprocesses code so that it is compatible with the backend.
         """
         return code
 
-    def simulate(self, fname, info, simulate):
+    def simulate(self, fname, info):
         """Returns random executions of the program at fname.
         """
         print("This backend does not support simulation.")
@@ -205,17 +227,14 @@ class Backend:
     def verify(self, fname, info):
         """Verifies the correctness of the program at fname.
         """
-        if self.cli[Args.NO_PROPERTIES] or not info.properties:
-            log.info("No property to verify!")
-            return ExitStatus.SUCCESS
 
         cmd = self.get_cmdline(fname, info)
         if self.cli[Args.TIMEOUT] > 0:
             cmd = [self.timeout_cmd, str(self.cli[Args.TIMEOUT]), *cmd]
         try:
-            log.info(f"Executing {' '.join(cmd)}")
+            log_call(cmd)
             out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
-            
+
             self.verbose_output(out, "Backend output")
             return self.handle_success(out, info)
         except CalledProcessError as err:
@@ -265,11 +284,13 @@ class Cbmc(Backend):
         cmd.append(fname)
         return cmd
 
-    def verify(self, fname, info):
-        if not self.cli[Args.STEPS]:
-            log.error("Backend 'cbmc' requires --steps N with N>0.")
-            return ExitStatus.INVALID_ARGS
-        return super().verify(fname, info)
+    def check_cli(self):
+        super().check_cli()
+        if not self.cli[Args.STEPS] and not self.cli[Args.SHOW]:
+            raise SliverError(
+                status=ExitStatus.INVALID_ARGS,
+                error_message="Backend 'cbmc' requires --steps N (with N>0)."
+            )
 
     def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode == 10:
@@ -370,7 +391,7 @@ class CadpMonitor(Backend):
         except (CalledProcessError, FileNotFoundError):
             raise SliverError(
                 status=ExitStatus.BACKEND_ERROR,
-                log_message=(
+                error_message=(
                     "CADP not found or invalid license file. "
                     "Please, visit https://cadp.inria.fr "
                     "to obtain a valid license."))
@@ -385,7 +406,7 @@ class CadpMonitor(Backend):
         cmd.append(mcl)
         return cmd
 
-    def simulate(self, fname, info, simulate):
+    def simulate(self, fname, info):
         if not(self.check_cadp()):
             return ExitStatus.BACKEND_ERROR
         cmd = [
@@ -395,8 +416,8 @@ class CadpMonitor(Backend):
             cmd = [self.timeout_cmd, str(self.cli[Args.TIMEOUT]), *cmd]
 
         try:
-            for i in range(simulate):
-                self.verbose_output(f"Executing {' '.join(cmd)}")
+            for i in range(self.cli[Args.SIMULATE]):
+                log_call(cmd)
                 out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
                 self.verbose_output(out, "Backend output")
                 header = f"====== Trace #{i+1} ======"
@@ -445,15 +466,13 @@ class Cadp(CadpMonitor):
     """
     def __init__(self, cwd, cli):
         super().__init__(cwd, cli)
-        # Fall back to "monitor" ancoding for simulation
+        # Fall back to "monitor" encoding for simulation
         self.language = (
             Language.LNT_MONITOR
             if self.cli[Args.SIMULATE]
             else Language.LNT)
         self.name = "cadp"
         self.modalities = ("always", "fairly", "fairly_inf", "finally")
-        self.args = ["evaluator4", "-diag"]
-        self.debug_args = ["evaluator4", "-verbose", "-diag"]
 
     def get_cmdline(self, fname, _):
         cmd = ["lnt.open", fname, "evaluator4", "-diag"]
@@ -466,9 +485,6 @@ class Cadp(CadpMonitor):
         return f"{fname}.mcl"
 
     def verify(self, fname, info):
-        if self.cli[Args.NO_PROPERTIES] or not info.properties:
-            log.info("No property to verify!")
-            return ExitStatus.SUCCESS
         mcl = translate_property(info)
         mcl_fname = self._mcl_fname(fname)
         log.debug(f"Writing MCL query to {mcl_fname}...")

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from collections import UserDict
 from enum import Enum
 from __about__ import __date__, __summary__, __title__, __version__
 
@@ -100,11 +99,15 @@ def CLICK(name, **kwargs):
     return {
         "help": HELPMSG[name],
         "show_default": True,
-        **({"default": DEFAULTS[name]} if DEFAULTS[name] is not None else {}),
+        **({} if DEFAULTS[name] is None else {"default": DEFAULTS[name]}),
         **kwargs
     }
 
 
-class CliArgs(UserDict):
+class CliArgs(dict):
+    def __init__(self, file, __dict) -> None:
+        self.file = file
+        self.update(__dict)
+
     def __getitem__(self, key: Args):
-        return self.data.get(key.value, DEFAULTS[key])
+        return self.get(key.value, DEFAULTS[key])

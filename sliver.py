@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import logging
 import sys
-from subprocess import CalledProcessError
 from pathlib import Path
 
 import click
@@ -45,7 +44,7 @@ FILE -- path of LABS file to analyze
 
 VALUES -- assign values for parameterised specification (key=value)
 """
-    cli = CliArgs(kwargs)
+    cli = CliArgs(file, kwargs)
     backend_arg, simulate, show = (
         cli[Args.BACKEND],
         cli[Args.SIMULATE],
@@ -56,35 +55,30 @@ VALUES -- assign values for parameterised specification (key=value)
         level=logging.DEBUG if cli[Args.VERBOSE] else logging.INFO
     )
 
-    if simulate and cli[Args.STEPS] == 0:
-        log.error(ExitStatus.format(ExitStatus.INVALID_ARGS))
-        print("Must specify the length of simulation traces (--steps)")
-        sys.exit(ExitStatus.INVALID_ARGS.value)
-
-    log.info("Encoding...")
-
-    sprint_cli = ", ".join(f"{k}={v}" for k, v in cli.data.items())
+    sprint_cli = ", ".join(f"{k}={v}" for k, v in cli.items())
     log.debug(f"CLI options: {file=}, {sprint_cli}")
     backend = ALL_BACKENDS[backend_arg](__DIR, cli)
     try:
-        backend.do_checks()
-        fname, info = backend.generate_code(file, simulate, show)
+        backend.check_cli()
+        log.info("Encoding...")
+        fname = backend.generate_code()
     except SliverError as err:
         err.handle(log=log, quit=True)
     if fname and show:
         sys.exit(ExitStatus.SUCCESS.value)
-    info = info.replace("\n", "|")[:-1]
-    log.debug(f"{info=}")
-    info = Info.parse(info)
     status = None
     if fname:
         try:
-            backend.do_checks(fname, info)
+            log.info(f"Gathering information on {file}...")
+            info = backend.get_info().replace("\n", "|")[:-1]
+            log.debug(f"{info=}")
+            info = Info.parse(info)
+            backend.check_info(info)
             sim_or_verify = "Running simulation" if simulate else "Verifying"
             if not simulate and cli[Args.PROPERTY]:
                 sim_or_verify += f""" '{cli[Args.PROPERTY]}'"""
             log.info(f"{sim_or_verify} with backend {backend_arg}...")
-            status = (backend.simulate(fname, info, simulate) if simulate else
+            status = (backend.simulate(fname, info) if simulate else
                       backend.verify(fname, info))
         except KeyboardInterrupt:
             status = ExitStatus.KILLED
