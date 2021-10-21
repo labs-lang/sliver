@@ -342,6 +342,14 @@ class Cseq(Backend):
         self._safe_remove(aux)
         super().cleanup(fname)
 
+    def check_cli(self):
+        super().check_cli()
+        if not self.cli[Args.STEPS] and not self.cli[Args.SHOW]:
+            raise SliverError(
+                status=ExitStatus.INVALID_ARGS,
+                error_message="Backend 'cseq' requires --steps N (with N>0)."
+            )
+
     def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode in (1, 10):
             out = err.output.decode("utf-8")
