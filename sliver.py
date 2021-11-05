@@ -36,6 +36,9 @@ log = logging.getLogger("sliver")
 @click.option('--no-properties', **CLICK(Args.NO_PROPERTIES, is_flag=True))
 @click.option('--property', **CLICK(Args.PROPERTY))
 @click.option('--keep-files', **CLICK(Args.KEEP_FILES, is_flag=True))
+@click.option('--include',
+              multiple=True, type=click.Path(exists=True),
+              **CLICK(Args.INCLUDE))
 def main(file, **kwargs):
     """\b
 * * *  The SLiVER LAbS VERification tool. v2.0 (October 2021) * * *

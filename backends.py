@@ -196,6 +196,12 @@ class Backend:
             cmd = run(call, **self._run_args)
             out = cmd.stdout.decode()
             fname = str(self.base_dir / self.make_slug())
+            # Insert --include'd code
+            included = "___includes___\n\n"
+            for inc_fname in self.cli[Args.INCLUDE]:
+                with open(inc_fname) as f:
+                    included += f.read()
+            out = out.replace("___includes___", included)
             out = self.preprocess(out, fname)
             if self.cli[Args.SHOW]:
                 print(out)

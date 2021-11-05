@@ -12,6 +12,7 @@ class Args(Enum):
     FAIR = "fair"
     CORES_FROM = "from"
     KEEP_FILES = "keep_files"
+    INCLUDE = "include"
     PROPERTY = "property"
     NO_PROPERTIES = "no_properties"
     SHOW = "show"
@@ -47,6 +48,8 @@ HELPMSG = {
 
     Args.KEEP_FILES: "Do not remove intermediate files.",
 
+    Args.INCLUDE: "Add custom code to generated program (may be specified multiple times).",
+
     Args.PROPERTY: "Property to consider, others will be ignored.",
 
     Args.NO_PROPERTIES: "Ignore all properties.",
@@ -81,6 +84,7 @@ DEFAULTS = {
     Args.DEBUG: False,
     Args.FAIR: False,
     Args.CORES_FROM: None,
+    Args.INCLUDE: tuple(),
     Args.KEEP_FILES: False,
     Args.PROPERTY: None,
     Args.NO_PROPERTIES: False,
@@ -98,7 +102,10 @@ DEFAULTS = {
 def CLICK(name, **kwargs):
     return {
         "help": HELPMSG[name],
-        "show_default": True,
+        "show_default": (
+            DEFAULTS[name] is False or
+            DEFAULTS[name] == 0 or
+            DEFAULTS[name]),
         **({} if DEFAULTS[name] is None else {"default": DEFAULTS[name]}),
         **kwargs
     }
