@@ -1,6 +1,6 @@
 import re
 
-from pyparsing import (Word, alphanums, delimitedList, OneOrMore, ZeroOrMore,
+from pyparsing import (QuotedString, Word, alphanums, delimitedList, OneOrMore, ZeroOrMore,
                        Forward, Suppress, Group, ParserElement, Keyword,
                        replaceWith, dblQuotedString, removeQuotes,
                        SkipTo, LineEnd, printables, Optional, StringEnd)
@@ -55,7 +55,9 @@ def translateCPROVER(cex, fname, info, offset=-1):
     LBRACE, RBRACE = map(Suppress, "{}")
     SEP = Keyword("----------------------------------------------------")
     STUFF = Word(printables)
-    ASSUMPTION = Keyword("Assumption:").suppress() + SkipTo(STATE)
+    ASSUMPTION = (
+        Keyword("Assumption:") | Keyword("(SIMULATION)")
+        ).suppress() + SkipTo(STATE)
     INFO = (
         Optional(STATE + ppc.number().setResultsName("state")) &
         (FILE + STUFF.setResultsName("file")) &
@@ -66,7 +68,11 @@ def translateCPROVER(cex, fname, info, offset=-1):
 
     VAR = Word(printables, excludeChars="=")
     RECORD = Forward()
-    VAL = ((ppc.number() + Optional(Suppress("u"))) | BOOLEAN | Group(RECORD))
+    VAL = (
+        (ppc.number() + Optional(Suppress("u"))) |
+        BOOLEAN |
+        dblQuotedString |
+        Group(RECORD))
     RECORD <<= (LBRACE + delimitedList(VAL) + RBRACE)
 
     ASGN = VAR + Suppress("=") + VAL + SkipTo(LineEnd()).suppress()
@@ -103,6 +109,9 @@ def translateCPROVER(cex, fname, info, offset=-1):
             yield f"\n<{pprint_agent(info, agent)}: {func} '{info.lstig[int(value)].name}'>"  # noqa: E501
         elif var in ("firstAgent", "guessedcomp"):
             agent = value
+        # simulation: printf messages
+        elif var == "format" and value.startswith('"(SIMULATION)'):
+            yield f"\n<{value[1:-1]}>"
         # If multiple assignments correspond to the same line, it's because
         # we assigned to an array and CBMC is printing out the whole thing
         elif last_line != line:
@@ -114,7 +123,9 @@ def translateCPROVER(cex, fname, info, offset=-1):
     prova = cex[cex_end_pos + 18:]
     PROP = Suppress(INFO) + STUFF + Suppress(SkipTo(StringEnd()))
     prop = PROP.parseString(prova)
-    yield f"\n<property violated: '{prop[0]}'>\n"
+    if prop[0] != "__sliver_simulation__":
+        yield f"\n<property violated: '{prop[0]}'>"
+    yield "\n"
 
 
 def translate_cadp(cex, info):
