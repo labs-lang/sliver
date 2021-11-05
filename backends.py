@@ -270,7 +270,7 @@ class Cbmc(Backend):
 
     def get_cmdline(self, fname, _):
         cmd = [os.environ.get("CBMC") or (
-            str(self.cwd / "cbmc-simulator")
+            str(self.cwd / "backends" / "cbmc-simulator")
             if "Linux" in platform.system()
             else "cbmc")]
         CBMC_V, *CBMC_SUBV = check_output(
@@ -283,6 +283,32 @@ class Cbmc(Backend):
             cmd += ["--bounds-check", "--signed-overflow-check"]
         cmd.append(fname)
         return cmd
+
+    def simulate(self, fname, info):
+        exe = os.environ.get("CBMC") or (
+            str(self.cwd / "backends" / "cbmc-5.42.0" / "bin" / "cbmc")
+            if "Linux" in platform.system()
+            else "cbmc")
+        glucose = str(self.cwd / "backends" / "glucose" / "glucose-nondet.sh")
+        cmd = [
+            exe,
+            "--external-sat-solver", glucose,
+            "--trace",
+            "--stop-on-fail"
+        ]
+        cmd.append(fname)
+        log_call(cmd)
+        try:
+            out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
+            self.verbose_output(out, "Backend output")
+        except CalledProcessError as err:
+            out = err.output.decode("utf-8")
+            self.verbose_output(out, "Backend output")
+            try:
+                print(*translateCPROVER(out, fname, info), sep="", end="")
+            except Exception as e:
+                print(f"Counterexample translation failed: {e}")
+        return ExitStatus.SUCCESS
 
     def check_cli(self):
         super().check_cli()
@@ -310,7 +336,7 @@ class Cseq(Backend):
         self.name = "cseq"
         self.modalities = ("always", "finally")
         self.language = Language.C
-        self.cwd /= "cseq"
+        self.cwd /= "backends" / "cseq"
 
     def get_cmdline(self, fname, info):
         result = [
@@ -410,7 +436,7 @@ class CadpMonitor(Backend):
             cmd.append("-verbose")
         modality = info.properties[0].split()[0]
         mcl = "fairly.mcl" if modality == "finally" else "never.mcl"
-        mcl = str(Path("cadp") / Path(mcl))
+        mcl = str(Path("backends") / "cadp" / mcl)
         cmd.append(mcl)
         return cmd
 
