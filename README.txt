@@ -1,6 +1,6 @@
 
-              SLiVER 2.0
-              October 2021
+              SLiVER 2.1
+              November 2021
 
 The SLiVER LAbS VERification tool
 

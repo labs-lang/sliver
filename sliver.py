@@ -41,7 +41,7 @@ log = logging.getLogger("sliver")
               **CLICK(Args.INCLUDE))
 def main(file, **kwargs):
     """\b
-* * *  The SLiVER LAbS VERification tool. v2.0 (October 2021) * * *
+* * *  The SLiVER LAbS VERification tool. v2.1 (November 2021) * * *
 
 FILE -- path of LABS file to analyze
 
