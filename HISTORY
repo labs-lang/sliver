@@ -1,3 +1,12 @@
+Version 2.1 - 2021-11
+
+C translation: Fixed a bug with the nondeterministic value operator
+C translation: Fixed a bug with counterexample translation
+SLiVER: Fixed a bug in CSeq backend
+SLiVER: Fixed a bug with the --no-properties option
+SLiVER: Backend cbmc now supports simulation
+SLiVER: New CLI option `--include` 
+
 Version 2.0 - 2021-10
 
 LNT translation: the "cadp" backend uses a new property translation workflow. The old workflow is still available as "cadp-monitor"
@@ -6,7 +15,7 @@ Parser: Basic support for a new "raw function call" process `$call(...)`
 SLiVER: Updated dependencies (pyparsing and click)
 SLiVER: Better reporting, especially with `--verbose`
 SLiVER: New CLI options `--property` and `--no-properties` for property selection
-SLiVER: New CLI options `--keep-files` 
+SLiVER: New CLI option `--keep-files` 
 SLiVER: Fixed a bug in CSeq backend's parallel analysis which occasionally led to deadlocks
 
 Version 1.7 - 2021-07
