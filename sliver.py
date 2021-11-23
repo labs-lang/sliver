@@ -66,8 +66,11 @@ VALUES -- assign values for parameterised specification (key=value)
     backend = ALL_BACKENDS[backend_arg](__DIR, cli)
     try:
         backend.check_cli()
-        log.info("Encoding...")
-        fname = backend.generate_code()
+        if not cli[Args.TRANSLATE_CEX] or show:
+            log.info("Encoding...")
+            fname = backend.generate_code()
+        else:
+            fname = ""
     except SliverError as err:
         err.handle(log=log, quit=True)
     if fname and show:
