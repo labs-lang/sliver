@@ -62,11 +62,12 @@ class LabsExprVisitor(NodeVisitor):
 
 
 class Info(object):
-    def __init__(self, spawn, e, props, raw=""):
+    def __init__(self, spawn, e, props, assumes, raw=""):
         self.spawn = spawn
         self.i = {}
         self.lstig = {}
         self.properties = tuple(p for p in props.split(";") if p)
+        self.assumes = tuple(p for p in assumes.split(";") if p)
         for c in spawn.values():
             self.i.update(c.iface)
             self.lstig.update(c.lstig)
@@ -80,12 +81,22 @@ class Info(object):
         """Deserialize system info
         """
         lines = txt.split("|")
-        envs, comps, props = lines[0], lines[1:-1], lines[-1]
+        envs, comps, props, assumes = (
+            lines[0], lines[1:-2], lines[-2], lines[-1])
         return Info(
             spawn=Spawn.parse(comps),
             e=[Variable(*v.split("=")) for v in envs.split(";") if v],
             props=props,
+            assumes=assumes,
             raw=txt)
+
+    def max_key_i(self):
+        def max_of(v):
+            if v.is_array:
+                return v.index + v.size - 1
+            else:
+                return v.index
+        return max(max_of(v) for v in self.i.values())
 
     def lookup_var(self, name):
         """Finds a variable by name"""
@@ -102,7 +113,7 @@ class Info(object):
         match = _lookup(self.lstig)
         if match:
             return match
-        raise KeyError
+        raise KeyError(name)
 
     def pprint_var(self, store, key):
         v = get_var(store, key)
