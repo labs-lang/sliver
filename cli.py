@@ -49,7 +49,9 @@ HELPMSG = {
 
     Args.KEEP_FILES: "Do not remove intermediate files.",
 
-    Args.INCLUDE: "Add custom code to generated program (may be specified multiple times).",
+    Args.INCLUDE: (
+        "Add custom code to generated program "
+        "(may be specified multiple times)."),
 
     Args.PROPERTY: "Property to consider, others will be ignored.",
 
