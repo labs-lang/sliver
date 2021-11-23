@@ -1,34 +1,69 @@
 import re
-
-from pyparsing import (QuotedString, Word, alphanums, delimitedList, OneOrMore, ZeroOrMore,
+from pyparsing import (Word, alphanums, delimitedList, OneOrMore, ZeroOrMore,
                        Forward, Suppress, Group, ParserElement, Keyword,
-                       replaceWith, dblQuotedString, removeQuotes,
-                       SkipTo, LineEnd, printables, Optional, StringEnd)
+                       dblQuotedString, removeQuotes, SkipTo, StringEnd, Regex,
+                       printables)
 from pyparsing import pyparsing_common as ppc
+import time
 
 ATTR = re.compile(r"I\[([0-9]+)l?\]\[([0-9]+)l?\]")
 LSTIG = re.compile(r"Lvalue\[([0-9]+)l?\]\[([0-9]+)l?\]")
 LTSTAMP = re.compile(r"Ltstamp\[([0-9]+)l?\]\[([0-9]+)l?\]")
 ENV = re.compile(r"E\[([0-9]+)l?\]")
-STEP = re.compile(r"__LABS_step")
+STUFF = Word(printables)
+STATE = Keyword("State").suppress()
+SKIP = Regex(r'Assumption:|(SIMULATION)') + SkipTo(STATE)
 
-PROPAGATE = re.compile(r"propagate_or_confirm=TRUE")
-CONFIRM = re.compile(r"propagate_or_confirm=FALSE")
+######### OLD parser, kept for reference  # noqa: E266
+# BOOLEAN = (
+#     Keyword("TRUE").setParseAction(replaceWith(True)) |
+#     Keyword("FALSE").setParseAction(replaceWith(False)))
+# FILE, FN, LINE, THREAD, ASSUMPTION, SIMULATION = (
+#     Keyword(tk).suppress() for tk in
+#     ("file", "function", "line", "thread", "Assumption:", "(SIMULATION)"))
+# LBRACE = Suppress("{")
+# SKIP = (ASSUMPTION | SIMULATION) + SkipTo(STATE)
+# INFO = (
+#     Optional(STATE + ppc.number().setResultsName("state")) +
+#     (FILE + STUFF.setResultsName("file")) +
+#     (
+#         # At some point they brilliantly swapped "line" and "function"...
+#         (FN + STUFF.setResultsName("function")) &
+#         (LINE + ppc.number().setResultsName("line"))) +
+#     Optional(THREAD + ppc.number().setResultsName("thread"))
+# )
+# VAR = Word(printables, excludeChars="=")
+# VAL = (
+#     (ppc.number() + Optional(Suppress("u"))) |
+#     BOOLEAN |
+#     dblQuotedString |
+#     (LBRACE + restOfLine))
+# ASGN = VAR + Suppress("=") + VAL + SkipTo(LineEnd()).suppress()
+# TRACE = OneOrMore(Group(Group(INFO) + SEP.suppress() + Group(ASGN)))
+# PROP = Suppress(INFO) + STUFF + Suppress(SkipTo(StringEnd()))
 
-
-UNDEF = "16960"
-
-
-BOOLEAN = (
-    Keyword("TRUE").setParseAction(replaceWith(True)) |
-    Keyword("FALSE").setParseAction(replaceWith(False)))
+HEADER = Regex(r'(?:State (?P<state>\d+) )?file (?P<file>[^\s]+) function (?P<function>[^\s]+) line (?P<line>\d+) (?:thread (?P<thread>\d+))?')  # noqa: E501
+HEADER_OLD = Regex(r'(?:State (?P<state>\d+) )?file (?P<file>[^\s]+) line (?P<line>\d+) function (?P<function>[^\s]+) (?:thread (?P<thread>\d+))?')  # noqa: E501
+SEP = Keyword("----------------------------------------------------")
+ASGN = Regex(r'(?P<lhs>[^\s=]+)=(?P<rhs>.+)')
+TRACE = OneOrMore(Group(Group(HEADER) + SEP.suppress() + Group(ASGN))).ignore(OneOrMore(SKIP))  # noqa: E501
+TRACE_OLD = OneOrMore(Group(Group(HEADER_OLD) + SEP.suppress() + Group(ASGN))).ignore(OneOrMore(SKIP))  # noqa: E501
+PROP = Suppress(HEADER | HEADER_OLD) + STUFF + Suppress(SkipTo(StringEnd()))
 
 
 def pprint_agent(info, tid):
     return f"{info.spawn[int(tid)]} {tid}"
 
 
-def translateCPROVER(cex, fname, info, offset=-1):
+def translateCPROVER54(cex, info):
+    yield from translateCPROVER(cex, info, parser=TRACE_OLD)
+
+
+def translateCPROVERNEW(cex, info):
+    yield from translateCPROVER(cex, info, parser=TRACE)
+
+
+def translateCPROVER(cex, info, parser=TRACE):
     def pprint_assign(var, value, tid="", init=False):
         def fmt(match, store_name, tid):
             tid = match[1] if len(match.groups()) > 1 else tid
@@ -38,57 +73,33 @@ def translateCPROVER(cex, fname, info, offset=-1):
             # endline = " " if not(init) and store_name == "L" else "\n"
             return f"\n{agent}\t{assign}"
         is_attr = ATTR.match(var)
-        is_env = ENV.match(var)
-        is_lstig = LSTIG.match(var)
         if is_attr and info.i:
             return fmt(is_attr, "I", tid)
-        elif is_env:
+        is_env = ENV.match(var)
+        if is_env:
             return fmt(is_env, "E", tid)
-        elif is_lstig:
+        is_lstig = LSTIG.match(var)
+        if is_lstig:
             return fmt(is_lstig, "L", tid)
-        else:
-            return ""
-
-    STATE, FILE, FN, LINE, THREAD = (
-        Keyword(tk).suppress() for tk in
-        ("State", "file", "function", "line", "thread"))
-    LBRACE, RBRACE = map(Suppress, "{}")
-    SEP = Keyword("----------------------------------------------------")
-    STUFF = Word(printables)
-    ASSUMPTION = (
-        Keyword("Assumption:") | Keyword("(SIMULATION)")
-        ).suppress() + SkipTo(STATE)
-    INFO = (
-        Optional(STATE + ppc.number().setResultsName("state")) &
-        (FILE + STUFF.setResultsName("file")) &
-        (FN + STUFF.setResultsName("function")) &
-        (LINE + ppc.number().setResultsName("line")) &
-        Optional(THREAD + ppc.number().setResultsName("thread"))
-    ).ignore(ASSUMPTION)
-
-    VAR = Word(printables, excludeChars="=")
-    RECORD = Forward()
-    VAL = (
-        (ppc.number() + Optional(Suppress("u"))) |
-        BOOLEAN |
-        dblQuotedString |
-        Group(RECORD))
-    RECORD <<= (LBRACE + delimitedList(VAL) + RBRACE)
-
-    ASGN = VAR + Suppress("=") + VAL + SkipTo(LineEnd()).suppress()
-
-    TRACE = OneOrMore(Group(Group(INFO) + SEP.suppress() + Group(ASGN)))
+        return ""
+    
+    def get_value(rhs):
+        return rhs.rsplit("(", 1)[0].strip()
 
     cex_start_pos = cex.find("Counterexample:") + 15
-    cex_end_pos = cex.find("Violated property:")
-    states = TRACE.parseString(cex[cex_start_pos:cex_end_pos], parseAll=True)
+    cex_end_pos = cex.rfind("Violated property:")
+    # start = time.time()
+    states = parser.parseString(cex[cex_start_pos:cex_end_pos], parseAll=True)
+    # yield f"<parsing took {time.time()-start} s>\n"
+    # tr_start = time.time()
 
     inits = (
-        s[1] for s in states
-        if s[0]["function"] == "init" and not(LTSTAMP.match(s[1][0])))
+        (s[1].lhs, get_value(s[1].rhs)) for s in states
+        if s[0].function == "init" and not(LTSTAMP.match(s[1][0])))
     others = [
-        (s[0]["function"], s[0]["line"], *s[1]) for s in states
-        if s[0]["function"] not in ("init", "__CPROVER_initialize")]
+        (s[0].function, s[0].line, s[1].lhs, get_value(s[1].rhs))
+        for s in states
+        if s[0].function not in ("init", "__CPROVER_initialize")]
     yield "<initialization>"
     for i in inits:
         pprint = pprint_assign(*i, init=True)
@@ -120,11 +131,12 @@ def translateCPROVER(cex, fname, info, offset=-1):
             if pprint:
                 yield pprint
 
-    prova = cex[cex_end_pos + 18:]
-    PROP = Suppress(INFO) + STUFF + Suppress(SkipTo(StringEnd()))
-    prop = PROP.parseString(prova)
+    violation = cex[cex_end_pos + 18:]
+    prop = PROP.parseString(violation)
     if prop[0] != "__sliver_simulation__":
         yield f"\n<property violated: '{prop[0]}'>"
+    # yield f"\n<Translation took {time.time()-tr_start} s>"
+    # yield f"\n<Full time is {time.time()-start} s>"
     yield "\n"
 
 
