@@ -324,10 +324,13 @@ class Cbmc(Backend):
                 error_message="Backend 'cbmc' requires --steps N (with N>0)."
             )
 
+    def translate_cex(self, cex, fname, info):
+        return translateCPROVER(cex, fname, info)
+
     def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode == 10:
             out = err.output.decode("utf-8")
-            print(*translateCPROVER(out, fname, info), sep="", end="")
+            print(*self.translate_cex(out, fname, info), sep="", end="")
             return ExitStatus.FAILED
         elif err.returncode == 6:
             print("Backend failed with parsing error.")
@@ -382,10 +385,13 @@ class Cseq(Backend):
                 error_message="Backend 'cseq' requires --steps N (with N>0)."
             )
 
+    def translate_cex(self, cex, fname, info):
+        return translateCPROVER(cex, fname, info)
+
     def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode in (1, 10):
             out = err.output.decode("utf-8")
-            print(*translateCPROVER(out, fname, info, 19), sep="", end="")
+            print(*self.translate_cex(out, fname, info), sep="", end="")
             return ExitStatus.FAILED
         elif err.returncode == 6:
             log.info("Backend failed with parsing error.")
@@ -446,6 +452,9 @@ class CadpMonitor(Backend):
         cmd.append(mcl)
         return cmd
 
+    def translate_cex(self, cex, fname, info):
+        return translate_cadp(cex, info)
+
     def simulate(self, fname, info):
         if not(self.check_cadp()):
             return ExitStatus.BACKEND_ERROR
@@ -462,7 +471,7 @@ class CadpMonitor(Backend):
                 self.verbose_output(out, "Backend output")
                 header = f"====== Trace #{i+1} ======"
                 print(header)
-                print(*translate_cadp(out, info), sep="", end="")
+                print(*self.translate_cex(out, "", info), sep="", end="")
                 print(f'{"" :=<{len(header)}}')
             return ExitStatus.SUCCESS
         except CalledProcessError as err:
@@ -487,9 +496,9 @@ class CadpMonitor(Backend):
             if "evaluator.bcg" in out:
                 cex = self.extract_trace()
                 print("Counterexample prefix:")
-                print(*translate_cadp(cex, info), sep="", end="")
+                print(*self.translate_cex(cex, "", info), sep="", end="")
             else:
-                print(*translate_cadp(out, info), sep="", end="")
+                print(*self.translate_cex(out, "", info), sep="", end="")
             return ExitStatus.FAILED
         else:
             return super().handle_success(out, info)
