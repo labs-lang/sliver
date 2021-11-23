@@ -80,7 +80,12 @@ def contains(formula, var):
         return False
 
 
-def remove_quant(formula, quant, var, agents):
+def replace_with_string(f, agent):
+    # TODO extend to arrays (check f.offset)
+    return f"{f.var}_{agent}"
+
+
+def remove_quant(formula, quant, var, agents, fn=replace_with_string):
     """Remove the given quantified variable from formula.
     """
 
@@ -90,7 +95,7 @@ def remove_quant(formula, quant, var, agents):
     def replace_with(f, agent):
         nonlocal new_vars
         if isinstance(f, OfNode) and f.agent == var:
-            v = f"{f.var}_{agent}"
+            v = fn(f, agent)
             new_vars.add(v)
             return v
         elif isinstance(f, BinOp):
@@ -106,7 +111,22 @@ def remove_quant(formula, quant, var, agents):
         new_vars)
 
 
-def get_formula(info):
+def make_dict(formula):
+    """Return a dictionary mapping quantified variable names
+    to their quantifier and the type of agent being ranged over.
+    """
+    if isinstance(formula, Quant):
+        inner_dict, inner_formula = make_dict(formula.inner)
+        if formula.varname in inner_dict:
+            raise Exception(
+                f"Multiple definitions for variable {formula.varname}")
+        inner_dict[formula.varname] = (formula.quantifier, formula.typename)  # noqa: E501
+        return inner_dict, inner_formula
+    else:
+        return {}, formula
+
+
+def get_formula(info, prop=None):
     """Extract the 1st property in info.properties and
     turn it into a propositional formula (via quantifier elimination.)
 
@@ -114,21 +134,10 @@ def get_formula(info):
     by quantifier elimination, and the property's temporal modality.
     """
 
-    def make_dict(formula):
-        """Return a dictionary mapping quantified variable names
-        to their quantifier and the type of agent being ranged over.
-        """
-        if isinstance(formula, Quant):
-            inner_dict, inner_formula = make_dict(formula.inner)
-            if formula.varname in inner_dict:
-                raise Exception(
-                    f"Multiple definitions for variable {formula.varname}")
-            inner_dict[formula.varname] = (formula.quantifier, formula.typename)  # noqa: E501
-            return inner_dict, inner_formula
-        else:
-            return {}, formula
+    if not prop:
+        prop = info.properties[0]
 
-    parsed = PROP.parseString(info.properties[0])
+    parsed = PROP.parseString(prop)
     d, formula = make_dict(parsed[0].quant)
     # remove quantifiers
     # and collect variables created by quantifier elimination
@@ -140,6 +149,3 @@ def get_formula(info):
             new_vars = new_vars.union(nv)
 
     return formula, new_vars, parsed[0].modality
-
-
-__all__ = (pprint, get_formula)
