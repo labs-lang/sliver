@@ -20,6 +20,7 @@ class Args(Enum):
     STEPS = "steps"
     SYNC = "sync"
     TIMEOUT = "timeout"
+    TRANSLATE_CEX = "translate_cex"
     CORES_TO = "to"
     VALUES = "values"
     VERBOSE = "verbose"
@@ -70,6 +71,10 @@ HELPMSG = {
         "Configure time limit (seconds). "
         "Set to 0 to disable timeout."),
 
+    Args.TRANSLATE_CEX: (
+        "Translate given counterexample to LAbS and exit."
+    ),
+
     Args.CORES_TO: "Parallel analysis: partition end.",
 
     Args.VALUES: "assign values for parameterised specification (key=value)",
@@ -93,6 +98,7 @@ DEFAULTS = {
     Args.STEPS: 0,
     Args.SYNC: False,
     Args.TIMEOUT: 0,
+    Args.TRANSLATE_CEX: None,
     Args.CORES_TO: None,
     Args.VALUES: tuple(),
     Args.VERBOSE: False

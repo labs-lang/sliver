@@ -11,12 +11,13 @@ from backends import ALL_BACKENDS, ExitStatus, SliverError
 from __about__ import __title__, __version__
 
 __DIR = Path(__file__).parent.resolve()
+__existing = click.Path(exists=True)
 log = logging.getLogger("sliver")
 
 
 @click.command()
 @click.version_option(__version__, prog_name=__title__.lower())
-@click.argument('file', required=True, type=click.Path(exists=True))
+@click.argument('file', required=True, type=__existing)
 @click.argument('values', nargs=-1)
 @click.option('--backend',
               type=click.Choice(tuple(ALL_BACKENDS.keys())),
@@ -36,8 +37,10 @@ log = logging.getLogger("sliver")
 @click.option('--no-properties', **CLICK(Args.NO_PROPERTIES, is_flag=True))
 @click.option('--property', **CLICK(Args.PROPERTY))
 @click.option('--keep-files', **CLICK(Args.KEEP_FILES, is_flag=True))
+@click.option('--translate-cex',
+              **CLICK(Args.TRANSLATE_CEX, type=__existing))
 @click.option('--include',
-              multiple=True, type=click.Path(exists=True),
+              multiple=True, type=__existing,
               **CLICK(Args.INCLUDE))
 def main(file, **kwargs):
     """\b
@@ -77,7 +80,18 @@ VALUES -- assign values for parameterised specification (key=value)
             log.debug(f"{info=}")
             info = Info.parse(info)
             backend.check_info(info)
+
             sim_or_verify = "Running simulation" if simulate else "Verifying"
+
+            if cli[Args.TRANSLATE_CEX]:
+                cex_name = cli[Args.TRANSLATE_CEX]
+                log.info(f"Translating counterexample {cex_name}...")
+                with open(cex_name) as cex:
+                    out = cex.read()
+                    print(
+                        *backend.translate_cex(out, "", info), sep="", end="")
+                sys.exit(0)
+
             if not simulate and cli[Args.PROPERTY]:
                 sim_or_verify += f""" '{cli[Args.PROPERTY]}'"""
             log.info(f"{sim_or_verify} with backend {backend_arg}...")
