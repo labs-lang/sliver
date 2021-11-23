@@ -76,40 +76,40 @@ VALUES -- assign values for parameterised specification (key=value)
     if fname and show:
         sys.exit(ExitStatus.SUCCESS.value)
     status = None
-    if fname:
-        try:
-            log.info(f"Gathering information on {file}...")
-            info = backend.get_info().replace("\n", "|")[:-1]
-            log.debug(f"{info=}")
-            info = Info.parse(info)
-            backend.check_info(info)
+    
+    try:
+        log.info(f"Gathering information on {file}...")
+        info = backend.get_info().replace("\n", "|")[:-1]
+        log.debug(f"{info=}")
+        info = Info.parse(info, cli[Args.VALUES])
+        backend.check_info(info)
 
-            sim_or_verify = "Running simulation" if simulate else "Verifying"
+        sim_or_verify = "Running simulation" if simulate else "Verifying"
 
-            if cli[Args.TRANSLATE_CEX]:
-                cex_name = cli[Args.TRANSLATE_CEX]
-                log.info(f"Translating counterexample {cex_name}...")
-                with open(cex_name) as cex:
-                    out = cex.read()
-                    print(
-                        *backend.translate_cex(out, "", info), sep="", end="")
-                sys.exit(0)
+        if cli[Args.TRANSLATE_CEX]:
+            cex_name = cli[Args.TRANSLATE_CEX]
+            log.info(f"Translating counterexample {cex_name}...")
+            with open(cex_name) as cex:
+                out = cex.read()
+                print(
+                    *backend.translate_cex(out, "", info), sep="", end="")
+            sys.exit(0)
 
-            if not simulate and cli[Args.PROPERTY]:
-                sim_or_verify += f""" '{cli[Args.PROPERTY]}'"""
-            log.info(f"{sim_or_verify} with backend {backend_arg}...")
-            status = (backend.simulate(fname, info) if simulate else
-                      backend.verify(fname, info))
-        except KeyboardInterrupt:
-            status = ExitStatus.KILLED
-        except SliverError as err:
-            err.handle(quiet=True, quit=False)
-            status = err.status
-        finally:
-            backend.cleanup(fname)
-            if status:
-                print(ExitStatus.format(status, simulate))
-                sys.exit(status.value)
+        if not simulate and cli[Args.PROPERTY]:
+            sim_or_verify += f""" '{cli[Args.PROPERTY]}'"""
+        log.info(f"{sim_or_verify} with backend {backend_arg}...")
+        status = (backend.simulate(fname, info) if simulate else
+                    backend.verify(fname, info))
+    except KeyboardInterrupt:
+        status = ExitStatus.KILLED
+    except SliverError as err:
+        err.handle(quiet=True, quit=False)
+        status = err.status
+    finally:
+        backend.cleanup(fname)
+        if status:
+            print(ExitStatus.format(status, simulate))
+            sys.exit(status.value)
 
 
 if __name__ == "__main__":

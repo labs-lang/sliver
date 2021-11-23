@@ -62,10 +62,11 @@ class LabsExprVisitor(NodeVisitor):
 
 
 class Info(object):
-    def __init__(self, spawn, e, props, assumes, raw=""):
+    def __init__(self, spawn, e, props, assumes, raw, externs):
         self.spawn = spawn
         self.i = {}
         self.lstig = {}
+        self.externs = externs
         self.properties = tuple(p for p in props.split(";") if p)
         self.assumes = tuple(p for p in assumes.split(";") if p)
         for c in spawn.values():
@@ -75,7 +76,7 @@ class Info(object):
         self.raw = raw
 
     @staticmethod
-    def parse(txt):
+    def parse(txt, externs=[]):
         if not txt:
             raise ValueError("empty info")
         """Deserialize system info
@@ -83,11 +84,13 @@ class Info(object):
         lines = txt.split("|")
         envs, comps, props, assumes = (
             lines[0], lines[1:-2], lines[-2], lines[-1])
+        parsed_extern = [ex.split("=") for ex in externs]
         return Info(
             spawn=Spawn.parse(comps),
             e=[Variable(*v.split("=")) for v in envs.split(";") if v],
             props=props,
             assumes=assumes,
+            externs={e[0]: e[1] for e in parsed_extern},
             raw=txt)
 
     def max_key_i(self):
