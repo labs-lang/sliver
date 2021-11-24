@@ -12,6 +12,8 @@ import sys
 from cli import Args
 from cex import translateCPROVER, translate_cadp, translateCPROVER54, translateCPROVERNEW
 from atlas.mcl import translate_property
+from atlas.concretizer import Concretizer
+
 
 # LanguageInfo = namedtuple("LanguageInfo", ["extension", "encoding"])
 log = logging.getLogger('backend')
@@ -295,29 +297,42 @@ class Cbmc(Backend):
         return cmd
 
     def simulate(self, fname, info):
-        exe = os.environ.get("CBMC") or (
-            str(self.cwd / "backends" / "cbmc-5.42.0" / "bin" / "cbmc")
-            if "Linux" in platform.system()
-            else "cbmc")
-        glucose = str(self.cwd / "backends" / "glucose" / "glucose-nondet.sh")
-        cmd = [
-            exe,
-            "--external-sat-solver", glucose,
-            "--trace",
-            "--stop-on-fail"
-        ]
-        cmd.append(fname)
-        log_call(cmd)
-        try:
-            out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
-            self.verbose_output(out, "Backend output")
-        except CalledProcessError as err:
-            out = err.output.decode("utf-8")
-            self.verbose_output(out, "Backend output")
+        # exe = os.environ.get("CBMC") or (
+        #     str(self.cwd / "backends" / "cbmc-5.42.0" / "bin" / "cbmc")
+        #     if "Linux" in platform.system()
+        #     else "cbmc")
+        # # glucose = str(self.cwd / "backends" / "glucose" / "glucose-nondet.sh")
+        # cmd = [
+        #     exe,
+        #     # "--external-sat-solver", glucose,
+        #     "--trace",
+        #     "--stop-on-fail"
+        # ]
+        cmd = self.get_cmdline(fname, info)
+        c = Concretizer(info, self.cli, True)
+        # cmd.append(fname)
+        for i in range(self.cli[Args.SIMULATE]):
             try:
-                print(*translateCPROVER(out, fname, info), sep="", end="")
-            except Exception as e:
-                print(f"Counterexample translation failed: {e}")
+                ################ Concretization step #########################
+                c.concretize_file(fname)
+                # c_globals, c_init = c.concretize()
+                # print(c_globals)
+                # print(c_init)
+                ###############################################################
+                log_call(cmd)
+                out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
+                self.verbose_output(out, "Backend output")
+            except CalledProcessError as err:
+                out = err.output.decode("utf-8")
+                self.verbose_output(out, "Backend output")
+                try:
+                    header = f"====== Trace #{i+1} ======"
+                    print(header)
+                    for x in self.translate_cex(out, info):
+                        print(x, sep="", end="")
+                    print(f'{"" :=<{len(header)}}')
+                except Exception as e:
+                    print(f"Counterexample translation failed: {e}")
         return ExitStatus.SUCCESS
 
     def check_cli(self):
