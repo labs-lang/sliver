@@ -221,12 +221,12 @@ class Backend:
                 else ExitStatus.PARSING_ERROR)
             raise SliverError(status=status, error_message=msg)
 
-    def preprocess(self, code, fname):
+    def preprocess(self, code, _):
         """Preprocesses code so that it is compatible with the backend.
         """
         return code
 
-    def simulate(self, fname, info):
+    def simulate(self, _, _):
         """Returns random executions of the program at fname.
         """
         print("This backend does not support simulation.")
@@ -259,10 +259,10 @@ class Backend:
         else:
             log.debug(output)
 
-    def handle_success(self, out, info) -> ExitStatus:
+    def handle_success(self, _, _) -> ExitStatus:
         return ExitStatus.SUCCESS
 
-    def handle_error(self, err, fname, info) -> ExitStatus:
+    def handle_error(self, err, _, _) -> ExitStatus:
         if err.returncode == 124:
             return ExitStatus.TIMEOUT
         else:
@@ -310,7 +310,6 @@ class Cbmc(Backend):
         # ]
         cmd = self.get_cmdline(fname, info)
         c = Concretizer(info, self.cli, True)
-        # cmd.append(fname)
         for i in range(self.cli[Args.SIMULATE]):
             try:
                 ################ Concretization step #########################
