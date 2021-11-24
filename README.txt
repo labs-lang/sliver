@@ -1,20 +1,18 @@
 
-              SLiVER 2.1
+            SLiVER 2.2-PREVIEW
               November 2021
 
 The SLiVER LAbS VERification tool
 
     * Package contents *
 
-atlas/, cadp/     Files used by cadp and cadp-monitor backend
+atlas/            Python files for parsing properties
 
-cseq/             CSeq analysis tool
+backends/         Analysis backends and related files
 
 examples/         LAbS example specifications
 
 labs/             LAbS parser and translator
-
-cbmc-simulator    A build of CBMC 5.4
 
 HISTORY           SLiVER changelog
 
