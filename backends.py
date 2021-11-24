@@ -354,7 +354,7 @@ class Cseq(Backend):
         self.name = "cseq"
         self.modalities = ("always", "finally")
         self.language = Language.C
-        self.cwd /= "backends" / "cseq"
+        self.cwd /= Path("backends") / "cseq"
 
     def get_cmdline(self, fname, info):
         result = [
@@ -374,7 +374,7 @@ class Cseq(Backend):
             if arg[1] is not None:
                 result.extend(arg)
         # TODO change split according to info
-        result += ["--split", "_I", "--info", info.raw]
+        result += ["--split", "I", "--info", info.raw]
         return result
 
     def cleanup(self, fname):
