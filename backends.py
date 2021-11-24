@@ -10,7 +10,7 @@ from subprocess import PIPE, run, check_output, CalledProcessError, STDOUT
 import sys
 
 from cli import Args
-from cex import translateCPROVER, translate_cadp
+from cex import translateCPROVER, translate_cadp, translateCPROVER54, translateCPROVERNEW
 from atlas.mcl import translate_property
 
 # LanguageInfo = namedtuple("LanguageInfo", ["extension", "encoding"])
@@ -274,15 +274,19 @@ class Cbmc(Backend):
         self.modalities = ("always", "finally")
         self.language = Language.C
 
-    def get_cmdline(self, fname, _):
-        cmd = [os.environ.get("CBMC") or (
-            str(self.cwd / "backends" / "cbmc-simulator")
-            if "Linux" in platform.system()
-            else "cbmc")]
+    def get_cbmc_version(self, cmd):
         CBMC_V, *CBMC_SUBV = check_output(
             [cmd[0], "--version"],
             cwd=self.cwd).decode().strip().split(" ")[0].split(".")
         CBMC_SUBV = CBMC_SUBV[0]
+        return CBMC_V, CBMC_SUBV
+
+    def get_cmdline(self, fname, _):
+        cmd = [os.environ.get("CBMC") or (
+            str(self.cwd / "backends" / "cbmc" / "cbmc-simulator")
+            if "Linux" in platform.system()
+            else "cbmc")]
+        CBMC_V, CBMC_SUBV = self.get_cbmc_version(cmd)
         if not (int(CBMC_V) <= 5 and int(CBMC_SUBV) <= 4):
             cmd += ["--trace", "--stop-on-fail"]
         if self.cli[Args.DEBUG]:
@@ -324,13 +328,18 @@ class Cbmc(Backend):
                 error_message="Backend 'cbmc' requires --steps N (with N>0)."
             )
 
-    def translate_cex(self, cex, fname, info):
-        return translateCPROVER(cex, fname, info)
+    def translate_cex(self, cex, info):
+        cmd = self.get_cmdline("", "")
+        CBMC_V, CBMC_SUBV = self.get_cbmc_version(cmd)
+        if not (int(CBMC_V) <= 5 and int(CBMC_SUBV) <= 4):
+            return translateCPROVERNEW(cex, info)
+        else:
+            return translateCPROVER54(cex, info)
 
     def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode == 10:
             out = err.output.decode("utf-8")
-            print(*self.translate_cex(out, fname, info), sep="", end="")
+            print(*self.translate_cex(out, info), sep="", end="")
             return ExitStatus.FAILED
         elif err.returncode == 6:
             print("Backend failed with parsing error.")
@@ -385,13 +394,14 @@ class Cseq(Backend):
                 error_message="Backend 'cseq' requires --steps N (with N>0)."
             )
 
-    def translate_cex(self, cex, fname, info):
-        return translateCPROVER(cex, fname, info)
+    def translate_cex(self, cex, info):
+        return translateCPROVER(cex, info)
 
     def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode in (1, 10):
             out = err.output.decode("utf-8")
-            print(*self.translate_cex(out, fname, info), sep="", end="")
+            for ln in self.translate_cex(out, info):
+                print(ln, sep="", end="")
             return ExitStatus.FAILED
         elif err.returncode == 6:
             log.info("Backend failed with parsing error.")
@@ -452,7 +462,7 @@ class CadpMonitor(Backend):
         cmd.append(mcl)
         return cmd
 
-    def translate_cex(self, cex, fname, info):
+    def translate_cex(self, cex, info):
         return translate_cadp(cex, info)
 
     def simulate(self, fname, info):
@@ -471,7 +481,8 @@ class CadpMonitor(Backend):
                 self.verbose_output(out, "Backend output")
                 header = f"====== Trace #{i+1} ======"
                 print(header)
-                print(*self.translate_cex(out, "", info), sep="", end="")
+                for ln in self.translate_cex(out, info):
+                    print(ln, sep="", end="")
                 print(f'{"" :=<{len(header)}}')
             return ExitStatus.SUCCESS
         except CalledProcessError as err:
@@ -496,9 +507,9 @@ class CadpMonitor(Backend):
             if "evaluator.bcg" in out:
                 cex = self.extract_trace()
                 print("Counterexample prefix:")
-                print(*self.translate_cex(cex, "", info), sep="", end="")
+                print(*self.translate_cex(cex, info), sep="", end="")
             else:
-                print(*self.translate_cex(out, "", info), sep="", end="")
+                print(*self.translate_cex(out, info), sep="", end="")
             return ExitStatus.FAILED
         else:
             return super().handle_success(out, info)
