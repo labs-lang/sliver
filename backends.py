@@ -226,7 +226,7 @@ class Backend:
         """
         return code
 
-    def simulate(self, _, _):
+    def simulate(self, *args):
         """Returns random executions of the program at fname.
         """
         print("This backend does not support simulation.")
@@ -259,10 +259,10 @@ class Backend:
         else:
             log.debug(output)
 
-    def handle_success(self, _, _) -> ExitStatus:
+    def handle_success(self, *args) -> ExitStatus:
         return ExitStatus.SUCCESS
 
-    def handle_error(self, err, _, _) -> ExitStatus:
+    def handle_error(self, err, *args) -> ExitStatus:
         if err.returncode == 124:
             return ExitStatus.TIMEOUT
         else:

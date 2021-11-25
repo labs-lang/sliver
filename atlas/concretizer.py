@@ -168,7 +168,6 @@ class Concretizer:
 
     def _concretize_scheduler(self):
         steps = self.cli[Args.STEPS]
-        # self.sched = [Int(f"sched_{i:0>2}") for i in range(steps)]
         self.sched = IntVector("sched", steps)
         self.s.add(*(s >= 0 for s in self.sched))
         self.s.add(*(s < self.agents for s in self.sched))
