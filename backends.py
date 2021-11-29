@@ -13,7 +13,7 @@ from cli import Args
 from cex import translateCPROVER, translate_cadp, translateCPROVER54, translateCPROVERNEW
 from atlas.mcl import translate_property
 from atlas.concretizer import Concretizer
-
+from info import Info
 
 # LanguageInfo = namedtuple("LanguageInfo", ["extension", "encoding"])
 log = logging.getLogger('backend')
@@ -205,7 +205,17 @@ class Backend:
                     included += f.read()
             out = out.replace("___includes___", included)
             out = self.preprocess(out, fname)
+
             if self.cli[Args.SHOW]:
+                # TODO add concretize cli options
+                if self.cli[Args.SIMULATE] and self.language == Language.C:
+                    log.info(f"Gathering information on {fname}...")
+                    info = self.get_info().replace("\n", "|")[:-1]
+                    log.debug(f"{info=}")
+                    info = Info.parse(info, self.cli[Args.VALUES])
+                    self.check_info(info)
+                    c = Concretizer(info, self.cli, True)
+                    out = c.concretize_program(out)
                 print(out)
             else:
                 log.debug(f"Writing emulation program to {fname}...")

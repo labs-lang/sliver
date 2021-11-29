@@ -1,4 +1,4 @@
-import enum
+import re
 from z3 import (
     Concat, Exists, Optimize, simplify,
     Solver, Int, IntSort, And, Or, Function, ForAll, Not, If,
@@ -31,6 +31,7 @@ def symMax(vs):
 
 def symMin(vs):
     return symbolic_reduce(vs, lambda x, y: x < y)
+
 
 def Count(boolvec):
     return Sum(*(If(i, 1, 0) for i in boolvec))
@@ -106,6 +107,7 @@ class Concretizer:
         self.attrs = [[] for _ in range(self.agents)]
         self.lstigs = [[] for _ in range(self.agents)]
         self.sched = None
+        self.picks = {}
         self.is_setup = False
         if randomize:
             self.s = Optimize()
@@ -117,9 +119,16 @@ class Concretizer:
             self.s.push()
         else:
             self.s = Solver()
-        self._concretize_initial_state()
-        self._concretize_scheduler()
-        self.neigs = self._concretize_neigs()
+
+    def setup(self, picks):
+        if not self.is_setup:
+            self._concretize_initial_state()
+            self._concretize_scheduler()
+            for p in picks:
+                self.add_pick(*p)
+
+    def isAnAgent(self, var):
+        return And(var >= 0, var < self.agents)
 
     def _add_soft_constraints(self):
         for tid in range(self.agents):
@@ -169,8 +178,7 @@ class Concretizer:
     def _concretize_scheduler(self):
         steps = self.cli[Args.STEPS]
         self.sched = IntVector("sched", steps)
-        self.s.add(*(s >= 0 for s in self.sched))
-        self.s.add(*(s < self.agents for s in self.sched))
+        self.s.add(*(self.isAnAgent(x) for x in self.sched))
         # Round robin scheduler
         if self.cli[Args.FAIR]:
             self.s.add(self.sched[0] == 0)
@@ -178,69 +186,83 @@ class Concretizer:
                 (self.sched[i] == (self.sched[i - 1] + 1) % self.agents)
                 for i in range(1, steps)))
 
-    # TODO: generalize below to any nondet variable?
-    def _concretize_neigs(self):
-        NEIGS = self.info.externs["neigs"]
+    def add_pick(self, name, size):
+        size = int(size)
         steps = self.cli[Args.STEPS]
-        neigs = [BoolVector(f"neigs_{i}", self.agents) for i in range(steps)]
-        for step in range(steps):
-            for a in range(self.agents):
-                # No agent selects itselfs as neighbor
-                self.s.add(Or(a != self.sched[step], Not(neigs[step][a])))
-            # Number of neighbors equals NEIGS
-            self.s.add(Count(neigs[step]) == NEIGS)
-        return neigs
 
-    def concretize_file(self, fname):
+        p = [IntVector(f"{name}_{i}", size) for i in range(steps)]
+        for step in range(steps):
+            # Picks are agent ids
+            self.s.add(*(self.isAnAgent(x) for x in p[step]))
+            # No agent picks itselfs as neighbor
+            self.s.add(*(x != self.sched[step] for x in p[step]))
+            # All picks are different
+            self.s.add(*(
+                p[step][i] != p[step][j]
+                for j in range(size)
+                for i in range(j)))
+        self.picks[name] = (p, size)
+
+    def concretize_program(self, program):
+        def make_regex(placeholder):
+            return re.compile(
+                f'(?<=// ___{placeholder}___)'
+                + '(.*?)'
+                + f'(?=// ___end {placeholder}___)', re.DOTALL)
+
+        re_pick = re.compile(
+            r'TYPEOFVALUES '
+            r'([^\[]+)\[.+\]; /\* Pick ([0-9]+) \*/'
+        )
+
         if self.randomize:
             self._add_soft_constraints()
 
-        globs, inits = self.get_concretization()
-        places = {
-            "// ___concrete-globals___": None,
-            "// ___end concrete-globals___": None,
-            "// ___concrete-init___": None,
-            "// ___end concrete-init___": None,
-            "// ___concrete-scheduler___": None,
-            "// ___end concrete-scheduler___": None,
-            "// ___symbolic-scheduler___": None,
-            "// ___end symbolic-scheduler___": None
-        }
+        picks = re_pick.findall(program)
+        for pick_name, _ in picks:
+            usages = re.compile(f'(?<!TYPEOFVALUES ){pick_name}' + r'\[')
+            program = usages.sub(f"{pick_name}[__LABS_step][", program)
 
+        globs, inits = self.get_concretization(picks)
+
+        re_globals = make_regex("concrete-globals")
+        re_init = make_regex("concrete-init")
+        re_sched = make_regex("concrete-scheduler")
+        re_sym_sched = make_regex("symbolic-scheduler")
+        re_sym_pick = make_regex("symbolic-pick")
+
+        program = re_globals.sub(f'\n{globs}\n', program)
+        program = re_init.sub(f'\n{inits}\n', program)
+        program = re_sched.sub('\nfirstAgent = sched[__LABS_step];\n', program)
+        program = re_sym_sched.sub('\n', program)
+        program = re_sym_pick.sub('\n', program)
+
+        return program
+
+    def concretize_file(self, fname):
         with open(fname) as file:
-            lines = file.readlines()
-
-        for i, line in enumerate(lines):
-            for placeholder in places:
-                if placeholder in line:
-                    places[placeholder] = i
-
+            program = file.read()
+        program = self.concretize_program(program)
         with open(fname, "w") as file:
-            file.writelines(lines[:places["// ___concrete-globals___"] + 1])
-            file.write(globs)
-            file.write("\n")
-            file.writelines(lines[places["// ___end concrete-globals___"]:places["// ___concrete-init___"] + 1])
-            file.write(inits)
-            file.write("\n")
-            file.writelines(lines[places["// ___end concrete-init___"]:places["// ___concrete-scheduler___"] + 1])
-            file.write("firstAgent = sched[__LABS_step];\n")
-            file.writelines(lines[places["// ___end concrete-scheduler___"]:places["// ___symbolic-scheduler___"] + 1])
-            file.writelines(lines[places["// ___end symbolic-scheduler___"]:])
+            file.write(program)
 
+    def get_concretization(self, picks):
 
-    def get_concretization(self):
-        def fmt_globals(m, neigs):
-            STEPS, AGENTS = self.cli[Args.STEPS], self.agents
+        def fmt_globals(m):
+            STEPS = self.cli[Args.STEPS]
 
-            def fmt_step(row):
-                return ", ".join("1" if m[x] else "0" for x in row)
+            def fmt_intvec(vec):
+                return f"""{{ {",".join(str(m[x]) for x in vec)} }}"""
+
+            def fmt_pick(p, name, size):
+                rows = ", ".join(fmt_intvec(row) for row in p)
+                return f"TYPEOFAGENTID {name}[{STEPS}][{size}] = {{ {rows} }};"
+
+            picks = (fmt_pick(p, n, s) for n, (p, s) in self.picks.items())
             return (
-                f"TYPEOFAGENTID sched[{STEPS}] = {{"
-                + ",".join(str(m[x]) for x in self.sched)
-                + "};\n"
-                + f"_Bool is_neig[{STEPS}][{AGENTS}] = {{"
-                + ", ".join(f"{{{ fmt_step(row) }}}"for row in neigs)
-                + "};\n")
+                f"TYPEOFAGENTID sched[{STEPS}] = {fmt_intvec(self.sched)};"
+                + "\n"
+                + "\n".join(picks))
 
         def fmt_inits(m):
             def index(attr):
@@ -254,6 +276,8 @@ class Concretizer:
                 for tid in range(self.agents)
                 for attr in self.lstigs[tid]))
 
+        self.setup(picks)
+
         if self.s.check() == sat:
             m = self.s.model()
             # Avoid getting the same model in future
@@ -264,6 +288,6 @@ class Concretizer:
             if block:
                 self.s.add(Or(block))
 
-            return fmt_globals(m, self.neigs), fmt_inits(m)
+            return fmt_globals(m), fmt_inits(m)
         else:
             return None, None
