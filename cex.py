@@ -1,10 +1,10 @@
 import re
-from pyparsing import (Word, alphanums, delimitedList, OneOrMore, ZeroOrMore,
-                       Forward, Suppress, Group, ParserElement, Keyword,
-                       dblQuotedString, removeQuotes, SkipTo, StringEnd, Regex,
-                       printables)
+from pyparsing import (
+    LineEnd, LineStart, Word, alphanums, delimitedList, OneOrMore, ZeroOrMore,
+    Forward, Suppress, Group, ParserElement, Keyword, dblQuotedString,
+    removeQuotes, SkipTo, StringEnd, Regex, printables)
 from pyparsing import pyparsing_common as ppc
-import time
+
 
 ATTR = re.compile(r"I\[([0-9]+)l?\]\[([0-9]+)l?\]")
 LSTIG = re.compile(r"Lvalue\[([0-9]+)l?\]\[([0-9]+)l?\]")
@@ -48,7 +48,7 @@ SEP = Keyword("----------------------------------------------------")
 ASGN = Regex(r'(?P<lhs>[^\s=]+)=(?P<rhs>.+)')
 TRACE = OneOrMore(Group(Group(HEADER) + SEP.suppress() + Group(ASGN))).ignore(OneOrMore(SKIP))  # noqa: E501
 TRACE_OLD = OneOrMore(Group(Group(HEADER_OLD) + SEP.suppress() + Group(ASGN))).ignore(OneOrMore(SKIP))  # noqa: E501
-PROP = Suppress(HEADER | HEADER_OLD) + STUFF + Suppress(SkipTo(StringEnd()))
+PROP = Suppress(SkipTo(LineEnd())) + Suppress(SkipTo(LineStart())) + STUFF + Suppress(SkipTo(StringEnd()))  # noqa: E501
 
 
 def pprint_agent(info, tid):
