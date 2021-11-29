@@ -284,6 +284,32 @@ class Cbmc(Backend):
         cmd.append(fname)
         return cmd
 
+    def simulate(self, fname, info):
+        exe = os.environ.get("CBMC") or (
+            str(self.cwd / "backends" / "cbmc-5.42.0" / "bin" / "cbmc")
+            if "Linux" in platform.system()
+            else "cbmc")
+        glucose = str(self.cwd / "backends" / "glucose" / "glucose-nondet.sh")
+        cmd = [
+            exe,
+            "--external-sat-solver", glucose,
+            "--trace",
+            "--stop-on-fail"
+        ]
+        cmd.append(fname)
+        log_call(cmd)
+        try:
+            out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
+            self.verbose_output(out, "Backend output")
+        except CalledProcessError as err:
+            out = err.output.decode("utf-8")
+            self.verbose_output(out, "Backend output")
+            try:
+                print(*translateCPROVER(out, fname, info), sep="", end="")
+            except Exception as e:
+                print(f"Counterexample translation failed: {e}")
+        return ExitStatus.SUCCESS
+
     def check_cli(self):
         super().check_cli()
         if not self.cli[Args.STEPS] and not self.cli[Args.SHOW]:
