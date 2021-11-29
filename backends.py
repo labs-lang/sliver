@@ -270,7 +270,7 @@ class Cbmc(Backend):
 
     def get_cmdline(self, fname, _):
         cmd = [os.environ.get("CBMC") or (
-            str(self.cwd / "cbmc-simulator")
+            str(self.cwd / "backends" / "cbmc-simulator")
             if "Linux" in platform.system()
             else "cbmc")]
         CBMC_V, *CBMC_SUBV = check_output(
@@ -310,7 +310,7 @@ class Cseq(Backend):
         self.name = "cseq"
         self.modalities = ("always", "finally")
         self.language = Language.C
-        self.cwd /= "cseq"
+        self.cwd /= "backends" / "cseq"
 
     def get_cmdline(self, fname, info):
         result = [
@@ -410,7 +410,7 @@ class CadpMonitor(Backend):
             cmd.append("-verbose")
         modality = info.properties[0].split()[0]
         mcl = "fairly.mcl" if modality == "finally" else "never.mcl"
-        mcl = str(Path("cadp") / Path(mcl))
+        mcl = str(Path("backends") / "cadp" / mcl)
         cmd.append(mcl)
         return cmd
 
