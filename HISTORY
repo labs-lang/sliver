@@ -2,9 +2,9 @@ Version 2.1 - 2021-11
 
 C translation: Fixed a bug with the nondeterministic value operator
 C translation: Fixed a bug with counterexample translation
+LAbS: Added an optional "assume { ... }" section to constrain initial states (LAbS-to-C only)
 SLiVER: Fixed a bug in CSeq backend
 SLiVER: Fixed a bug with the --no-properties option
-SLiVER: Backend cbmc now supports simulation
 SLiVER: New CLI option `--include` 
 
 Version 2.0 - 2021-10
