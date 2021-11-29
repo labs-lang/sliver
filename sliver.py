@@ -99,7 +99,7 @@ VALUES -- assign values for parameterised specification (key=value)
             sim_or_verify += f""" '{cli[Args.PROPERTY]}'"""
         log.info(f"{sim_or_verify} with backend {backend_arg}...")
         status = (backend.simulate(fname, info) if simulate else
-                    backend.verify(fname, info))
+                  backend.verify(fname, info))
     except KeyboardInterrupt:
         status = ExitStatus.KILLED
     except SliverError as err:

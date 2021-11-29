@@ -307,17 +307,6 @@ class Cbmc(Backend):
         return cmd
 
     def simulate(self, fname, info):
-        # exe = os.environ.get("CBMC") or (
-        #     str(self.cwd / "backends" / "cbmc-5.42.0" / "bin" / "cbmc")
-        #     if "Linux" in platform.system()
-        #     else "cbmc")
-        # # glucose = str(self.cwd / "backends" / "glucose" / "glucose-nondet.sh")
-        # cmd = [
-        #     exe,
-        #     # "--external-sat-solver", glucose,
-        #     "--trace",
-        #     "--stop-on-fail"
-        # ]
         cmd = self.get_cmdline(fname, info)
         c = Concretizer(info, self.cli, True)
         for i in range(self.cli[Args.SIMULATE]):
