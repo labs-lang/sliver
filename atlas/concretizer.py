@@ -204,15 +204,16 @@ class Concretizer:
         self.picks[name] = (p, size)
 
     def concretize_program(self, program):
+
         def make_regex(placeholder):
+            p = re.escape(placeholder)
             return re.compile(
-                f'(?<=// ___{placeholder}___)'
-                + '(.*?)'
-                + f'(?=// ___end {placeholder}___)', re.DOTALL)
+                f'(?<=// ___{p}___)(.*?)(?=// ___end {p}___)',
+                re.DOTALL)
 
         re_pick = re.compile(
             r'TYPEOFVALUES '
-            r'([^\[]+)\[.+\]; /\* Pick ([0-9]+) \*/'
+            r'([^\[\n]+)\[.+\]; \/\* Pick ([0-9]+) \*\/'
         )
 
         if self.randomize:
@@ -220,7 +221,9 @@ class Concretizer:
 
         picks = re_pick.findall(program)
         for pick_name, _ in picks:
-            usages = re.compile(f'(?<!TYPEOFVALUES ){pick_name}' + r'\[')
+            usages = re.compile(
+                f'(?<!TYPEOFVALUES ){re.escape(pick_name)}' +
+                r'\[')
             program = usages.sub(f"{pick_name}[__LABS_step][", program)
 
         globs, inits = self.get_concretization(picks)
@@ -231,11 +234,11 @@ class Concretizer:
         re_sym_sched = make_regex("symbolic-scheduler")
         re_sym_pick = make_regex("symbolic-pick")
 
-        program = re_globals.sub(f'\n{globs}\n', program)
+        program = re_sym_pick.sub('\n', program)
+        program = re_globals.sub(f'\n{globs}\n', program, 1)
         program = re_init.sub(f'\n{inits}\n', program)
         program = re_sched.sub('\nfirstAgent = sched[__LABS_step];\n', program)
         program = re_sym_sched.sub('\n', program)
-        program = re_sym_pick.sub('\n', program)
 
         return program
 
@@ -247,7 +250,7 @@ class Concretizer:
             file.write(program)
 
     def get_concretization(self, picks):
-
+        
         def fmt_globals(m):
             STEPS = self.cli[Args.STEPS]
 
