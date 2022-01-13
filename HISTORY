@@ -1,10 +1,4 @@
-Version 2.2 - 2021-11
-
-C translation: Fixed a bug with trace translation in simulation mode
-C translation: Performance improvements to trace translation
-SLiVER: LAbS files may now contain an optional "assume { ... }" section to constrain initial states (LAbS-to-C only)
-
-Version 2.1 - 2021-11 (internal release)
+Version 2.1 - 2021-11
 
 C translation: Fixed a bug with the nondeterministic value operator
 C translation: Fixed a bug with counterexample translation
