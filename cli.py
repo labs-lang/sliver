@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 
+import logging
+import sys
+from dataclasses import dataclass
 from enum import Enum
+
 from __about__ import __date__, __summary__, __title__, __version__
 
+log = logging.getLogger('backend')
 
 class Args(Enum):
     BACKEND = "backend"
@@ -126,3 +131,48 @@ class CliArgs(dict):
 
     def __getitem__(self, key: Args):
         return self.get(key.value, DEFAULTS[key])
+
+
+class ExitStatus(Enum):
+    SUCCESS = 0
+    BACKEND_ERROR = 1
+    INVALID_ARGS = 2
+    PARSING_ERROR = 6
+    FAILED = 10
+    TIMEOUT = 124
+    KILLED = 130
+
+    @staticmethod
+    def format(code, simulate=False) -> str:
+        task = "Simulation" if simulate else "Verification"
+        return {
+            ExitStatus.SUCCESS:
+                "Done." if simulate else "Verification successful.",
+            ExitStatus.BACKEND_ERROR: "Backend failed.",
+            ExitStatus.INVALID_ARGS: "Invalid arguments.",
+            ExitStatus.PARSING_ERROR: "Could not parse input file.",
+            ExitStatus.FAILED: f"{task} failed.",
+            ExitStatus.TIMEOUT: f"{task} stopped (timeout).",
+            ExitStatus.KILLED: f"\n{task} stopped (keyboard interrupt)."
+        }.get(code, f"Unexpected exit code {code.value}")
+
+
+@dataclass
+class SliverError(BaseException):
+    status: ExitStatus
+    stdout: str = ""
+    error_message: str = ""
+    info_message: str = ""
+
+    def handle(self, log=log, quit=False, quiet=False, simulate=False):
+        if self.info_message:
+            log.info(self.info_message)
+        if self.error_message:
+            log.error(self.error_message)
+        if self.stdout:
+            print(self.stdout)
+        if not quiet:
+            print(ExitStatus.format(self.status, simulate))
+        if quit:
+            print()
+            sys.exit(self.status.value)

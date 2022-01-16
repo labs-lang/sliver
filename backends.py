@@ -9,10 +9,10 @@ from pathlib import Path
 from subprocess import PIPE, run, check_output, CalledProcessError, STDOUT
 import sys
 
-from cli import Args
 from cex import translateCPROVER, translate_cadp, translateCPROVER54, translateCPROVERNEW
 from atlas.mcl import translate_property
 from atlas.concretizer import Concretizer
+from cli import Args, ExitStatus, SliverError
 from info import Info
 
 # LanguageInfo = namedtuple("LanguageInfo", ["extension", "encoding"])
@@ -33,50 +33,6 @@ class Language(Enum):
     C = LanguageInfo(extension="c", encoding="c")
     LNT = LanguageInfo(extension="lnt", encoding="lnt")
     LNT_MONITOR = LanguageInfo(extension="lnt", encoding="lnt-monitor")
-
-
-class ExitStatus(Enum):
-    SUCCESS = 0
-    BACKEND_ERROR = 1
-    INVALID_ARGS = 2
-    PARSING_ERROR = 6
-    FAILED = 10
-    TIMEOUT = 124
-    KILLED = 130
-
-    @staticmethod
-    def format(code, simulate=False) -> str:
-        task = "Simulation" if simulate else "Verification"
-        return {
-            ExitStatus.SUCCESS:
-                "Done." if simulate else "Verification successful.",
-            ExitStatus.BACKEND_ERROR: "Backend failed.",
-            ExitStatus.INVALID_ARGS: "Invalid arguments.",
-            ExitStatus.PARSING_ERROR: "Could not parse input file.",
-            ExitStatus.FAILED: f"{task} failed.",
-            ExitStatus.TIMEOUT: f"{task} stopped (timeout).",
-            ExitStatus.KILLED: f"\n{task} stopped (keyboard interrupt)."
-        }.get(code, f"Unexpected exit code {code.value}")
-
-
-@dataclass
-class SliverError(BaseException):
-    status: ExitStatus
-    stdout: str = ""
-    error_message: str = ""
-    info_message: str = ""
-
-    def handle(self, log=log, quit=False, quiet=False, simulate=False):
-        if self.info_message:
-            log.info(self.info_message)
-        if self.error_message:
-            log.error(self.error_message)
-        if self.stdout:
-            print(self.stdout)
-        if not quiet:
-            print(ExitStatus.format(self.status, simulate))
-        if quit:
-            sys.exit(self.status.value)
 
 
 class Backend:
