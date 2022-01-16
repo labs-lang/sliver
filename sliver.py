@@ -107,6 +107,7 @@ VALUES -- assign values for parameterised specification (key=value)
         backend.cleanup(fname)
         if status:
             print(ExitStatus.format(status, simulate))
+            print()
             sys.exit(status.value)
 
 

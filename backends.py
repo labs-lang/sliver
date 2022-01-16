@@ -6,16 +6,16 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from subprocess import PIPE, run, check_output, CalledProcessError, STDOUT
-import sys
+from subprocess import PIPE, STDOUT, CalledProcessError, check_output, run
 
-from cex import translateCPROVER, translate_cadp, translateCPROVER54, translateCPROVERNEW
-from atlas.mcl import translate_property
 from atlas.concretizer import Concretizer
+from atlas.mcl import translate_property
+from cex import (translate_cadp, translateCPROVER, translateCPROVER54,
+                 translateCPROVERNEW)
 from cli import Args, ExitStatus, SliverError
 from info import Info
 
-# LanguageInfo = namedtuple("LanguageInfo", ["extension", "encoding"])
+
 log = logging.getLogger('backend')
 
 
