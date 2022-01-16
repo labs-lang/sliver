@@ -76,12 +76,10 @@ VALUES -- assign values for parameterised specification (key=value)
     if fname and show:
         sys.exit(ExitStatus.SUCCESS.value)
     status = None
-    
+
     try:
         log.info(f"Gathering information on {file}...")
-        info = backend.get_info().replace("\n", "|")[:-1]
-        log.debug(f"{info=}")
-        info = Info.parse(info, cli[Args.VALUES])
+        info = backend.get_info(parsed=True)
         backend.check_info(info)
 
         sim_or_verify = "Running simulation" if simulate else "Verifying"

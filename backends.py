@@ -177,12 +177,18 @@ class Backend:
             call.extend(["--values", *self.cli[Args.VALUES]])
         return call
 
-    def get_info(self):
+    def get_info(self, parsed=False):
         try:
             call_info = self._labs_cmdline() + ["--info"]
             log_call(call_info)
             info_call = run(call_info, **self._run_args)
-            return info_call.stdout.decode()
+            info = info_call.stdout.decode()
+            if parsed:
+                info = info.replace("\n", "|")[:-1]
+                log.debug(f"{info=}")
+                return Info.parse(info, self.cli[Args.VALUES])
+            else:
+                return info
         except CalledProcessError as e:
             log.error(e)
             msg = e.stderr.decode()
