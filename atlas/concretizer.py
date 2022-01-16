@@ -1,19 +1,15 @@
-import re
-from z3 import (
-    Concat, Exists, Optimize, simplify,
-    Solver, Int, IntSort, And, Or, Function, ForAll, Not, If,
-    set_option, sat, unsat, Sum, BoolVector
-    )
-import time
 import random
+import re
+import time
 
+from cli import Args, ExitStatus, SliverError
+from info import get_var
+from z3 import (And, If, Int, Not, Optimize, Or, Solver, Sum, sat, set_option,
+                simplify)
 from z3.z3 import IntVector
 
-from atlas.atlas import (
-    OfNode, BinOp, Nary, BuiltIn, QUANT, make_dict, contains, remove_quant)
-from cli import Args
-from info import get_var
-
+from atlas.atlas import (QUANT, BinOp, BuiltIn, Nary, OfNode, contains,
+                         make_dict, remove_quant)
 
 RND_SEED = time.time()
 
@@ -250,7 +246,6 @@ class Concretizer:
             file.write(program)
 
     def get_concretization(self, picks):
-        
         def fmt_globals(m):
             STEPS = self.cli[Args.STEPS]
 
@@ -293,4 +288,6 @@ class Concretizer:
 
             return fmt_globals(m), fmt_inits(m)
         else:
-            return None, None
+            raise SliverError(
+                ExitStatus.BACKEND_ERROR,
+                error_message="Could not find a valid concretization.")
