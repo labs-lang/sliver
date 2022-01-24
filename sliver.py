@@ -78,7 +78,7 @@ VALUES -- assign values for parameterised specification (key=value)
     status = None
 
     try:
-        log.info(f"Gathering information on {file}...")
+        log.info(f"Gathering information on {cli.file}...")
         info = backend.get_info(parsed=True)
         backend.check_info(info)
 
