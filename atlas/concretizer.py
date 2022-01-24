@@ -43,7 +43,10 @@ def to_z3(node):
             "=": lambda x, y: x == y,
             "!=": lambda x, y: x != y,
             ">": lambda x, y: x > y,
+            ">=": lambda x, y: x >= y,
             "<": lambda x, y: x < y,
+            "<=": lambda x, y: x <= y,
+            "%": lambda x, y: x % y,
             "or": lambda x, y: Or(x, y),
             "and": lambda x, y: And(x, y)
         }
@@ -91,6 +94,8 @@ def quant_to_z3(quant, info, attrs, lstigs):
                 formula, quant, var, info.spawn.tids(agent_type),
                 replace_with_attr
             )
+    # TODO if to_z3(formula) is a conjunction of constraints,
+    # Return them as a list (apparently it helps Z3)
     return simplify(to_z3(formula))
 
 
