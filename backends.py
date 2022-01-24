@@ -171,10 +171,8 @@ class Backend:
             if self.cli[Args.SHOW]:
                 # TODO add concretize cli options
                 if self.cli[Args.SIMULATE] and self.language == Language.C:
-                    log.info(f"Gathering information on {fname}...")
-                    info = self.get_info().replace("\n", "|")[:-1]
-                    log.debug(f"{info=}")
-                    info = Info.parse(info, self.cli[Args.VALUES])
+                    log.info(f"Gathering information on {self.cli.file}...")
+                    info = self.get_info(parsed=True)
                     self.check_info(info)
                     c = Concretizer(info, self.cli, True)
                     out = c.concretize_program(out)
