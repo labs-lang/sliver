@@ -4,8 +4,10 @@ from collections import namedtuple
 
 from pyparsing import (
     alphanums, alphas, Combine, delimitedList, Forward, Group, infixNotation,
-    Keyword, oneOf, opAssoc, Optional, Suppress, Word)
+    Keyword, oneOf, opAssoc, Optional, Suppress, Word, ParserElement)
 from pyparsing import pyparsing_common as ppc
+
+ParserElement.enablePackrat()
 
 LPAR, RPAR, LBRAK, RBRAK, COMMA = map(Suppress, "()[],")
 kws = oneOf("and or not id true false forall exists")
@@ -52,9 +54,21 @@ EXPR <<= infixNotation(EXPRATOM, [
     (oneOf("> < = >= <= !="), 2, opAssoc.LEFT, lambda x:BinOp(*x[0]))
 ])
 
+
+def makeBinOp(args):
+    if len(args) <= 3:
+        return BinOp(*args)
+    elif args[3] in ("and", "or"):
+        return Nary(args[3], [x for x in args if x != args[3]])
+    else:
+        return makeBinOp([makeBinOp(args[:3]), *args[3:]])
+
+
 BEXPR <<= infixNotation(EXPR, [
     # Note: "not" is implemented as a BuiltIn
-    (oneOf("and or"), 2, opAssoc.LEFT, lambda x:BinOp(*x[0]))
+    # (oneOf("and or"), 2, opAssoc.LEFT, lambda x:BinOp(*x[0]))
+    (Keyword("and"), 2, opAssoc.LEFT, lambda x:makeBinOp(x[0])),
+    (Keyword("or"), 2, opAssoc.LEFT, lambda x:makeBinOp(x[0]))
 ])
 
 QUANT = Forward()
