@@ -5,7 +5,6 @@ from pathlib import Path
 
 import click
 
-from info import Info
 from cli import CLICK, Args, CliArgs
 from backends import ALL_BACKENDS, ExitStatus, SliverError
 from __about__ import __title__, __version__
