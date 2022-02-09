@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Rudimentary value analysis for LAbS specifications
 
+from collections import namedtuple
 from functools import reduce
 from itertools import product
 from pathlib import Path
@@ -118,16 +119,18 @@ class Stripes:
         self.stripes = self._prune(set(args))
 
     @staticmethod
-    def _prune(stripes) -> set:
+    def _prune(stripes) -> frozenset:
         joins = set(
             a.join(b) for a, b in product(stripes, stripes)
-            # remove a.adjacent(b) if the concrete domain is not the integers!
-            if a.overlaps(b) or a.adjacent(b))
+            if a.overlaps(b))
         stripes |= joins
         subsets = set(
             a for a, b in product(stripes, stripes)
             if a.is_within(b))
-        return stripes - subsets
+        return frozenset(stripes - subsets)
+
+    def __hash__(self):
+        return hash(self.stripes)
 
     def __or__(self, other):
         return Stripes(*(self.stripes | other.stripes))
@@ -169,33 +172,37 @@ def S(mn, mx=None):
     return Stripes(I(mn, mx))
 
 
-def merge(s0, s1):
-    result = {**s0}
-    for k in s1:
-        if k in result:
-            result[k] |= s1[k]
-        else:
-            result[k] = s1[k]
-    return result
+def merge(s0, s1, State):
+    result = {k: getattr(s0, k) for k in s0._fields}
+    for k in s1._fields:
+        if result[k] is None:
+            result[k] = getattr(s1, k)
+        elif s1[i] is not None:
+            result[k] |= getattr(s1, k)
+    return State(**result)
 
 
 def make_init(info):
     """Get value analysis in the initial state"""
     stores = (info.lstig, info.e, *(a.iface for a in info.spawn.values()))
-    s0 = {
-        "id": S(0, info.spawn.num_agents() - 1)
-    }
+    s0 = {}
     for store in stores:
         for var in store.values():
-            stripe = (
-                S(min(var.values), max(var.values))
-                if isinstance(var.values, range)
-                else Stripes(*(I(x) for x in var.values)))
-            if var.name in s0:
-                s0[var.name] |= stripe
-            else:
-                s0[var.name] = stripe
-    return s0
+            for id in range(info.spawn.num_agents()):
+                vals = var.values(id)
+                stripe = (
+                    S(min(vals), max(vals))
+                    if isinstance(vals, range)
+                    else Stripes(*(I(x) for x in vals)))
+                if var.name in s0:
+                    s0[var.name] |= stripe
+                else:
+                    s0[var.name] = stripe
+
+    State = namedtuple("State", s0.keys())
+    s0 = State(**s0)
+
+    return State, s0
 
 
 def find(proc, filter):
@@ -209,7 +216,7 @@ def find(proc, filter):
         pass
 
 
-def eval_expr(s0, expr):
+def eval_expr(expr, s, externs):
     OPS = {
             "+": lambda x, y: x+y,
             "-": lambda x, y: x-y,
@@ -218,27 +225,31 @@ def eval_expr(s0, expr):
             "%": lambda x, y: x % y,
         }
     if expr == "#self":
-        return s0["id"]
+        return externs["id"]
     elif isinstance(expr, int):
         return S(expr)
+    elif isinstance(expr, str) and expr in s._fields:
+        return getattr(s, expr)
     elif isinstance(expr, str):
-        return s0[expr]
+        return externs[expr]
     elif isinstance(expr, list) and len(expr) == 2:
         # unary expressions
         if expr[0] == "-":
-            return -eval_expr(s0, expr[1])
+            return -eval_expr(expr[1], s, externs)
         elif expr[0] == "abs":
-            return abs(eval_expr(s0, expr[1]))
+            return abs(eval_expr(expr[1], s, externs))
     elif isinstance(expr, list) and expr and expr[0] == "#array":
         # Do not care about array indexes
-        eval_expr(s0, [expr[1], *expr[3:]])
+        eval_expr([expr[1], *expr[3:]], s, externs)
     elif isinstance(expr, list):
-        recur_tail = (eval_expr(s0, e) for e in expr[1:])
+        recur_tail = (eval_expr(e, s, externs) for e in expr[1:])
         return reduce(OPS[expr[0]], recur_tail)
+    else:
+        raise ValueError("unexpected", expr)
 
 
-def apply_assignment(s0, asgn):
-    s1 = {**s0}
+def apply_assignment(asgn, s0, externs, State):
+    s1 = {k: getattr(s0, k) for k in s0._fields}
 
     def get_varname(x):
         if isinstance(x, str):
@@ -249,22 +260,25 @@ def apply_assignment(s0, asgn):
             raise ValueError(x)
 
     def apply_single(var, expr):
-        s1[var] |= eval_expr(s0, expr)
+        # print(f"Applying {var} <- {expr} to {s0}")
+        s1[var] = eval_expr(expr, s0, externs)
 
     if isinstance(asgn[1], list) and asgn[1][0] == "list":
         for var, expr in zip(asgn[1][1:], asgn[2][1:]):
             apply_single(get_varname(var), expr)
     else:
         apply_single(get_varname(asgn[1]), asgn[2])
-    return s1
+    return State(**s1)
 
 
 def value_analysis(cli, info):
-    s0 = make_init(info)
+    State, s0 = make_init(info)
+    externs = {
+        "id": S(0, info.spawn.num_agents() - 1)
+    }
     for ext in cli[Args.VALUES]:
         name, value = ext.split("=")
-        s0["_" + name] = S(int(value))
-    print(s0)
+        externs["_" + name] = S(int(value))
     with open(cli.file) as f:
         ast = FILE.parseFile(f)
 
@@ -286,32 +300,38 @@ def value_analysis(cli, info):
                     isinstance(proc[0], str) and
                     proc[0].startswith("assign"))))
 
-    print(assignments)
-
     # We use a chaos automaton of all assignments to overapproximate
     # the range of feasible values
     fixpoint = False
+    old_states = set([s0])
     for _ in range(100):
-        new_states = (apply_assignment(s0, a) for a in assignments)
-        s1 = reduce(merge, new_states)
-        if s1 == s0:
+        new_states = set(apply_assignment(a, s, externs, State) for s in old_states for a in assignments)
+
+        # print(new_states)
+        # input()
+        if new_states <= old_states:
             fixpoint = True
             break
         else:
-            s0 = s1
+            old_states |= new_states
+    
+    def mergeFn(s0, s1):
+        return merge(s0, s1, State)
 
+    s1 = reduce(mergeFn, old_states)
     return s1, fixpoint
 
 
 if __name__ == "__main__":
+
     # Just some code for testing
     FNAME, d = (
         # "/Users/luca/git/labs/labs-examples/leader.labs",
         # {"values": ["n=4"]})
-        "/Users/luca/git/labs/labs-examples/philosophers.labs",
-        {"values": ["n=39"]})
-    # "/Users/luca/git/labs/labs-examples/boids-aw.labs",
-    # {"values": ["birds=3", "grid=5", "delta=5"]})
+        # "/Users/luca/git/labs/labs-examples/philosophers.labs",
+        # {"values": ["n=39"]})
+        "/Users/luca/git/labs/labs-examples/boids-aw.labs",
+        {"values": ["birds=3", "grid=5", "delta=5"]})
     cli = CliArgs(FNAME, d)  # leader
     print(cli)
     b = Cadp(Path("."), cli)
