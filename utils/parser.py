@@ -72,6 +72,7 @@ BUILTIN = (
     Keyword("max")
 )
 
+
 def baseVarRefParser(pexpr):
     ARRAY_INDEX = Suppress("[") + pexpr + Suppress("]")
     return (VARNAME + Optional(NoWhite + ARRAY_INDEX)).setParseAction(
@@ -303,7 +304,6 @@ def add_stigmergy_vars(process, vars):
     return walk(process, set())
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Translate LAbS to Masseur')
     parser.add_argument('file', type=Path, help='LAbS file to translate')
@@ -314,93 +314,92 @@ if __name__ == "__main__":
         # ast = FILE.setDebug().parseFile(f)
         ast = FILE.parseFile(f)
 
-        stigmergy_vars = set(
-            var[0]
-            for lstig in ast.stigmergies
-            for t in lstig.tuples
-            for var in t)
+    stigmergy_vars = set(
+        var[0]
+        for lstig in ast.stigmergies
+        for t in lstig.tuples
+        for var in t)
 
-        if "system" not in ast:
-            print("missing 'system'", file=stderr)
-            exit(1)
+    if "system" not in ast:
+        print("missing 'system'", file=stderr)
+        exit(1)
 
-        # compute_ids(ast.system.spawn.asList())
+    # compute_ids(ast.system.spawn.asList())
 
-        if "extern" in ast.system:
-            walk_and_print(["#params", *ast.system.extern])
-            print()
-
-        if "environment" in ast.system:
-            walk_and_print(["#shared-vars", *ast.system.environment.asList()])
-            print()
-        # We use a dictionary because we want to remember the insertion order
-        repl = {var[0]: None for a in ast.agents for var in a.interface}
-        # Add stigmergic variables (in order):
-        repl.update({
-            var[0]: None
-            for lstig in ast.stigmergies
-            for t in lstig.tuples
-            for var in t})
-
-        walk_and_print(["#replicated-vars", *repl.keys()])
+    if "extern" in ast.system:
+        walk_and_print(["#params", *ast.system.extern])
         print()
 
-        if stigmergy_vars:
-            walk_and_print(["#system", *ast.system.spawn.asList(), ["#raw", "propagate"], ["#raw", "confirm"]])  # noqa: E501
-        else:
-            walk_and_print(["#system", *ast.system.spawn.asList()])  # noqa: E501
+    if "environment" in ast.system:
+        walk_and_print(["#shared-vars", *ast.system.environment.asList()])
+        print()
+    # We use a dictionary because we want to remember the insertion order
+    repl = {var[0]: None for a in ast.agents for var in a.interface}
+    # Add stigmergic variables (in order):
+    repl.update({
+        var[0]: None
+        for lstig in ast.stigmergies
+        for t in lstig.tuples
+        for var in t})
+
+    walk_and_print(["#replicated-vars", *repl.keys()])
+    print()
+
+    if stigmergy_vars:
+        walk_and_print(["#system", *ast.system.spawn.asList(), ["#raw", "propagate"], ["#raw", "confirm"]])  # noqa: E501
+    else:
+        walk_and_print(["#system", *ast.system.spawn.asList()])  # noqa: E501
+    print()
+
+    for p in ast.system.processes:
+        walk_and_print(["#def", p.name, p.body.asList()])
+
+    for agent in ast.agents:
+        # TODO fail if "Behavior" is not defined
+        behavior = [p for p in agent.processes if p.name == "Behavior"][0]
+        # If Behavior is in the form "Behavior = <other constant>", use
+        # <other constant> directly as the behavior of the agent
+        b = (
+            behavior.body[1]
+            if behavior.body[0] == "#call"
+            else f"{agent.name}_Behavior")
+        b = fix_scope(b, agent)
+
+        agent_stigmergy_vars = [
+            var for lstig in ast.stigmergies
+            for t in lstig.tuples for var in t
+            if lstig.name in agent.stigmergies.asList()]
+
+        agent_masseur = [
+            "#agent", agent.name, b,
+            *agent.interface.asList(),
+            *agent_stigmergy_vars]
+        walk_and_print(agent_masseur)
         print()
 
-        for p in ast.system.processes:
-            walk_and_print(["#def", p.name, p.body.asList()])
-
-        for agent in ast.agents:
-            # TODO fail if "Behavior" is not defined
-            behavior = [p for p in agent.processes if p.name == "Behavior"][0]
-            # If Behavior is in the form "Behavior = <other constant>", use
-            # <other constant> directly as the behavior of the agent
-            b = (
-                behavior.body[1]
-                if behavior.body[0] == "#call"
-                else f"{agent.name}_Behavior")
-            b = fix_scope(b, agent)
-
-            agent_stigmergy_vars = [
-                var for lstig in ast.stigmergies
-                for t in lstig.tuples for var in t
-                if lstig.name in agent.stigmergies.asList()]
-
-            agent_masseur = [
-                "#agent", agent.name, b,
-                *agent.interface.asList(),
-                *agent_stigmergy_vars]
-            walk_and_print(agent_masseur)
+        for p in agent.processes:
+            new_p = fix_scope(p.body.asList(), agent)
+            new_p = add_stigmergy_vars(new_p, stigmergy_vars)
+            walk_and_print(["#def", agent.name+"_"+p.name, new_p])
             print()
 
-            for p in agent.processes:
-                new_p = fix_scope(p.body.asList(), agent)
-                new_p = add_stigmergy_vars(new_p, stigmergy_vars)
-                walk_and_print(["#def", agent.name+"_"+p.name, new_p])
-                print()
+    links = [
+        ['"link"', v[0], lstig.link]
+        for lstig in ast.stigmergies
+        for t in lstig.tuples
+        for v in t]
 
-        links = [
-            ['"link"', v[0], lstig.link]
-            for lstig in ast.stigmergies
-            for t in lstig.tuples
-            for v in t]
-
-
-        try:
-            maxTuple = max(len(t) for lstig in ast.stigmergies for t in lstig.tuples)  # noqa: E501
-            labs_links_tuples = (
+    try:
+        maxTuple = max(len(t) for lstig in ast.stigmergies for t in lstig.tuples)  # noqa: E501
+        labs_links_tuples = (
             "#template", "lstig",
             ['"maxTuple"', maxTuple],
             *[('"tuple"', *[v[0] for v in t]) for lstig in ast.stigmergies for t in lstig.tuples],  # noqa: E501
             *links)
-            walk_and_print(labs_links_tuples)
-            print()
-        except ValueError:
-            # max(x) raises ValueError when x is empty.
-            # In such a case there are no stigmergies
-            # and we don't need to print anything
-            pass
+        walk_and_print(labs_links_tuples)
+        print()
+    except ValueError:
+        # max(x) raises ValueError when x is empty.
+        # In such a case there are no stigmergies
+        # and we don't need to print anything
+        pass
