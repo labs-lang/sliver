@@ -134,10 +134,6 @@ class Info(object):
                if store else ""
 
     def instrument(self):
-        def format(fmt, var, index):
-            return ",".join(
-                fmt.format(TYPE, index + i, var.rnd_value())
-                for i in range(var.size))
 
         def fmt(location, var, offset=0):
             return [
@@ -219,7 +215,7 @@ class Variable:
         self.index = int(index)
         self.size = 1
         self.store = store
-        visitor = LabsExprVisitor(self.index)
+        self.init = init
         if "[" in name:
             self.name, size = name.split("[")
             self.size = int(size[:-1])
@@ -227,24 +223,29 @@ class Variable:
         else:
             self.name = name
             self.is_array = False
-        if init[0] == "[":
-            self.values = [
+
+    def values(self, id):
+        visitor = LabsExprVisitor(id)
+        if self.init[0] == "[":
+            return [
                 visitor.visit_string(v)
-                for v in init[1:-1].split(",")]
-        elif ".." in init:
-            low, up = init.split("..")
-            self.values = range(
+                for v in self.init[1:-1].split(",")]
+        elif ".." in self.init:
+            low, up = self.init.split("..")
+            return range(
                 visitor.visit_string(low),
                 visitor.visit_string(up))
-        elif init == "undef":
-            self.values = [-32767]  # UNDEF
+        elif self.init == "undef":
+            return [-32767]  # UNDEF
         else:
-            self.values = [visitor.visit_string(init)]
+            return [visitor.visit_string(self.init)]
 
-    def rnd_value(self):
+    def rnd_value(self, id):
         """Returns a random, feasible initial value for the variable.
         """
-        return choice(self.values)
+        val = choice(self.values(id))
+        print(">>>", val)
+        return val
 
 
 def get_var(lst, index):

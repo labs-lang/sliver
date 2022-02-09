@@ -16,6 +16,7 @@ VARNAME = Word(alphas.lower(), alphanums + "_").ignore(kws)
 TYPENAME = Word(alphas.upper(), alphanums + "_").ignore(kws)
 
 # AST nodes for ATLAS properties
+EnvNode = namedtuple("Env", ["var", "offset"])
 OfNode = namedtuple("Of", ["var", "offset", "agent"])
 BinOp = namedtuple("BinOp", ["e1", "op", "e2"])
 BuiltIn = namedtuple("BuiltIn", ["fn", "args"])
@@ -25,6 +26,8 @@ Prop = namedtuple("Prop", ["modality", "quant"])
 
 
 def pprint(node):
+    if isinstance(node, EnvNode):
+        return f"{node.var}"
     if isinstance(node, OfNode):
         return f"{node.var} of {node.agent}"
     if isinstance(node, BinOp):
@@ -44,6 +47,7 @@ OFFSET = LBRAK + EXPR + RBRAK
 EXPRATOM = (
     ppc.signed_integer |
     (VARNAME + Optional(OFFSET, default=None) + Keyword("of").suppress() + VARNAME).setParseAction(lambda toks: OfNode(*toks)) |  # noqa: E501
+    (VARNAME + Optional(OFFSET, default=None)).setParseAction(lambda toks: EnvNode(*toks)) |  # noqa: E501
     (Combine(BUILTIN + LPAR) + Group(delimitedList(EXPR)) + RPAR).setParseAction(lambda toks: BuiltIn(*toks))  # noqa: E501
 )
 

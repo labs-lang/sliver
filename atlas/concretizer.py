@@ -70,7 +70,7 @@ def to_z3(node):
         return node
 
 
-def quant_to_z3(quant, info, attrs, lstigs):
+def quant_to_z3(quant, info, attrs, lstigs, envs):
     dict_, formula = make_dict(quant)
 
     def replace_with_attr(node, agent):
@@ -84,6 +84,8 @@ def quant_to_z3(quant, info, attrs, lstigs):
                 return attrs[agent][idx]
             elif var.store == "lstig":
                 return lstigs[agent][idx]
+            elif var.store == "e":
+                return envs[idx]
             else:
                 raise NotImplementedError
 
@@ -107,6 +109,7 @@ class Concretizer:
         self.agents = self.info.spawn.num_agents()
         self.attrs = [[] for _ in range(self.agents)]
         self.lstigs = [[] for _ in range(self.agents)]
+        self.envs = []
         self.sched = None
         self.picks = {}
         self.is_setup = False
@@ -136,16 +139,20 @@ class Concretizer:
             a = self.info.spawn[tid]
             for i, attr in enumerate(self.attrs[tid]):
                 v = get_var(a.iface, i)
-                self.s.add_soft(attr == v.rnd_value())
+                self.s.add_soft(attr == v.rnd_value(tid))
+        for i, env_var in enumerate(self.envs):
+            v = get_var(self.info.e, i)
+            self.s.add_soft(env_var == v.rnd_value(0))
 
-    def _init_constraint(self, v, attrs):
+    def _init_constraint(self, v, attrs, id):
         def c(attr):
-            if isinstance(v.values, range):
-                return And(attr >= v.values.start, attr < v.values.stop)
-            elif isinstance(v.values, list):
-                return Or(*(attr == int(x) for x in v.values))
+            values = v.values(id)
+            if isinstance(values, range):
+                return And(attr >= values.start, attr < values.stop)
+            elif isinstance(values, list):
+                return Or(*(attr == int(x) for x in values))
             else:
-                return (attr == int(v.values))
+                return (attr == int(values))
         self.s.add(*(c(a) for a in attrs))
 
     def _concretize_initial_state(self):
@@ -154,26 +161,33 @@ class Concretizer:
             for v in a.iface.values():
                 attrs = ([
                     Int(f"I_{tid:0>2}_{i:0>2}")
-                    for i in range(v.index, v.index + v.size)
-                    ]
+                    for i in range(v.index, v.index + v.size)]
                     if v.is_array
                     else [Int(f"I_{tid:0>2}_{v.index:0>2}")])
-                self._init_constraint(v, attrs)
+                self._init_constraint(v, attrs, tid)
                 self.attrs[tid].extend(attrs)
             for v in a.lstig.values():
                 lstigs = ([
                     Int(f"L_{tid:0>2}_{i:0>2}")
-                    for i in range(v.index, v.index + v.size)
-                    ]
+                    for i in range(v.index, v.index + v.size)]
                     if v.is_array
                     else [Int(f"L_{tid:0>2}_{v.index:0>2}")])
-                self._init_constraint(v, lstigs)
+                self._init_constraint(v, lstigs, tid)
                 self.lstigs[tid].extend(lstigs)
+
+        for v in self.info.e.values():
+            envs = ([
+                Int(f"E_{i:0>2}")
+                for i in range(v.index, v.index + v.size)]
+                if v.is_array
+                else [Int(f"E_{v.index:0>2}")])
+            self._init_constraint(v, envs, 0)
+            self.envs = envs
 
         for assume in self.info.assumes:
             formula = QUANT.parseString(assume)[0]
             constraint = quant_to_z3(
-                formula, self.info, self.attrs, self.lstigs)
+                formula, self.info, self.attrs, self.lstigs, self.envs)
             self.s.add(constraint)
 
     def _concretize_scheduler(self):
@@ -214,11 +228,8 @@ class Concretizer:
 
         re_pick = re.compile(
             r'TYPEOFVALUES '
-            r'([^\[\n]+)\[.+\]; \/\* Pick ([0-9]+) \*\/'
+            r'([^\[\n]+)\[.+\]; \/\* Pick ([0-9]+)(?: where [^\n]+)? \*\/'
         )
-
-        if self.randomize:
-            self._add_soft_constraints()
 
         picks = re_pick.findall(program)
         for pick_name, _ in picks:
@@ -277,9 +288,15 @@ class Concretizer:
                 + "\n" + "\n".join(
                 f"Lvalue[{tid}][{index(attr)}] = {m[attr]};"
                 for tid in range(self.agents)
-                for attr in self.lstigs[tid]))
+                for attr in self.lstigs[tid])
+                + "\n" + "\n".join(
+                f"E[{index(attr)}] = {m[attr]};"
+                for attr in self.envs))
 
         self.setup(picks)
+
+        if self.randomize:
+            self._add_soft_constraints()
 
         if self.s.check() == sat:
             m = self.s.model()
@@ -293,6 +310,8 @@ class Concretizer:
 
             return fmt_globals(m), fmt_inits(m)
         else:
+            for a in self.s.assertions():
+                print(a)
             raise SliverError(
                 ExitStatus.BACKEND_ERROR,
                 error_message="Could not find a valid concretization.")
