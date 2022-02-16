@@ -159,18 +159,22 @@ def make_dict(formula):
         return {}, formula
 
 
-def get_formula(info, prop=None):
+def get_quant_formula(info, prop=None):
+    if not prop:
+        prop = info.properties[0]
+    return PROP.parseString(prop)
+
+
+def get_formula(info, prop=None, parsed=None):
     """Extract the 1st property in info.properties and
     turn it into a propositional formula (via quantifier elimination.)
 
     Return: the propositional formula, the set of variables introduced
     by quantifier elimination, and the property's temporal modality.
     """
+    if parsed is None:
+        parsed = get_quant_formula(info, prop)
 
-    if not prop:
-        prop = info.properties[0]
-
-    parsed = PROP.parseString(prop)
     d, formula = make_dict(parsed[0].quant)
     # remove quantifiers
     # and collect variables created by quantifier elimination

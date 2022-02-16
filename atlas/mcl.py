@@ -163,11 +163,11 @@ def pprint_mcl(node):
         return node
 
 
-def translate_property(info):
+def translate_property(info, parsed=None):
     """Retrieve the first property in info.properties
     and translate it into MCL.
     """
-    formula, new_vars, modality = get_formula(info)
+    formula, new_vars, modality = get_formula(info, parsed)
     result = sprint_predicate(sorted(new_vars), pprint_mcl(formula))
     if modality == "always":
         result += sprint_invariant(sorted(new_vars), info)
