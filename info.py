@@ -93,13 +93,24 @@ class Info(object):
             externs={e[0]: e[1] for e in parsed_extern},
             raw=txt)
 
+    @staticmethod
+    def _max_of(v):
+        if v.is_array:
+            return v.index + v.size - 1
+        else:
+            return v.index
+
     def max_key_i(self):
-        def max_of(v):
-            if v.is_array:
-                return v.index + v.size - 1
-            else:
-                return v.index
-        return max(max_of(v) for v in self.i.values())
+        if not self.i:
+            return -1
+        return max(self._max_of(v) for v in self.i.values())
+
+    def max_key_lstig(self):
+        if not self.lstig:
+            return -1
+        return max(self._max_of(v) for v in self.lstig.values())
+
+
 
     def lookup_var(self, name):
         """Finds a variable by name"""
