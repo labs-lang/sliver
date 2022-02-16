@@ -223,7 +223,7 @@ class Backend:
     def verbose_output(self, output, decorate=None):
         if decorate:
             log.debug(f"""
-------{decorate}:------
+------{decorate}------
 {output}
 ---------------------------""")
         else:
@@ -271,12 +271,7 @@ class Cbmc(Backend):
         c = Concretizer(info, self.cli, True)
         for i in range(self.cli[Args.SIMULATE]):
             try:
-                ################ Concretization step #########################
-                c.concretize_file(fname)
-                # c_globals, c_init = c.concretize()
-                # print(c_globals)
-                # print(c_init)
-                ###############################################################
+                c.concretize_file(fname)  # Concretization step
                 log_call(cmd)
                 out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
                 self.verbose_output(out, "Backend output")
