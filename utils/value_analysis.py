@@ -4,10 +4,10 @@
 from collections import namedtuple
 from functools import reduce
 from itertools import product
-from pathlib import Path
+# from pathlib import Path
 
-from backends import Cadp
-from cli import Args, CliArgs
+# from backends import Cadp
+from cli import Args
 from .parser import FILE
 
 
@@ -105,6 +105,12 @@ class Interval:
         amin, amax = abs(self.min), abs(self.max)
         return Interval(min(amin, amax), max(amin, amax))
 
+    def Min(self, other):
+        return Interval(min(self.min, other.min), min(self.max, other.max))
+
+    def Max(self, other):
+        return Interval(max(self.min, other.min), max(self.max, other.max))
+
 
 class Stripes:
     """The stripes "domain"
@@ -119,15 +125,25 @@ class Stripes:
         self.stripes = self._prune(set(args))
 
     @staticmethod
-    def _prune(stripes) -> frozenset:
-        joins = set(
-            a.join(b) for a, b in product(stripes, stripes)
-            if a.overlaps(b))
-        stripes |= joins
-        subsets = set(
-            a for a, b in product(stripes, stripes)
-            if a.is_within(b))
-        return frozenset(stripes - subsets)
+    def _prune(stripes, prune_adjacent=False) -> frozenset:
+        enter = True
+        to_join = set()
+        while enter or any(len(j) > 1 for j in to_join):
+            enter = False
+            to_join = set(tuple(
+                b for b in stripes
+                if a.overlaps(b) or (prune_adjacent and a.adjacent(b)))
+                for a in stripes)
+            joins = set(reduce(lambda a, b: a.join(b), j) for j in to_join)
+            stripes |= joins
+            subsets = set(
+                a for a, b in product(stripes, stripes)
+                if a.is_within(b))
+            stripes -= subsets
+        return frozenset(stripes)
+
+    def join_adjacent(self):
+        return Stripes(*self._prune(self.stripes, True))
 
     def __hash__(self):
         return hash(self.stripes)
@@ -136,7 +152,7 @@ class Stripes:
         return Stripes(*(self.stripes | other.stripes))
 
     def __repr__(self):
-        return str(self.stripes)
+        return f"{{ {', '.join(str(x) for x in self.stripes)} }}"
 
     def _combine(self, other, fn):
         x = set(fn(a, b) for a, b in product(self.stripes, other.stripes))
@@ -163,6 +179,12 @@ class Stripes:
     def __sub__(self, other):
         return Stripes(*self._combine(other, lambda a, b: a - b))
 
+    def Min(self, other):
+        return Stripes(*self._combine(other, lambda a, b: a.Min(b)))
+
+    def Max(self, other):
+        return Stripes(*self._combine(other, lambda a, b: a.Max(b)))
+
 
 def I(mn, mx=None):  # noqa: E741, E743
     return Interval(mn, mx)
@@ -177,7 +199,7 @@ def merge(s0, s1, State):
     for k in s1._fields:
         if result[k] is None:
             result[k] = getattr(s1, k)
-        elif s1[i] is not None:
+        elif getattr(s1, k) is not None:
             result[k] |= getattr(s1, k)
     return State(**result)
 
@@ -223,6 +245,8 @@ def eval_expr(expr, s, externs):
             "*": lambda x, y: x*y,
             "/": lambda x, y: x//y,
             "%": lambda x, y: x % y,
+            "min": lambda x, y: x.Min(y),
+            "max": lambda x, y: x.Max(y)
         }
     if expr == "#self":
         return externs["id"]
@@ -282,6 +306,7 @@ def value_analysis(cli, info):
     with open(cli.file) as f:
         ast = FILE.parseFile(f)
 
+    # Extract all assignment statements from specification.
     assignments = []
     for a in ast.agents:
         behavior = [p for p in a.processes if p.name == "Behavior"][0]
@@ -300,41 +325,47 @@ def value_analysis(cli, info):
                     isinstance(proc[0], str) and
                     proc[0].startswith("assign"))))
 
-    # We use a chaos automaton of all assignments to overapproximate
-    # the range of feasible values
+    # We use a chaos automaton of all assignments
+    # to overapproximate the range of feasible values 
     fixpoint = False
     old_states = set([s0])
+    # TODO make analysis bound configurable
     for _ in range(100):
-        new_states = set(apply_assignment(a, s, externs, State) for s in old_states for a in assignments)
+        new_states = set(
+            apply_assignment(a, s, externs, State)
+            for s in old_states for a in assignments)
 
-        # print(new_states)
-        # input()
         if new_states <= old_states:
             fixpoint = True
             break
         else:
             old_states |= new_states
-    
-    def mergeFn(s0, s1):
+
+    def mergeStates(s0, s1):
         return merge(s0, s1, State)
 
-    s1 = reduce(mergeFn, old_states)
+    s1 = reduce(mergeStates, old_states)
+    s1 = State(**{
+        x: getattr(s1, x).join_adjacent()
+        for x in s1._fields
+    })
     return s1, fixpoint
 
 
 if __name__ == "__main__":
+    pass
 
     # Just some code for testing
-    FNAME, d = (
-        # "/Users/luca/git/labs/labs-examples/leader.labs",
-        # {"values": ["n=4"]})
-        # "/Users/luca/git/labs/labs-examples/philosophers.labs",
-        # {"values": ["n=39"]})
-        "/Users/luca/git/labs/labs-examples/boids-aw.labs",
-        {"values": ["birds=3", "grid=5", "delta=5"]})
-    cli = CliArgs(FNAME, d)  # leader
-    print(cli)
-    b = Cadp(Path("."), cli)
-    info = b.get_info(parsed=True)
-    ranges, fixpoint = value_analysis(cli, info)
-    print(ranges, fixpoint)
+    # FNAME, d = (
+    #     # "/Users/luca/git/labs/labs-examples/leader.labs",
+    #     # {"values": ["n=4"]})
+    #     # "/Users/luca/git/labs/labs-examples/philosophers.labs",
+    #     # {"values": ["n=39"]})
+    #     "/Users/luca/git/labs/labs-examples/boids-aw.labs",
+    #     {"values": ["birds=3", "grid=5", "delta=5"]})
+    # cli = CliArgs(FNAME, d)  # leader
+    # print(cli)
+    # b = Cadp(Path("."), cli)
+    # info = b.get_info(parsed=True)
+    # ranges, fixpoint = value_analysis(cli, info)
+    # print(ranges, fixpoint)
