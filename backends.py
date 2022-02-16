@@ -458,8 +458,9 @@ class CadpMonitor(Backend):
             return ExitStatus.BACKEND_ERROR
 
     def cleanup(self, fname):
+        self.temp_files.append("evaluator.bcg")
         aux = (Path(self.cwd) / f for f in
-               ("evaluator", "executor", "evaluator@1.o", "evaluator.bcg"))
+               ("evaluator", "executor", "evaluator@1.o"))
         aux2 = (Path(self.cwd) / f"{Path(fname).stem}.{suffix}" for suffix in
                 ("err", "f", "h", "h.BAK", "lotos", "o", "t"))
         self._safe_remove(aux)
@@ -472,10 +473,11 @@ class CadpMonitor(Backend):
 
     def handle_success(self, out, info) -> ExitStatus:
         if "\nFALSE\n" in out:
-            if "evaluator.bcg" in out:
+            if "evaluator.bcg" in out and "<initial state>" not in out:
                 cex = self.extract_trace()
-                print("Counterexample prefix:")
-                print(*self.translate_cex(cex, info), sep="", end="")
+                if cex:
+                    print("Counterexample prefix:")
+                    print(*self.translate_cex(cex, info), sep="", end="")
             else:
                 print(*self.translate_cex(out, info), sep="", end="")
             return ExitStatus.FAILED
@@ -484,7 +486,15 @@ class CadpMonitor(Backend):
 
     def extract_trace(self):
         cmd = ["bcg_open", "evaluator.bcg", "executor", "100", "2"]
-        return check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
+        log_call(cmd)
+        try:
+            out = check_output(
+                cmd, stderr=STDOUT, cwd=self.cwd, timeout=180).decode()
+            self.verbose_output(out, "Trace from counterexample BCG")
+            return out
+        except TimeoutExpired:
+            log.info("Could not extract a counterexample.")
+            return ""
 
 
 class Cadp(CadpMonitor):
