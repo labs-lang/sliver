@@ -85,6 +85,21 @@ QUANT <<= (
 PROP = (oneOf("always fairly fairly_inf finally") + QUANT).setParseAction(lambda toks: Prop(*toks))  # noqa: E501
 
 
+def get_state_vars(formula):
+    if isinstance(formula, OfNode) or isinstance(formula, EnvNode):
+        return set((formula.var, ))
+    elif isinstance(formula, Quant):
+        return get_state_vars(formula.inner)
+    elif isinstance(formula, BinOp):
+        return get_state_vars(formula.e1) | get_state_vars(formula.e2)
+    elif isinstance(formula, BuiltIn) or isinstance(formula, Nary):
+        sets = [get_state_vars(f) for f in formula.args]
+        result = set().union(*sets)
+        print(sets)
+        return result
+    else:
+        return set()
+
 def contains(formula, var):
     """Return True iff formula contains variable var.
     """
