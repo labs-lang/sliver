@@ -2,7 +2,7 @@ import re
 from pyparsing import (
     LineEnd, LineStart, Word, alphanums, delimitedList, OneOrMore, ZeroOrMore,
     Forward, Suppress, Group, ParserElement, Keyword, dblQuotedString,
-    removeQuotes, SkipTo, StringEnd, Regex, printables)
+    removeQuotes, SkipTo, StringEnd, Regex, printables, replaceWith)
 from pyparsing import pyparsing_common as ppc
 
 
@@ -82,7 +82,7 @@ def translateCPROVER(cex, info, parser=TRACE):
         if is_lstig:
             return fmt(is_lstig, "L", tid)
         return ""
-    
+
     def get_value(rhs):
         return rhs.rsplit("(", 1)[0].strip()
 
@@ -163,10 +163,18 @@ def translate_cadp(cex, info):
             for k, v in enumerate(args[1:]))
 
     lines = cex.split('\n')
-    first_line = [i+1 for i, l in enumerate(lines) if "<initial state>" in l][0]  # noqa: E501
-    lines = [l[1:-1] for l in lines[first_line:] if l and l[0] == '"']  # noqa: E501, E741
+    first_line = next(
+        i+1 for i, l in enumerate(lines)
+        if "<initial state>" in l)
+    last_line = next(
+        i for i, l in enumerate(lines[first_line:], first_line)
+        if "<goal state>" in l or "<deadlock>" in l)
+    lines = [l[1:-1] for l in lines[first_line:last_line] if l and l[0] == '"']  # noqa: E501, E741
 
     ParserElement.setDefaultWhitespaceChars(' \t\n\x01\x02')
+    BOOLEAN = (
+        Keyword("TRUE").setParseAction(replaceWith(True)) |
+        Keyword("FALSE").setParseAction(replaceWith(False)))
     NAME = Word(alphanums)
     LPAR, RPAR = map(Suppress, "()")
     RECORD = Forward()
@@ -181,6 +189,12 @@ def translate_cadp(cex, info):
     yield "<initialization>\n"
 
     for l in lines:    # noqa: E741
+        if "invisible transition" in l:
+            # skip internal moves
+            continue
+        elif "<deadlock>" in l:
+            yield l
+            continue
         step = STEP.parseString(l, parseAll=True)
         if step[0] == "ENDINIT":
             yield "<end initialization>\n"
