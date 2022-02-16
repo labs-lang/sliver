@@ -6,15 +6,18 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from subprocess import PIPE, STDOUT, CalledProcessError, check_output, run
+from subprocess import (PIPE, STDOUT, CalledProcessError, TimeoutExpired,
+                        check_output, run)
 
+from atlas.atlas import get_quant_formula, get_state_vars
 from atlas.concretizer import Concretizer
 from atlas.mcl import translate_property
+from atlas.svl import svl
 from cex import (translate_cadp, translateCPROVER, translateCPROVER54,
                  translateCPROVERNEW)
 from cli import Args, ExitStatus, SliverError
-from info import Info
-
+from info import Info, get_var
+from utils.value_analysis import value_analysis
 
 log = logging.getLogger('backend')
 
@@ -33,6 +36,7 @@ class Language(Enum):
     C = LanguageInfo(extension="c", encoding="c")
     LNT = LanguageInfo(extension="lnt", encoding="lnt")
     LNT_MONITOR = LanguageInfo(extension="lnt", encoding="lnt-monitor")
+    LNT_PARALLEL = LanguageInfo(extension="lnt", encoding="lnt-parallel")
 
 
 class Backend:
@@ -543,7 +547,134 @@ class Cadp(CadpMonitor):
         super().cleanup(fname)
 
 
+class CadpCompositional(CadpMonitor):
+    """The CADP-based workflow using parallel emulation programs
+    """
+    def __init__(self, cwd, cli):
+        super().__init__(cwd, cli)
+        # Fall back to "monitor" encoding for simulation
+        self.language = (
+            Language.LNT_MONITOR
+            if self.cli[Args.SIMULATE]
+            else Language.LNT_PARALLEL)
+        self.name = "cadp-comp"
+        self.modalities = ("always", "fairly", "fairly_inf", "finally")
+
+    def get_cmdline(self, fname, _):
+        return ["svl", self._svl_fname(fname)]
+
+    def _svl_fname(self, fname):
+        return f"SVL_{Path(fname).stem}.svl"
+
+    def _mcl_fname(self, fname):
+        return Path(fname).with_suffix(".mcl")
+
+    def preprocess(self, code, fname):
+        code = super().preprocess(code, fname)
+        info = self.get_info(parsed=True)
+        ranges, fixpoint = value_analysis(self.cli, info)
+        self.verbose_output(str(ranges), "Value analysis")
+        if not fixpoint:
+            log.critical(f"Value analysis of {fname} did not succeed.")
+            return ExitStatus.BACKEND_ERROR
+
+        all_args = (
+            (info.i, "i", info.max_key_i() + 1),
+            (info.lstig, "l", info.max_key_lstig() + 1),
+        )
+
+        def fmt(store, array_name, bound):
+            def make_assignments():
+                for idx in range(bound):
+                    var = get_var(store, idx)
+                    intervals = tuple(getattr(ranges, var.name).stripes)
+                    if len(intervals) == 1 and intervals[0].min == intervals[0].max:  # noqa: E501
+                        yield f"{array_name}[{idx}] := {intervals[0].min}"
+                    else:
+                        constraints = " or ".join(
+                            f"(x == {i.min})" if i.min == i.max
+                            else f"(x >= {i.min}) and (x <= {i.max})"
+                            for i in intervals
+                        )
+                        yield f"    x := any Int where ({constraints});\n    {array_name}[{idx}] := x"  # noqa: E501
+                return
+
+            assigns = ";\n    ".join(make_assignments())
+            return "\n".join((
+                "var x: Int in",
+                "    ",
+                assigns,
+                "end var;")) if assigns else ""
+
+        good_i, good_l = fmt(*all_args[0]), fmt(*all_args[1])
+        code = code.replace("(*GOODIFACE*)", good_i)
+        code = code.replace("(*GOODLSTIG*)", good_l)
+        return code
+
+    def verify(self, fname, info):
+        mcl = translate_property(info)
+        mcl_fname = self._mcl_fname(fname)
+        log.debug(f"Writing MCL query to {mcl_fname}...")
+        with open(mcl_fname, "w") as f:
+            f.write(mcl)
+        self.temp_files.append(mcl_fname)
+        self.verbose_output(mcl, "MCL property")
+
+        atlas = get_quant_formula(info)
+        atlas_vars = get_state_vars(atlas[0].quant)
+        not_hidden = set()
+        for x in atlas_vars:
+            var = info.lookup_var(x)
+            lnt_names = {"i": "ATTR", "lstig": "L"}
+            n = lnt_names.get(var.store)
+            if n:
+                not_hidden.add(n)
+
+        svl_script = svl(str(Path(fname).name), not_hidden)
+        svl_fname = self._svl_fname(fname)
+        with open(svl_fname, "w") as f:
+            f.write(svl_script)
+        self.temp_files.append(svl_fname)
+        self.temp_files.append(Path(svl_fname).with_suffix(".log"))
+        self.temp_files.append(f"{fname}.bcg")
+        self.verbose_output(svl_script, "SVL script")
+        return Backend.verify(self, fname, info)
+
+    def handle_success(self, out, info) -> ExitStatus:
+        log_fname = (self.base_dir / self.make_slug())
+        log_fname = log_fname.with_name(f"SVL_{log_fname.stem}.log")
+        with open(log_fname) as f:
+            out = f.read()
+        result = super().handle_success(out, info)
+        if "\nFALSE\n" in out:
+            print("<property violated>")
+        return result
+
+    def cleanup(self, fname):
+        svl_fname = self._svl_fname(fname)
+        sweep = ["svl", "-sweep", svl_fname]
+        clean = ["svl", "-clean", svl_fname]
+        if not(self.cli[Args.KEEP_FILES]):
+            for cmd in (sweep, clean):
+                try:
+                    log_call(cmd)
+                    cmd_out = check_output(cmd).decode()
+                    log.debug(cmd_out)
+                except CalledProcessError:
+                    continue
+        else:
+            log.debug("Keeping SVL intermediate files. To remove them, use:")
+            log.debug("    " + " ".join(sweep))
+            log.debug("    " + " ".join(clean))
+        self._safe_remove((
+            self.cwd / f"{fname}@1.o",
+            self.cwd / "svl001_composition_1.err#0",
+        ))
+        super().cleanup(fname)
+
+
 ALL_BACKENDS = {
     **{clz.__name__.lower(): clz for clz in (Cbmc, Cseq, Esbmc, Cadp)},
-    "cadp-monitor": CadpMonitor
+    "cadp-monitor": CadpMonitor,
+    "cadp-comp": CadpCompositional
 }
