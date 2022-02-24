@@ -125,11 +125,13 @@ class Concretizer:
             self.s = Solver()
 
     def setup(self, picks):
-        if not self.is_setup:
-            self._concretize_initial_state()
-            self._concretize_scheduler()
-            for p in picks:
-                self.add_pick(*p)
+        if self.is_setup:
+            return
+        self._concretize_initial_state()
+        self._concretize_scheduler()
+        for p in picks:
+            self.add_pick(*p)
+        self.is_setup = True
 
     def isAnAgent(self, var):
         return And(var >= 0, var < self.agents)
