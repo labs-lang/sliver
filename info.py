@@ -110,8 +110,6 @@ class Info(object):
             return -1
         return max(self._max_of(v) for v in self.lstig.values())
 
-
-
     def lookup_var(self, name):
         """Finds a variable by name"""
         def _lookup(store):
@@ -255,7 +253,6 @@ class Variable:
         """Returns a random, feasible initial value for the variable.
         """
         val = choice(self.values(id))
-        print(">>>", val)
         return val
 
 
@@ -274,7 +271,7 @@ def get_var(lst, index):
 
     _len = sum(v.size for v in lst)
     if not (0 <= index < _len):
-        raise KeyError("Out of bounds")
+        raise KeyError(f"Out of bounds: {lst}[{index}]")
     count = 0
     for v in lst:
         count += v.size
