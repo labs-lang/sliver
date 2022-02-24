@@ -129,6 +129,10 @@ class CliArgs(dict):
     def __init__(self, file, __dict) -> None:
         self.file = file
         self.update(__dict)
+        self.externs = {}
+        for x in self[Args.VALUES]:
+            k, v = x.split("=")
+            self.externs[k] = int(v)
 
     def __getitem__(self, key: Args):
         return self.get(key.value, DEFAULTS[key])
