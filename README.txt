@@ -1,6 +1,6 @@
 
-            SLiVER 2.2-PREVIEW
-              November 2021
+            SLiVER 3.0-PREVIEW
+             20 February 2022
 
 The SLiVER LAbS VERification tool
 
