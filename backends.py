@@ -630,7 +630,12 @@ class CadpCompositional(CadpMonitor):
             if n:
                 not_hidden.add(n)
 
-        svl_script = svl(str(Path(fname).name), not_hidden)
+        svl_script = svl(
+            str(Path(fname).name),
+            not_hidden,
+            has_stigmergy=bool(info.lstig),
+            has_env=bool(info.e),
+            num_agents=info.spawn.num_agents())
         svl_fname = self._svl_fname(fname)
         with open(svl_fname, "w") as f:
             f.write(svl_script)

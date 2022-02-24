@@ -3,7 +3,57 @@ import platform
 from cli import SliverError
 
 
-def svl(fname, not_hidden):
+def exp_agent(has_stigmergy, has_env, not_hidden, id_):
+    hide = [x for x in ("ATTR", "L") if x not in not_hidden]
+    hide = f"""hide {", ".join(hide)} in\n""" if hide else "\n"
+    gates = "spurious, tick, attr"
+    gates_l = ", put, qry, l, refresh, request" if has_stigmergy else ""
+    gates_e = ", getenv, setenv" if has_env else ""
+    return f"""
+    {hide}agent [{gates}{gates_l}{gates_e}] (ID ({id_}))
+    {"end hide" if hide else ""}
+    """
+
+
+def exp_main(has_stigmergy, has_env, num_agents, not_hidden):
+    r_r = "refresh, request"
+    ge_se = "getenv, setenv"
+    gates = r_r if has_stigmergy else ""
+    agents = "\n  ||\n".join(
+        exp_agent(has_stigmergy, has_env, not_hidden, i)
+        for i in range(num_agents))
+
+    if has_stigmergy and has_env:
+        gates += ", "
+    if has_env:
+        gates += ge_se
+    prios = """
+    total prio
+    "i" > all but "i" """
+    if has_stigmergy:
+        prios += """
+    "REFRESH .*" > "L .*" > "REQUEST .*"
+    "L !0.*" > "L !1.*" > "L !2.*"
+    "REQUEST !0.*" > "REQUEST !1.*" > "REQUEST !2.*" """
+
+    return f"""
+{"par" if has_stigmergy or has_env else ""}
+{r_r +" -> MatrixStorage ["+ r_r +", debug]" if has_stigmergy else ""}
+{"||" if has_stigmergy else ""}
+{"getenv, setenv -> Env [getenv, setenv]" if has_env else ""}
+{"||" if has_env else ""}
+{gates}{" -> " if gates else ""}
+    ({prios}
+    in
+    par tick{", put, qry" if has_stigmergy else ""} in
+    {agents}
+    end par
+    end prio)
+{"end par" if has_stigmergy or has_env else ""}
+"""
+
+
+def svl(fname, not_hidden, has_stigmergy, has_env, num_agents):
     with open(fname) as f:
         lines = f.readlines()
     start = next(
@@ -24,7 +74,7 @@ def svl(fname, not_hidden):
 "{fname}.bcg" = root leaf divbranching reduction of
 (
    hide all but SPURIOUS, {", ".join(not_hidden) if not_hidden else ""} in
-{main}
+{exp_main(has_stigmergy, has_env, num_agents, not_hidden)}
    end hide
 );
 
