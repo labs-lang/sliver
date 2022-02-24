@@ -527,7 +527,7 @@ class Cadp(CadpMonitor):
         return f"{fname}.mcl"
 
     def verify(self, fname, info):
-        mcl = translate_property(info)
+        mcl = translate_property(info, self.cli.externs)
         mcl_fname = self._mcl_fname(fname)
         log.debug(f"Writing MCL query to {mcl_fname}...")
         with open(mcl_fname, "w") as f:
@@ -612,7 +612,7 @@ class CadpCompositional(CadpMonitor):
         return code
 
     def verify(self, fname, info):
-        mcl = translate_property(info)
+        mcl = translate_property(info, self.cli.externs)
         mcl_fname = self._mcl_fname(fname)
         log.debug(f"Writing MCL query to {mcl_fname}...")
         with open(mcl_fname, "w") as f:

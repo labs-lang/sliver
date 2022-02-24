@@ -28,6 +28,8 @@ def LABEL(store):
 
 def sprint_assign(varname, info, binds_to="v"):
     var, agent_id = varname.rsplit("_", 1)
+    if var == "id":
+        return ""
     var_info = info.lookup_var(var)
     label = LABEL(var_info.store)
     return f"""{{{label} !{agent_id} !{var_info.index} ?{binds_to}:Int ...}}"""
@@ -61,7 +63,7 @@ def sprint_irrelevant(varnames, info, fn, box_or_diamond):
     def filter_(vs):
         return " and ".join(f"""(x <> {v.index})""" for v in vs)
 
-    var_infos = [info.lookup_var(v) for v in varnames]
+    var_infos = [info.lookup_var(v) for v in varnames if v != "id"]
     labels = set(LABEL(v.store) for v in var_infos)
     other_actions = " and ".join(f"(not {{{lbl} ...}})" for lbl in labels)
     attrs = {
@@ -163,11 +165,11 @@ def pprint_mcl(node):
         return node
 
 
-def translate_property(info, parsed=None):
+def translate_property(info, externs, parsed=None):
     """Retrieve the first property in info.properties
     and translate it into MCL.
     """
-    formula, new_vars, modality = get_formula(info, parsed)
+    formula, new_vars, modality = get_formula(info, externs, parsed)
     result = sprint_predicate(sorted(new_vars), pprint_mcl(formula))
     if modality == "always":
         result += sprint_invariant(sorted(new_vars), info)
