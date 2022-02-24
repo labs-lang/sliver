@@ -476,7 +476,7 @@ class CadpMonitor(Backend):
         return code.replace("module HEADER is", f"module {base_name} is")
 
     def handle_success(self, out, info) -> ExitStatus:
-        if "\nFALSE\n" in out:
+        if "\nFALSE\n" in out or "\nFAIL\n" in out:
             if "evaluator.bcg" in out and "<initial state>" not in out:
                 cex = self.extract_trace()
                 if cex:
@@ -575,8 +575,9 @@ class CadpCompositional(CadpMonitor):
         ranges, fixpoint = value_analysis(self.cli, info)
         self.verbose_output(str(ranges), "Value analysis")
         if not fixpoint:
-            log.critical(f"Value analysis of {fname} did not succeed.")
-            return ExitStatus.BACKEND_ERROR
+            raise SliverError(
+                status=ExitStatus.BACKEND_ERROR,
+                error_message=f"Value analysis of {fname} did not succeed.")
 
         all_args = (
             (info.i, "i", info.max_key_i() + 1),
