@@ -206,7 +206,7 @@ class Backend:
         print("This backend does not support simulation.")
         return ExitStatus.BACKEND_ERROR
 
-    def verify(self, fname, info):
+    def verify(self, fname, info, suppress_output=False):
         """Verifies the correctness of the program at fname.
         """
 
@@ -216,12 +216,13 @@ class Backend:
         try:
             log_call(cmd)
             out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
-
-            self.verbose_output(out, "Backend output")
+            if not suppress_output:
+                self.verbose_output(out, "Backend output")
             return self.handle_success(out, info)
         except CalledProcessError as err:
             log.debug(err)
-            self.verbose_output(err.output.decode(), "Backend output")
+            if not suppress_output:
+                self.verbose_output(err.output.decode(), "Backend output")
             return self.handle_error(err, fname, info)
 
     def verbose_output(self, output, decorate=None):
@@ -641,10 +642,14 @@ class CadpCompositional(CadpMonitor):
         with open(svl_fname, "w") as f:
             f.write(svl_script)
         self.temp_files.append(svl_fname)
-        self.temp_files.append(Path(svl_fname).with_suffix(".log"))
+        svl_logfile = Path(svl_fname).with_suffix(".log")
+        self.temp_files.append(svl_logfile)
         self.temp_files.append(f"{fname}.bcg")
         self.verbose_output(svl_script, "SVL script")
-        return Backend.verify(self, fname, info)
+        result = Backend.verify(self, fname, info, suppress_output=True)
+        with open(svl_logfile) as logfile:
+            self.verbose_output(logfile.read(), "Backend output")
+        return result
 
     def handle_success(self, out, info) -> ExitStatus:
         log_fname = (self.base_dir / self.make_slug())
