@@ -27,14 +27,17 @@ def exp_main(has_stigmergy, has_env, num_agents, not_hidden):
         gates += ", "
     if has_env:
         gates += ge_se
-    prios = """
+
+    def prio(gate):
+        return " > ".join(f'"{gate} !{i} .*"' for i in range(num_agents))
+
+    prios = f"""
     total prio
-    "i" > all but "i" """
-    if has_stigmergy:
-        prios += """
-    "REFRESH .*" > "L .*" > "REQUEST .*"
-    "L !0.*" > "L !1.*" > "L !2.*"
-    "REQUEST !0.*" > "REQUEST !1.*" > "REQUEST !2.*" """
+        "ATTR .*" > "REFRESH .*" > "L .*" > "REQUEST .*"
+        {prio("ATTR")}
+        {prio("L")}
+        {prio("REQUEST")}
+    in""" if has_stigmergy else ""
 
     return f"""
 {"par" if has_stigmergy or has_env else ""}
@@ -43,12 +46,11 @@ def exp_main(has_stigmergy, has_env, num_agents, not_hidden):
 {"getenv, setenv -> Env [getenv, setenv]" if has_env else ""}
 {"||" if has_env else ""}
 {gates}{" -> " if gates else ""}
-    ({prios}
-    in
+    ({prios if has_stigmergy else ""}
     par tick{", put, qry" if has_stigmergy else ""} in
     {agents}
     end par
-    end prio)
+    {"end prio)" if has_stigmergy else ""}
 {"end par" if has_stigmergy or has_env else ""}
 """
 
@@ -71,7 +73,9 @@ def svl(fname, not_hidden, has_stigmergy, has_env, num_agents):
 
 % DEFAULT_PROCESS_FILE="{fname}"
 
-"{fname}.bcg" = root leaf divbranching reduction of
+"{fname}.bcg" = root leaf sharp reduction
+hold "request", "refresh", "l", "attr"
+of
 (
    hide all but SPURIOUS, {", ".join(not_hidden) if not_hidden else ""} in
 {exp_main(has_stigmergy, has_env, num_agents, not_hidden)}
