@@ -637,7 +637,8 @@ class CadpCompositional(CadpMonitor):
             not_hidden,
             has_stigmergy=bool(info.lstig),
             has_env=bool(info.e),
-            num_agents=info.spawn.num_agents())
+            num_agents=info.spawn.num_agents(),
+            cli=self.cli)
         svl_fname = self._svl_fname(fname)
         with open(svl_fname, "w") as f:
             f.write(svl_script)

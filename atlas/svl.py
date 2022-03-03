@@ -1,6 +1,7 @@
 from pathlib import Path
 import platform
-from cli import SliverError
+
+from cli import Args
 
 
 def exp_agent(has_stigmergy, has_env, not_hidden, id_):
@@ -15,18 +16,24 @@ def exp_agent(has_stigmergy, has_env, not_hidden, id_):
     """
 
 
-def exp_main(has_stigmergy, has_env, num_agents, not_hidden):
-    r_r = "refresh, request"
-    ge_se = "getenv, setenv"
-    gates = r_r if has_stigmergy else ""
+def exp_main(has_stigmergy, has_env, num_agents, not_hidden, cli):
+    gates = [
+        "tick" if cli[Args.FAIR] else "",
+        "refresh, request" if has_stigmergy else "",
+        "getenv, setenv" if has_env else ""
+    ]
+    gates = ", ".join(g for g in gates if g)
+
+    processes = [
+        "tick -> sched [tick]" if cli[Args.FAIR] else "",
+        "refresh, request -> Timestamps [refresh, request, debug]" if has_stigmergy else "",
+        "getenv, setenv -> Env [getenv, setenv]" if has_env else "",
+    ]
+    processes = "\n||\n".join(p for p in processes if p)  
+
     agents = "\n  ||\n".join(
         exp_agent(has_stigmergy, has_env, not_hidden, i)
         for i in range(num_agents))
-
-    if has_stigmergy and has_env:
-        gates += ", "
-    if has_env:
-        gates += ge_se
 
     def prio(gate):
         return " > ".join(f'"{gate} !{i} .*"' for i in range(num_agents))
@@ -40,33 +47,20 @@ def exp_main(has_stigmergy, has_env, num_agents, not_hidden):
     in""" if has_stigmergy else ""
 
     return f"""
-{"par" if has_stigmergy or has_env else ""}
-{r_r +" -> MatrixStorage ["+ r_r +", debug]" if has_stigmergy else ""}
-{"||" if has_stigmergy else ""}
-{"getenv, setenv -> Env [getenv, setenv]" if has_env else ""}
-{"||" if has_env else ""}
+{"par" if processes else ""}
+{processes if processes else ""}
+{"||" if processes else ""}
 {gates}{" -> " if gates else ""}
     ({prios if has_stigmergy else ""}
     par tick{", put, qry" if has_stigmergy else ""} in
     {agents}
     end par
     {"end prio)" if has_stigmergy else ""}
-{"end par" if has_stigmergy or has_env else ""}
+{"end par" if processes else ""}
 """
 
 
-def svl(fname, not_hidden, has_stigmergy, has_env, num_agents):
-    with open(fname) as f:
-        lines = f.readlines()
-    start = next(
-        (i+1 for i, l in enumerate(lines) if "process main" in l),
-        None)
-    if start is None:
-        raise SliverError("Generation of SVL script has failed.")
-    end = next((
-        i for i, l in enumerate(lines[start:], start)
-        if "end process" in l), -1)
-    main = "".join(lines[start:end])
+def svl(fname, not_hidden, has_stigmergy, has_env, num_agents, cli):
 
     return f"""
 % CADP_TIME={"/usr/bin/time" if "Linux" in platform.system() else "gtime"}
@@ -78,7 +72,7 @@ hold "request", "refresh", "l", "attr"
 of
 (
    hide all but SPURIOUS, {", ".join(not_hidden) if not_hidden else ""} in
-{exp_main(has_stigmergy, has_env, num_agents, not_hidden)}
+{exp_main(has_stigmergy, has_env, num_agents, not_hidden, cli)}
    end hide
 );
 
