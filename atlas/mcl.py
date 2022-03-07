@@ -170,17 +170,20 @@ def translate_property(info, externs, parsed=None):
     and translate it into MCL.
     """
     formula, new_vars, modality = get_formula(info, externs, parsed)
-    result = sprint_predicate(sorted(new_vars), pprint_mcl(formula))
+    # Sort variables by agent id
+    new_vars = sorted(list(new_vars), key=lambda v: int(v.split("_")[-1]))
+
+    result = sprint_predicate(new_vars, pprint_mcl(formula))
     if modality == "always":
-        result += sprint_invariant(sorted(new_vars), info)
+        result += sprint_invariant(new_vars, info)
     elif modality == "finally":
-        result += sprint_finally(sorted(new_vars), info)
+        result += sprint_finally(new_vars, info)
     elif modality == "fairly":
-        result += sprint_reach(sorted(new_vars), info)
-        result += sprint_invariant(sorted(new_vars), info, "Reach", short_circuit="Predicate")  # noqa: E501
+        result += sprint_reach(new_vars, info)
+        result += sprint_invariant(new_vars, info, "Reach", short_circuit="Predicate")  # noqa: E501
     elif modality == "fairly_inf":
-        result += sprint_reach(sorted(new_vars), info)
-        result += sprint_invariant(sorted(new_vars), info, "Reach")  # noqa: E501
+        result += sprint_reach(new_vars, info)
+        result += sprint_invariant(new_vars, info, "Reach")  # noqa: E501
     else:
         raise Exception(f"Unrecognized modality {modality}")
 
