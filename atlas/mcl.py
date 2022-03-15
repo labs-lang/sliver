@@ -176,7 +176,7 @@ def translate_property(info, externs, parsed=None):
     result = sprint_predicate(new_vars, pprint_mcl(formula))
     if modality == "always":
         result += sprint_invariant(new_vars, info)
-    elif modality == "finally":
+    elif modality in ("eventually", "finally"):
         result += sprint_finally(new_vars, info)
     elif modality == "fairly":
         result += sprint_reach(new_vars, info)

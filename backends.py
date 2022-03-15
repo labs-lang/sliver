@@ -248,7 +248,7 @@ class Cbmc(Backend):
     def __init__(self, cwd, cli):
         super().__init__(cwd, cli)
         self.name = "cbmc"
-        self.modalities = ("always", "finally")
+        self.modalities = ("always", "finally", "eventually")
         self.language = Language.C
 
     def get_cbmc_version(self, cmd):
@@ -325,7 +325,7 @@ class Cseq(Backend):
     def __init__(self, cwd, cli):
         super().__init__(cwd, cli)
         self.name = "cseq"
-        self.modalities = ("always", "finally")
+        self.modalities = ("always", "finally", "eventually")
         self.language = Language.C
         self.cwd /= Path("backends") / "cseq"
 
@@ -387,7 +387,7 @@ class Esbmc(Backend):
     def __init__(self, cwd, cli):
         super().__init__(cwd, cli)
         self.name = "esbmc"
-        self.modalities = ("always", "finally")
+        self.modalities = ("always", "eventually", "finally")
         self.language = Language.C
 
     def get_cmdline(self, fname, _):
@@ -409,7 +409,7 @@ class CadpMonitor(Backend):
     def __init__(self, cwd, cli):
         super().__init__(cwd, cli)
         self.name = "cadp-monitor"
-        self.modalities = ("always", "finally")
+        self.modalities = ("always", "eventually", "finally")
         self.language = Language.LNT_MONITOR
 
     def check_cadp(self):
@@ -515,7 +515,8 @@ class Cadp(CadpMonitor):
             if self.cli[Args.SIMULATE]
             else Language.LNT)
         self.name = "cadp"
-        self.modalities = ("always", "fairly", "fairly_inf", "finally")
+        self.modalities = (
+            "always", "eventually", "fairly", "fairly_inf", "finally")
 
     def get_cmdline(self, fname, _):
         cmd = ["lnt.open", fname, "evaluator4", "-diag"]
@@ -559,7 +560,8 @@ class CadpCompositional(CadpMonitor):
             if self.cli[Args.SIMULATE]
             else Language.LNT_PARALLEL)
         self.name = "cadp-comp"
-        self.modalities = ("always", "fairly", "fairly_inf", "finally")
+        self.modalities = ("always", "eventually", 
+            "fairly", "fairly_inf", "finally")
 
     def get_cmdline(self, fname, _):
         return ["svl", self._svl_fname(fname)]
