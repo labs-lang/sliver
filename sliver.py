@@ -5,7 +5,7 @@ from pathlib import Path
 
 import click
 
-from cli import CLICK, Args, CliArgs
+from cli import CLICK, LONGDESCR, Args, CliArgs
 from backends import ALL_BACKENDS, ExitStatus, SliverError
 from __about__ import __title__, __version__
 
@@ -14,7 +14,7 @@ __existing = click.Path(exists=True)
 log = logging.getLogger("sliver")
 
 
-@click.command()
+@click.command(help=LONGDESCR)
 @click.version_option(__version__, prog_name=__title__.lower())
 @click.argument('file', required=True, type=__existing)
 @click.argument('values', nargs=-1)
@@ -42,13 +42,6 @@ log = logging.getLogger("sliver")
               multiple=True, type=__existing,
               **CLICK(Args.INCLUDE))
 def main(file, **kwargs):
-    """\b
-* * *  The SLiVER LAbS VERification tool. v3.0-PREVIEW (25 February 2022) * * *
-
-FILE -- path of LABS file to analyze
-
-VALUES -- assign values for parameterised specification (key=value)
-"""
     cli = CliArgs(file, kwargs)
     backend_arg, simulate, show = (
         cli[Args.BACKEND],

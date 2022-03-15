@@ -33,7 +33,7 @@ class Args(Enum):
 
 
 LONGDESCR = f"""
-* * * {__title__.lower()}. {__summary__} v{__version__} ({__date__}) * * *
+* * * {__summary__} v{__version__} ({__date__}) * * *
 
 FILE -- path of LABS file to analyze
 
