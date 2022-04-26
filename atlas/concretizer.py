@@ -228,9 +228,13 @@ class Concretizer:
                 f'(?<=// ___{p}___)(.*?)(?=// ___end {p}___)',
                 re.DOTALL)
 
-        re_pick = re.compile(
+        re_pick_where = re.compile(
             r'TYPEOFVALUES '
             r'([^\[\n]+)\[.+\]; \/\* Pick ([0-9]+)(?: where [^\n]+)? \*\/'
+        )
+        re_pick = re.compile(
+            r'TYPEOFVALUES '
+            r'([^\[\n]+)\[.+\]; \/\* Pick ([0-9]+) \*\/'
         )
 
         picks = re_pick.findall(program)

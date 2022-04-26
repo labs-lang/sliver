@@ -115,6 +115,9 @@ def translateCPROVER(cex, info, parser=TRACE):
             if system:
                 yield f"\n<end {system}>"
                 system = None
+        elif var == "__sim_spurious" and value == "TRUE":
+            yield f"\n<spurious>"
+            break
         elif var == "guessedkey":
             system = func
             yield f"\n<{pprint_agent(info, agent)}: {func} '{info.lstig[int(value)].name}'>"  # noqa: E501
