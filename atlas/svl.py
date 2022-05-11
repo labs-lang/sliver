@@ -42,6 +42,7 @@ def exp_main(has_stigmergy, has_env, num_agents, not_hidden, cli):
     total prio
         "ATTR .*" > "REFRESH .*" > "L .*" > "REQUEST .*"
         {prio("ATTR")}
+        {prio("REFRESH")}
         {prio("L")}
         {prio("REQUEST")}
     in""" if has_stigmergy else ""
