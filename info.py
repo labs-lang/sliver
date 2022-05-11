@@ -181,13 +181,19 @@ class Spawn:
                 return v
         raise KeyError
 
-    def tids(self, agent_type):
-        """Returns all ids of agents of the given type
+    def range_of(self, agent_type):
+        """Returns the id range for the given type
         """
         for (a, b), v in self.items():
             if v.name == str(agent_type):
-                return tuple(range(a, b))
+                return range(a, b)
         raise KeyError
+
+    def tids(self, agent_type):
+        """Returns all ids of agents of the given type
+        """
+        return tuple(self.range_of(agent_type))
+        
 
     def num_agents(self):
         """Returns the total number of agents in the system
