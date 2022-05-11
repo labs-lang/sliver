@@ -136,6 +136,10 @@ class Concretizer:
     def isAnAgent(self, var):
         return And(var >= 0, var < self.agents)
 
+    def isOfType(self, var, typ):
+        rng = self.info.spawn.range_of(typ)
+        return And(var >= rng.start, var < rng.stop)
+
     def _add_soft_constraints(self):
         for tid in range(self.agents):
             a = self.info.spawn[tid]
@@ -203,14 +207,21 @@ class Concretizer:
                 (self.sched[i] == (self.sched[i - 1] + 1) % self.agents)
                 for i in range(1, steps)))
 
-    def add_pick(self, name, size):
+    def add_pick(self, name, size, typ, _):
+        """Adds constraints for statement <name> ;= pick <size> <typ> <where>
+        
+        The last argument is the "where" clause and is currently ignored.
+        """
         size = int(size)
         steps = self.cli[Args.STEPS]
 
         p = [IntVector(f"{name}_{i}", size) for i in range(steps)]
         for step in range(steps):
             # Picks are agent ids
-            self.s.add(*(self.isAnAgent(x) for x in p[step]))
+            if typ is None:
+                self.s.add(*(self.isAnAgent(x) for x in p[step]))
+            else:
+                self.s.add(*(self.isOfType(x, typ) for x in p[step]))
             # No agent picks itselfs as neighbor
             self.s.add(*(x != self.sched[step] for x in p[step]))
             # All picks are different
@@ -228,17 +239,13 @@ class Concretizer:
                 f'(?<=// ___{p}___)(.*?)(?=// ___end {p}___)',
                 re.DOTALL)
 
-        re_pick_where = re.compile(
-            r'TYPEOFVALUES '
-            r'([^\[\n]+)\[.+\]; \/\* Pick ([0-9]+)(?: where [^\n]+)? \*\/'
-        )
         re_pick = re.compile(
             r'TYPEOFVALUES '
-            r'([^\[\n]+)\[.+\]; \/\* Pick ([0-9]+) \*\/'
+            r'([^\[\n]+)\[.+\]; \/\* Pick ([0-9]+)\s+(\S*)?\s*(where .+)?\*\/'
         )
 
         picks = re_pick.findall(program)
-        for pick_name, _ in picks:
+        for pick_name, *_ in picks:
             usages = re.compile(
                 f'(?<!TYPEOFVALUES ){re.escape(pick_name)}' +
                 r'\[')
