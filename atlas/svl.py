@@ -69,7 +69,7 @@ def svl(fname, not_hidden, has_stigmergy, has_env, num_agents, cli):
 % DEFAULT_PROCESS_FILE="{fname}"
 
 "{fname}.bcg" = root leaf sharp reduction
-hold "request", "refresh", "l", "attr"
+hold "REQUEST", "REFRESH", "L", "ATTR"
 of
 (
    hide all but SPURIOUS, {", ".join(not_hidden) if not_hidden else ""} in
