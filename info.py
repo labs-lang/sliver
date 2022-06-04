@@ -5,6 +5,7 @@ about a LAbS system
 """
 from random import choice
 from ast import NodeVisitor, parse
+import re
 
 
 class LabsExprVisitor(NodeVisitor):
@@ -82,11 +83,11 @@ class Info(object):
         """Deserialize system info
         """
         lines = txt.split("|")
-        envs, comps, props, assumes = (
-            lines[0], lines[1:-2], lines[-2], lines[-1])
+        envs, comps, props, assumes, picks = (
+            lines[0], lines[1:-2], lines[-3], lines[-2], lines[-1])
         parsed_extern = [ex.split("=") for ex in externs]
         return Info(
-            spawn=Spawn.parse(comps),
+            spawn=Spawn.parse(comps, picks),
             e=[Variable(*v.split("=")) for v in envs.split(";") if v],
             props=props,
             assumes=assumes,
@@ -172,6 +173,9 @@ class Spawn:
 
     def __init__(self, d):
         self._dict = d
+    
+    def picks_of(self, agent_type):
+        return self._picks[agent_type]
 
     def __getitem__(self, key):
         """spawn[tid] returns the agent definition for agent tid
@@ -193,7 +197,6 @@ class Spawn:
         """Returns all ids of agents of the given type
         """
         return tuple(self.range_of(agent_type))
-        
 
     def num_agents(self):
         """Returns the total number of agents in the system
@@ -211,13 +214,19 @@ class Spawn:
         return self._dict.items()
 
     @staticmethod
-    def parse(c):
+    def parse(c, picks=""):
         result = {}
+        picks = dict([x.split(" ", 1) for x in picks.split(";")])
+        picks = {k: v.split("),(") for k,v in picks.items()}
+        reg = re.compile(r'\(+([^,]+),')
+        for k in picks:
+            matches = [reg.match(x) for x in picks[k] if reg.match(x)]
+            picks[k] = [m.group(1) for m in matches]
 
         for comp, iface, lstig in zip(c[::3], c[1::3], c[2::3]):
             name, rng = comp.split(" ")
             compmin, compmax = rng.split(",")
-            result[(int(compmin), int(compmax))] = Agent(name, iface, lstig)
+            result[(int(compmin), int(compmax))] = Agent(name, iface, lstig, picks[name])
 
         return Spawn(result)
 
@@ -277,7 +286,7 @@ def get_var(lst, index):
 
     _len = sum(v.size for v in lst)
     if not (0 <= index < _len):
-        raise KeyError(f"Out of bounds: {lst}[{index}]")
+        raise KeyError("Out of bounds: "+lst+"["+index+"]")
     count = 0
     for v in lst:
         count += v.size
@@ -287,10 +296,11 @@ def get_var(lst, index):
 
 class Agent:
 
-    def __init__(self, name, iface, lstig):
+    def __init__(self, name, iface, lstig, picks=[]):
         self.name = name
         self.iface = {}
         self.lstig = {}
+        self.picks = picks
 
         if iface != "":
             for txt in iface.split(";"):
