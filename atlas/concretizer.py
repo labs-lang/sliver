@@ -208,27 +208,54 @@ class Concretizer:
                 for i in range(1, steps)))
 
     def add_pick(self, name, size, typ, _):
-        """Adds constraints for statement <name> ;= pick <size> <typ> <where>
-        
+        """Adds constraints for statement <name> := pick <size> <typ> <where>
+
+        <typ> is optional. When omitted, pick from all agents.
         The last argument is the "where" clause and is currently ignored.
         """
         size = int(size)
         steps = self.cli[Args.STEPS]
 
+        def can_pick(tid, name):
+            for ag in self.info.spawn.values():
+                if name in ag.picks:
+                    return self.isOfType(tid, ag.name)
+
         p = [IntVector(f"{name}_{i}", size) for i in range(steps)]
         for step in range(steps):
-            # Picks are agent ids
-            if typ is None:
-                self.s.add(*(self.isAnAgent(x) for x in p[step]))
-            else:
-                self.s.add(*(self.isOfType(x, typ) for x in p[step]))
-            # No agent picks itselfs as neighbor
-            self.s.add(*(x != self.sched[step] for x in p[step]))
-            # All picks are different
-            self.s.add(*(
+            # if agent cannot actually use the pick, set to 0
+
+            if_can_pick = [
+                # Honor agent type,
+                self.isOfType(x, typ) for x in p[step]
+            ] if typ else [
+                # If pick is untyped, x should still be a valid id
+                self.isAnAgent(x) for x in p[step]
+            ]
+            # picks should be distinct
+            if_can_pick.extend(
                 p[step][i] != p[step][j]
                 for j in range(size)
-                for i in range(j)))
+                for i in range(j)
+            )
+            # Agent cannot pick itself
+            if_can_pick.extend(x != self.sched[step] for x in p[step])
+            self.s.add(If(
+                can_pick(self.sched[step], name),
+                And(if_can_pick),
+                And([x == 0 for x in p[step]])
+            ))
+            # if typ:
+            #     self.s.add(*(self.isOfType(x, typ) for x in p[step]))
+            # else:
+            #     self.s.add(*(self.isAnAgent(x) for x in p[step]))
+            # # No agent picks itself as neighbor
+            # self.s.add(*(x != self.sched[step] for x in p[step]))
+            # # All picks are different
+            # self.s.add(*(
+            #     p[step][i] != p[step][j]
+            #     for j in range(size)
+            #     for i in range(j)))
         self.picks[name] = (p, size)
 
     def concretize_program(self, program):
