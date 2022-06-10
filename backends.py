@@ -515,11 +515,11 @@ class Cadp(CadpMonitor):
             if self.cli[Args.SIMULATE]
             else Language.LNT)
         self.name = "cadp"
-        self.modalities = (
-            "always", "eventually", "fairly", "fairly_inf", "finally")
+        self.modalities = ("always", "eventually", 
+            "fairly", "fairly_inf", "finally")
 
     def get_cmdline(self, fname, _):
-        cmd = ["lnt.open", fname, "evaluator4", "-diag"]
+        cmd = ["bcg_open", f"{fname}.bcg", "evaluator4", "-diag"]
         if self.cli[Args.DEBUG]:
             cmd.append("-verbose")
         cmd.append(self._mcl_fname(fname))
@@ -536,7 +536,26 @@ class Cadp(CadpMonitor):
             f.write(mcl)
         self.temp_files.append(mcl_fname)
         self.verbose_output(mcl, "MCL property")
-        return Backend.verify(self, fname, info)
+
+        try:
+            cmd = ["lnt.open", fname, "generator", f"{fname}.bcg"]
+            log_call(cmd)
+            out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
+            self.verbose_output(out, "BCG generation ourput:")
+            # ###### WARNING ##########
+            # Here we can use divbranching because the properties we support
+            # so far are preserved by it. Extensions to the property language
+            # may require sharp or strong reduction.
+            cmd = [
+                "bcg_min", "-divbranching", f"{fname}.bcg", f"{fname}.min.bcg"]
+            log_call(cmd)
+            check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
+            self.temp_files.append(f"{fname}.bcg")
+            self.temp_files.append(f"{fname}.min.bcg")
+            return Backend.verify(self, fname, info)
+        except CalledProcessError as err:
+            log.error(err.output.decode())
+            return ExitStatus.BACKEND_ERROR
 
     def handle_success(self, out, info) -> ExitStatus:
         result = super().handle_success(out, info)
@@ -545,12 +564,16 @@ class Cadp(CadpMonitor):
         return result
 
     def cleanup(self, fname):
-        self._safe_remove((self.cwd / "evaluator4", ))
+        self._safe_remove((
+            self.cwd / "evaluator4", 
+            self.cwd / f"{fname}@1.o", 
+            self.cwd / f"{fname}.min@1.o",
+        ))
         super().cleanup(fname)
 
 
 class CadpCompositional(CadpMonitor):
-    """The CADP-based workflow using parallel emulation programs
+    """The CADP-based workflow using parallel emulation programs.
     """
     def __init__(self, cwd, cli):
         super().__init__(cwd, cli)
