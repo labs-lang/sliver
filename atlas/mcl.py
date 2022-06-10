@@ -40,10 +40,11 @@ def irrelevant(var, varnames):
 
 
 def preprocess(params, prefix, info):
-    varnames = set(p.rsplit("_", 1)[0] for p in params)
+    sort_params = sorted(params)
+    varnames = set(p.rsplit("_", 1)[0] for p in sort_params)
     prefix = f"{prefix}_" if prefix else ""
-    inits = [sprint_assign(p, info, f"{prefix}{p}") for p in params]
-    nu_params = [f"{p}:Int:={prefix}{p}" for p in params]
+    inits = [sprint_assign(p, info, f"{prefix}{p}") for p in sort_params]
+    nu_params = [f"{p}:Int:={prefix}{p}" for p in sort_params]
     return varnames, inits, nu_params
 
 
@@ -65,7 +66,12 @@ def sprint_irrelevant(varnames, info, fn, box_or_diamond):
 
     var_infos = [info.lookup_var(v) for v in varnames if v != "id"]
     labels = set(LABEL(v.store) for v in var_infos)
-    other_actions = " and ".join(f"(not {{{lbl} ...}})" for lbl in labels)
+    other_actions = [
+        """(not "SPURIOUS")""",
+        *(f"(not {{{lbl} ...}})" for lbl in labels)
+    ]
+    other_actions = " and ".join(other_actions)
+    other_actions = f"({other_actions})"
     attrs = {
         s: [v for v in var_infos if v.store == s]
         for s in ("i", "lstig", "e")}
@@ -170,8 +176,14 @@ def translate_property(info, externs, parsed=None):
     and translate it into MCL.
     """
     formula, new_vars, modality = get_formula(info, externs, parsed)
-    # Sort variables by agent id
-    new_vars = sorted(list(new_vars), key=lambda v: int(v.split("_")[-1]))
+    # Sort variables by agent id and index
+
+    def key_of(v):
+        name, agent_id = v.rsplit("_",1)
+        idx = info.lookup_var(name).index
+        return int(agent_id), idx
+
+    new_vars = sorted(list(new_vars), key=key_of)
 
     result = sprint_predicate(new_vars, pprint_mcl(formula))
     if modality == "always":
