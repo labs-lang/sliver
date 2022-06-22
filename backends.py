@@ -519,7 +519,7 @@ class Cadp(CadpMonitor):
             "fairly", "fairly_inf", "finally")
 
     def get_cmdline(self, fname, _):
-        cmd = ["bcg_open", f"{fname}.bcg", "evaluator4", "-diag"]
+        cmd = ["bcg_open", f"{fname}.min.bcg", "evaluator4", "-diag"]
         if self.cli[Args.DEBUG]:
             cmd.append("-verbose")
         cmd.append(self._mcl_fname(fname))
