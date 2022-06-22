@@ -57,19 +57,22 @@ def update_clauses(params, info, fn, box_or_diamond):
         for i, p in enumerate(params))
 
 
-def sprint_irrelevant(varnames, info, fn, box_or_diamond):
+def _id(x):
+    return x
+
+
+def sprint_irrelevant(names, info, fn, box_or_diamond=_id, not_spurious=True):
     """Print a clause matching "irrelevant" transitions
     (i.e., those that do not affect satisfaction of Predicate).
     """
     def filter_(vs):
         return " and ".join(f"""(x <> {v.index})""" for v in vs)
 
-    var_infos = [info.lookup_var(v) for v in varnames if v != "id"]
+    var_infos = [info.lookup_var(v) for v in names if v != "id"]
     labels = set(LABEL(v.store) for v in var_infos)
-    other_actions = [
-        """(not "SPURIOUS")""",
-        *(f"(not {{{lbl} ...}})" for lbl in labels)
-    ]
+    other_actions = ["""(not "SPURIOUS")"""] if not_spurious else []
+    other_actions.extend(f"(not {{{lbl} ...}})" for lbl in labels)
+
     other_actions = " and ".join(other_actions)
     other_actions = f"({other_actions})"
     attrs = {
@@ -109,8 +112,8 @@ end_macro
 
 
 def sprint_finally(params, info):
-    varnames, inits, args = preprocess(params, "", info)
-    irrelevants = f"{sprint_irrelevant(varnames,info, '', lambda x: x)}*"
+    names, inits, args = preprocess(params, "", info)
+    irrelevants = f"{sprint_irrelevant(names, info, '', not_spurious=False)}*"
     inits = [x for y in zip(repeat(irrelevants), inits) for x in y]
     mcl_and = "\n    and\n    "
     return f"""
@@ -120,17 +123,17 @@ mu R ({", ".join(args)}) . (
     or
     ((<"SPURIOUS"> true) and ([not "SPURIOUS"] false)))
     or
-    ({sprint_irrelevant(varnames, info, f"R({', '.join(params)})", BOX)}
+    ({sprint_irrelevant(names, info, f"R({', '.join(params)})", BOX)}
     and
     {mcl_and.join(update_clauses(params, info, "R", BOX))}))
 """
 
 
 def sprint_invariant(params, info, name="Predicate", short_circuit=None):
-    varnames, inits, nu_params = preprocess(params, "init", info)
+    names, inits, nu_params = preprocess(params, "init", info)
     # We must capture irrelevant initializations,
     # otherwise we will get a vacuous pass
-    irrelevants = f"{sprint_irrelevant(varnames,info, '', lambda x: x)}*"  # noqa: E501
+    irrelevants = f"{sprint_irrelevant(names, info, '', not_spurious=False)}*"  # noqa: E501
     inits = [x for y in zip(repeat(irrelevants), inits) for x in y]
     mcl_and = "\n    and\n    "
 
@@ -145,7 +148,7 @@ nu Inv ({", ".join(nu_params)}) . (
     {name}({", ".join(params)})
     and
     {short_circuit}{"(" if short_circuit else ""}
-    {sprint_irrelevant(varnames, info, f"Inv({', '.join(params)})", BOX)}
+    {sprint_irrelevant(names, info, f"Inv({', '.join(params)})", BOX)}
     and
     {mcl_and.join(update_clauses(params, info, "Inv", BOX))}
 {")" if short_circuit else ""})
