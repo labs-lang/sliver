@@ -1,17 +1,19 @@
+import logging
 import random
 import re
 import time
 
 from cli import Args, ExitStatus, SliverError
 from info import get_var
-from z3 import (And, If, Int, Not, Optimize, Or, Solver, Sum, sat, set_option,
-                simplify)
+from z3 import (And, Bool, If, Implies, Int, Not, Or, Solver, Sum, sat,
+                set_option, simplify)
 from z3.z3 import IntVector
 
 from atlas.atlas import (QUANT, BinOp, BuiltIn, Nary, OfNode, contains,
                          make_dict, remove_quant)
 
-RND_SEED = time.time()
+log = logging.getLogger('backend')
+RND_SEED = int(time.time())
 
 
 def symbolic_reduce(vs, fn):
@@ -112,17 +114,13 @@ class Concretizer:
         self.envs = []
         self.sched = None
         self.picks = {}
+        self.softs = set()
         self.is_setup = False
+        self.s = Solver()
         if randomize:
-            self.s = Optimize()
-            set_option(":auto_config", False)
-            set_option(":smt.phase_selection", 5)
-            set_option(":smt.random_seed", int(RND_SEED))
+            set_option(":smt.random_seed", RND_SEED)
             random.seed(RND_SEED)
-            # Force incremental solver
-            self.s.push()
-        else:
-            self.s = Solver()
+            log.debug(f"Concretization: random seed is {RND_SEED}")
 
     def setup(self, picks):
         if self.is_setup:
@@ -141,14 +139,28 @@ class Concretizer:
         return And(var >= rng.start, var < rng.stop)
 
     def _add_soft_constraints(self):
+        self.s.push()
         for tid in range(self.agents):
             a = self.info.spawn[tid]
             for i, attr in enumerate(self.attrs[tid]):
                 v = get_var(a.iface, i)
-                self.s.add_soft(attr == v.rnd_value(tid))
+                fresh_bool = Bool(f"{v.store}_{v.index}_%%soft%%")
+                self.softs.add(fresh_bool)
+                self.s.add(Implies(fresh_bool, attr == v.rnd_value(tid)))
+
+                # self.s.add_soft(attr == v.rnd_value(tid))
         for i, env_var in enumerate(self.envs):
             v = get_var(self.info.e, i)
-            self.s.add_soft(env_var == v.rnd_value(0))
+            fresh_bool = Bool(f"{v.store}_{v.index}_%%soft%%")
+            self.softs.add(fresh_bool)
+            self.s.add(Implies(fresh_bool, attr == v.rnd_value(tid)))
+            # self.s.add_soft(env_var == v.rnd_value(0))
+
+    def _reset_soft_constraints(self):
+        # Remove previous soft constraints
+        self.softs = set()
+        while self.s.num_scopes() > 0:
+            self.s.pop()
 
     def _init_constraint(self, v, attrs, id):
         def c(attr):
@@ -245,17 +257,6 @@ class Concretizer:
                 And(if_can_pick),
                 And([x == 0 for x in p[step]])
             ))
-            # if typ:
-            #     self.s.add(*(self.isOfType(x, typ) for x in p[step]))
-            # else:
-            #     self.s.add(*(self.isAnAgent(x) for x in p[step]))
-            # # No agent picks itself as neighbor
-            # self.s.add(*(x != self.sched[step] for x in p[step]))
-            # # All picks are different
-            # self.s.add(*(
-            #     p[step][i] != p[step][j]
-            #     for j in range(size)
-            #     for i in range(j)))
         self.picks[name] = (p, size)
 
     def concretize_program(self, program):
@@ -335,16 +336,30 @@ class Concretizer:
 
         self.setup(picks)
 
-        if self.randomize:
+        if self.randomize:  
+            self._reset_soft_constraints()
             self._add_soft_constraints()
 
-        if self.s.check() == sat:
+        check = None
+        softs = list(self.softs)
+        # Randomize the order of soft sonstraints
+        random.shuffle(softs)
+        # Try solving. If the current problem is unsat,
+        # remove a (random) soft constraintt and try again
+        while check != sat and len(softs):
+            check = self.s.check(*softs)
+            if check != sat:
+                softs.pop()
+
+        if check == sat:
             m = self.s.model()
             # Avoid getting the same model in future
             block = []
             for decl in m:
                 const = decl()
-                block.append(const != m[decl])
+                # Ignore variables used for soft constraints
+                if """%%soft%%""" not in str(const):
+                    block.append(const != m[decl])
             if block:
                 self.s.add(Or(block))
 
