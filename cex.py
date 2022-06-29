@@ -115,6 +115,7 @@ def translateCPROVER(cex, info, parser=TRACE):
             if system:
                 yield f"\n<end {system}>"
                 system = None
+            yield f"""\n<step {int(value.replace("u", ""))}>"""
         elif var == "__sim_spurious" and value == "TRUE":
             yield f"\n<spurious>"
             break
