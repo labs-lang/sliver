@@ -117,7 +117,7 @@ def translateCPROVER(cex, info, parser=TRACE):
                 system = None
             yield f"""\n<step {int(value.replace("u", ""))}>"""
         elif var == "__sim_spurious" and value == "TRUE":
-            yield f"\n<spurious>"
+            yield "\n<spurious>"
             break
         elif var == "guessedkey":
             system = func

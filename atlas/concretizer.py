@@ -336,7 +336,7 @@ class Concretizer:
 
         self.setup(picks)
 
-        if self.randomize:  
+        if self.randomize:
             self._reset_soft_constraints()
             self._add_soft_constraints()
 

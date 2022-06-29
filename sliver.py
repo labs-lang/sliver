@@ -5,9 +5,9 @@ from pathlib import Path
 
 import click
 
-from cli import CLICK, LONGDESCR, Args, CliArgs
-from backends import ALL_BACKENDS, ExitStatus, SliverError
 from __about__ import __title__, __version__
+from backends import ALL_BACKENDS
+from cli import CLICK, LONGDESCR, Args, CliArgs, ExitStatus, SliverError
 
 __DIR = Path(__file__).parent.resolve()
 __existing = click.Path(exists=True)
