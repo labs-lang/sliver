@@ -144,7 +144,7 @@ class Concretizer:
             a = self.info.spawn[tid]
             for i, attr in enumerate(self.attrs[tid]):
                 v = get_var(a.iface, i)
-                fresh_bool = Bool(f"{v.store}_{v.index}_%%soft%%")
+                fresh_bool = Bool(f"{v.store}_{tid}_{v.index}_%%soft%%")
                 self.softs.add(fresh_bool)
                 self.s.add(Implies(fresh_bool, attr == v.rnd_value(tid)))
 
@@ -346,10 +346,13 @@ class Concretizer:
         random.shuffle(softs)
         # Try solving. If the current problem is unsat,
         # remove a (random) soft constraintt and try again
-        while check != sat and len(softs):
+        while check != sat:
             check = self.s.check(*softs)
             if check != sat:
-                softs.pop()
+                if not softs:
+                    break
+                x = softs.pop()
+                log.debug(f"unsat, retracting {x}...")
 
         if check == sat:
             m = self.s.model()
@@ -365,8 +368,7 @@ class Concretizer:
 
             return fmt_globals(m), fmt_inits(m)
         else:
-            for a in self.s.assertions():
-                print(a)
+            log.debug(f"Unsat core is {self.s.unsat_core()}")
             raise SliverError(
                 ExitStatus.BACKEND_ERROR,
                 error_message="Could not find a valid concretization.")
