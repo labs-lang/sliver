@@ -145,6 +145,7 @@ class ExitStatus(Enum):
     PARSING_ERROR = 6
     FAILED = 10
     TIMEOUT = 124
+    NOT_FOUND = 127
     KILLED = 130
 
     @staticmethod
