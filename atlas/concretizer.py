@@ -118,6 +118,8 @@ class Concretizer:
         self.is_setup = False
         self.s = Solver()
         if randomize:
+            set_option(":auto_config", False)
+            set_option(":smt.phase_selection", 5)
             set_option(":smt.random_seed", RND_SEED)
             random.seed(RND_SEED)
             log.debug(f"Concretization: random seed is {RND_SEED}")
@@ -148,13 +150,31 @@ class Concretizer:
                 self.softs.add(fresh_bool)
                 self.s.add(Implies(fresh_bool, attr == v.rnd_value(tid)))
 
-                # self.s.add_soft(attr == v.rnd_value(tid))
         for i, env_var in enumerate(self.envs):
             v = get_var(self.info.e, i)
             fresh_bool = Bool(f"{v.store}_{v.index}_%%soft%%")
             self.softs.add(fresh_bool)
             self.s.add(Implies(fresh_bool, attr == v.rnd_value(tid)))
-            # self.s.add_soft(env_var == v.rnd_value(0))
+
+        # Experimental: soft constraints on picks
+        # (Does not seem necessary so far)
+        # for name in self.picks:
+        #     p, size, typ = self.picks[name]
+        #     for step in range(self.cli[Args.STEPS]):
+        #         choices = list(
+        #             self.info.spawn.range_of(typ)
+        #             if typ
+        #             else range(self.agents))
+        #         try:
+        #             choices.remove(self.sched[step])
+        #         except ValueError:
+        #             pass
+        #         for i in range(size):
+        #             random.shuffle(choices)
+        #             for i in range(size):
+        #                 soft = Bool(f"pick_{name}_{step}_{i}_%%soft%%")
+        #                 self.softs.add(soft)
+        #                 self.s.add(Implies(soft, p[step][i] == choices.pop()))
 
     def _reset_soft_constraints(self):
         # Remove previous soft constraints
@@ -252,12 +272,13 @@ class Concretizer:
             )
             # Agent cannot pick itself
             if_can_pick.extend(x != self.sched[step] for x in p[step])
+
             self.s.add(If(
                 can_pick(self.sched[step], name),
                 And(if_can_pick),
                 And([x == 0 for x in p[step]])
             ))
-        self.picks[name] = (p, size)
+        self.picks[name] = (p, size, typ)
 
     def concretize_program(self, program):
 
@@ -313,7 +334,7 @@ class Concretizer:
                 rows = ", ".join(fmt_intvec(row) for row in p)
                 return f"TYPEOFAGENTID {name}[{STEPS}][{size}] = {{ {rows} }};"
 
-            picks = (fmt_pick(p, n, s) for n, (p, s) in self.picks.items())
+            picks = (fmt_pick(p, n, s) for n, (p, s, _) in self.picks.items())
             return (
                 f"TYPEOFAGENTID sched[{STEPS}] = {fmt_intvec(self.sched)};"
                 + "\n"
@@ -344,8 +365,12 @@ class Concretizer:
         softs = list(self.softs)
         # Randomize the order of soft sonstraints
         random.shuffle(softs)
+        # ...But keep "pick" constraints at the beginning of the list
+        # (so they will removed last)
+        # softs.sort(key=lambda s: 0 if "pick_" in str(s) else 1)
+
         # Try solving. If the current problem is unsat,
-        # remove a (random) soft constraintt and try again
+        # remove a (random) soft constraint and try again
         while check != sat:
             check = self.s.check(*softs)
             if check != sat:
