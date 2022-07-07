@@ -174,7 +174,7 @@ class Concretizer:
         #             for i in range(size):
         #                 soft = Bool(f"pick_{name}_{step}_{i}_%%soft%%")
         #                 self.softs.add(soft)
-        #                 self.s.add(Implies(soft, p[step][i] == choices.pop()))
+        #                 self.s.add(Implies(soft, p[step][i] == choices.pop()))  # noQA: E501
 
     def _reset_soft_constraints(self):
         # Remove previous soft constraints
@@ -376,8 +376,8 @@ class Concretizer:
             if check != sat:
                 if not softs:
                     break
-                x = softs.pop()
-                log.debug(f"unsat, retracting {x}...")
+                softs.pop()
+                # log.debug(f"unsat, retracting {softs.pop()}...")
 
         if check == sat:
             m = self.s.model()
