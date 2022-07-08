@@ -24,6 +24,7 @@ Typically, a SLiVER release will contain the following files and directories:
 |`LICENSE_cbmc`       |The software license for CBMC|
 |`README.md`          |This document|
 |`README.txt`         |Release-specific instructions|
+|`requirements.txt`   |Python dependencies|
 |`sliver.py`          |SLiVER command-line front-end|
 |`*.py`               |SLiVER support files| 
 |*other files and directories*      |Python libraries used by SLiVER|
@@ -32,17 +33,19 @@ Typically, a SLiVER release will contain the following files and directories:
 
 To install SLiVER, please follow the steps below:
 
-1. install Python 3.8 or higher.
+1. Install Python 3.8 or higher.
     
 2. (Optional) Install Python 2.7 (required by the bundled CSeq backend).
 
 3. Download and extract the latest version of SLiVER from the [**Releases** page](https://github.com/labs-lang/sliver/releases)
 
-4. set execution (+x) permissions for `sliver.py`, `cseq/cseq.py`, `cbmc-simulator` 
+4. Set execution (+x) permissions for `sliver.py`, `cseq/cseq.py`, `cbmc-simulator` 
 
-5. Invoking `./sliver.py --help` from the command line should now display basic usage directions.
+5. Install dependencies with `pip install -r requirements.txt`
 
-6. Follow `README.txt` for additional (release-specific) instructions.
+6. Invoking `./sliver.py --help` from the command line should now display basic usage directions.
+
+7. Follow `README.txt` for additional (release-specific) instructions.
 
 The COORDINATION paper [3] 
 [(PDF)](https://hal.inria.fr/hal-02890401/en)

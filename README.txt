@@ -18,6 +18,8 @@ HISTORY           SLiVER changelog
 
 README.txt        this file
 
+requirements.txt  Python packages required by SLiVER
+
 sliver.py         SLiVER command-line front-end
 
 (Other files)     Libraries used by SLiVER
@@ -34,7 +36,9 @@ To install SLiVER, please follow the steps below:
     
     4. set execution permissions (chmod +x) for sliver.py and cbmc-simulator
 
-    5. optionally set execution permissions also for cseq/cseq.py (required to use the cseq backend)
+    5. Install dependencies with (pip install -r requirements.txt)
+
+    6. optionally set execution permissions also for cseq/cseq.py (required to use the cseq backend)
 
     * Usage *
 
