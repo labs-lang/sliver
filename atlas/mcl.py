@@ -28,6 +28,8 @@ def LABEL(store):
 
 def sprint_assign(varname, info, binds_to="v"):
     var, agent_id = varname.rsplit("_", 1)
+    if var == "id":
+        return ""
     var_info = info.lookup_var(var)
     label = LABEL(var_info.store)
     return f"""{{{label} !{agent_id} !{var_info.index} ?{binds_to}:Int ...}}"""
@@ -38,10 +40,11 @@ def irrelevant(var, varnames):
 
 
 def preprocess(params, prefix, info):
-    varnames = set(p.rsplit("_", 1)[0] for p in params)
+    sort_params = sorted(params)
+    varnames = set(p.rsplit("_", 1)[0] for p in sort_params)
     prefix = f"{prefix}_" if prefix else ""
-    inits = [sprint_assign(p, info, f"{prefix}{p}") for p in params]
-    nu_params = [f"{p}:Int:={prefix}{p}" for p in params]
+    inits = [sprint_assign(p, info, f"{prefix}{p}") for p in sort_params]
+    nu_params = [f"{p}:Int:={prefix}{p}" for p in sort_params]
     return varnames, inits, nu_params
 
 
@@ -54,16 +57,24 @@ def update_clauses(params, info, fn, box_or_diamond):
         for i, p in enumerate(params))
 
 
-def sprint_irrelevant(varnames, info, fn, box_or_diamond):
+def _id(x):
+    return x
+
+
+def sprint_irrelevant(names, info, fn, box_or_diamond=_id, not_spurious=True):
     """Print a clause matching "irrelevant" transitions
     (i.e., those that do not affect satisfaction of Predicate).
     """
     def filter_(vs):
         return " and ".join(f"""(x <> {v.index})""" for v in vs)
 
-    var_infos = [info.lookup_var(v) for v in varnames]
+    var_infos = [info.lookup_var(v) for v in names if v != "id"]
     labels = set(LABEL(v.store) for v in var_infos)
-    other_actions = " and ".join(f"(not {{{lbl} ...}})" for lbl in labels)
+    other_actions = ["""(not "SPURIOUS")"""] if not_spurious else []
+    other_actions.extend(f"(not {{{lbl} ...}})" for lbl in labels)
+
+    other_actions = " and ".join(other_actions)
+    other_actions = f"({other_actions})"
     attrs = {
         s: [v for v in var_infos if v.store == s]
         for s in ("i", "lstig", "e")}
@@ -101,8 +112,8 @@ end_macro
 
 
 def sprint_finally(params, info):
-    varnames, inits, args = preprocess(params, "", info)
-    irrelevants = f"{sprint_irrelevant(varnames,info, '', lambda x: x)}*"
+    names, inits, args = preprocess(params, "", info)
+    irrelevants = f"{sprint_irrelevant(names, info, '', not_spurious=False)}*"
     inits = [x for y in zip(repeat(irrelevants), inits) for x in y]
     mcl_and = "\n    and\n    "
     return f"""
@@ -112,17 +123,17 @@ mu R ({", ".join(args)}) . (
     or
     ((<"SPURIOUS"> true) and ([not "SPURIOUS"] false)))
     or
-    ({sprint_irrelevant(varnames, info, f"R({', '.join(params)})", BOX)}
+    ({sprint_irrelevant(names, info, f"R({', '.join(params)})", BOX)}
     and
     {mcl_and.join(update_clauses(params, info, "R", BOX))}))
 """
 
 
 def sprint_invariant(params, info, name="Predicate", short_circuit=None):
-    varnames, inits, nu_params = preprocess(params, "init", info)
+    names, inits, nu_params = preprocess(params, "init", info)
     # We must capture irrelevant initializations,
     # otherwise we will get a vacuous pass
-    irrelevants = f"{sprint_irrelevant(varnames,info, '', lambda x: x)}*"  # noqa: E501
+    irrelevants = f"{sprint_irrelevant(names, info, '', not_spurious=False)}*"  # noqa: E501
     inits = [x for y in zip(repeat(irrelevants), inits) for x in y]
     mcl_and = "\n    and\n    "
 
@@ -137,7 +148,7 @@ nu Inv ({", ".join(nu_params)}) . (
     {name}({", ".join(params)})
     and
     {short_circuit}{"(" if short_circuit else ""}
-    {sprint_irrelevant(varnames, info, f"Inv({', '.join(params)})", BOX)}
+    {sprint_irrelevant(names, info, f"Inv({', '.join(params)})", BOX)}
     and
     {mcl_and.join(update_clauses(params, info, "Inv", BOX))}
 {")" if short_circuit else ""})
@@ -163,22 +174,31 @@ def pprint_mcl(node):
         return node
 
 
-def translate_property(info):
+def translate_property(info, externs, parsed=None):
     """Retrieve the first property in info.properties
     and translate it into MCL.
     """
-    formula, new_vars, modality = get_formula(info)
-    result = sprint_predicate(sorted(new_vars), pprint_mcl(formula))
+    formula, new_vars, modality = get_formula(info, externs, parsed)
+    # Sort variables by agent id and index
+
+    def key_of(v):
+        name, agent_id = v.rsplit("_",1)
+        idx = info.lookup_var(name).index
+        return int(agent_id), idx
+
+    new_vars = sorted(list(new_vars), key=key_of)
+
+    result = sprint_predicate(new_vars, pprint_mcl(formula))
     if modality == "always":
-        result += sprint_invariant(sorted(new_vars), info)
-    elif modality == "finally":
-        result += sprint_finally(sorted(new_vars), info)
+        result += sprint_invariant(new_vars, info)
+    elif modality in ("eventually", "finally"):
+        result += sprint_finally(new_vars, info)
     elif modality == "fairly":
-        result += sprint_reach(sorted(new_vars), info)
-        result += sprint_invariant(sorted(new_vars), info, "Reach", short_circuit="Predicate")  # noqa: E501
+        result += sprint_reach(new_vars, info)
+        result += sprint_invariant(new_vars, info, "Reach", short_circuit="Predicate")  # noqa: E501
     elif modality == "fairly_inf":
-        result += sprint_reach(sorted(new_vars), info)
-        result += sprint_invariant(sorted(new_vars), info, "Reach")  # noqa: E501
+        result += sprint_reach(new_vars, info)
+        result += sprint_invariant(new_vars, info, "Reach")  # noqa: E501
     else:
         raise Exception(f"Unrecognized modality {modality}")
 

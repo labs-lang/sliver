@@ -1,24 +1,24 @@
 
-              SLiVER 2.1
-              November 2021
+            SLiVER  3.0
+            8 July 2022
 
 The SLiVER LAbS VERification tool
 
     * Package contents *
 
-atlas/, cadp/     Files used by cadp and cadp-monitor backend
+atlas/            Python files for parsing properties
 
-cseq/             CSeq analysis tool
+backends/         Analysis backends and related files
 
 examples/         LAbS example specifications
 
 labs/             LAbS parser and translator
 
-cbmc-simulator    A build of CBMC 5.4
-
 HISTORY           SLiVER changelog
 
 README.txt        this file
+
+requirements.txt  Python packages required by SLiVER
 
 sliver.py         SLiVER command-line front-end
 
@@ -36,7 +36,9 @@ To install SLiVER, please follow the steps below:
     
     4. set execution permissions (chmod +x) for sliver.py and cbmc-simulator
 
-    5. optionally set execution permissions also for cseq/cseq.py (required to use the cseq backend)
+    5. Install dependencies with (pip install -r requirements.txt)
+
+    6. optionally set execution permissions also for cseq/cseq.py (required to use the cseq backend)
 
     * Usage *
 

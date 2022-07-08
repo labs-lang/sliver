@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
+import inspect
 import logging
 import sys
 from pathlib import Path
 
 import click
 
-from info import Info
-from cli import CLICK, Args, CliArgs
-from backends import ALL_BACKENDS, ExitStatus, SliverError
 from __about__ import __title__, __version__
+from backends.backends import ALL_BACKENDS
+from cli import CLICK, LONGDESCR, Args, CliArgs, ExitStatus, SliverError
+
+if not hasattr(sys.modules[__name__], '__file__'):
+    __file__ = inspect.getfile(inspect.currentframe())
 
 __DIR = Path(__file__).parent.resolve()
 __existing = click.Path(exists=True)
 log = logging.getLogger("sliver")
 
 
-@click.command()
+@click.command(help=LONGDESCR)
 @click.version_option(__version__, prog_name=__title__.lower())
 @click.argument('file', required=True, type=__existing)
 @click.argument('values', nargs=-1)
@@ -43,13 +46,6 @@ log = logging.getLogger("sliver")
               multiple=True, type=__existing,
               **CLICK(Args.INCLUDE))
 def main(file, **kwargs):
-    """\b
-* * *  The SLiVER LAbS VERification tool. v2.1 (November 2021) * * *
-
-FILE -- path of LABS file to analyze
-
-VALUES -- assign values for parameterised specification (key=value)
-"""
     cli = CliArgs(file, kwargs)
     backend_arg, simulate, show = (
         cli[Args.BACKEND],
@@ -76,12 +72,10 @@ VALUES -- assign values for parameterised specification (key=value)
     if fname and show:
         sys.exit(ExitStatus.SUCCESS.value)
     status = None
-    
+
     try:
-        log.info(f"Gathering information on {file}...")
-        info = backend.get_info().replace("\n", "|")[:-1]
-        log.debug(f"{info=}")
-        info = Info.parse(info, cli[Args.VALUES])
+        log.info(f"Gathering information on {cli.file}...")
+        info = backend.get_info(parsed=True)
         backend.check_info(info)
 
         sim_or_verify = "Running simulation" if simulate else "Verifying"
@@ -99,7 +93,7 @@ VALUES -- assign values for parameterised specification (key=value)
             sim_or_verify += f""" '{cli[Args.PROPERTY]}'"""
         log.info(f"{sim_or_verify} with backend {backend_arg}...")
         status = (backend.simulate(fname, info) if simulate else
-                    backend.verify(fname, info))
+                  backend.verify(fname, info))
     except KeyboardInterrupt:
         status = ExitStatus.KILLED
     except SliverError as err:
@@ -109,6 +103,7 @@ VALUES -- assign values for parameterised specification (key=value)
         backend.cleanup(fname)
         if status:
             print(ExitStatus.format(status, simulate))
+            print()
             sys.exit(status.value)
 
 

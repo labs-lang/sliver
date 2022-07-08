@@ -5,6 +5,7 @@ about a LAbS system
 """
 from random import choice
 from ast import NodeVisitor, parse
+import re
 
 
 class LabsExprVisitor(NodeVisitor):
@@ -82,24 +83,33 @@ class Info(object):
         """Deserialize system info
         """
         lines = txt.split("|")
-        envs, comps, props, assumes = (
-            lines[0], lines[1:-2], lines[-2], lines[-1])
+        envs, comps, props, assumes, picks = (
+            lines[0], lines[1:-2], lines[-3], lines[-2], lines[-1])
         parsed_extern = [ex.split("=") for ex in externs]
         return Info(
-            spawn=Spawn.parse(comps),
+            spawn=Spawn.parse(comps, picks),
             e=[Variable(*v.split("=")) for v in envs.split(";") if v],
             props=props,
             assumes=assumes,
             externs={e[0]: e[1] for e in parsed_extern},
             raw=txt)
 
+    @staticmethod
+    def _max_of(v):
+        if v.is_array:
+            return v.index + v.size - 1
+        else:
+            return v.index
+
     def max_key_i(self):
-        def max_of(v):
-            if v.is_array:
-                return v.index + v.size - 1
-            else:
-                return v.index
-        return max(max_of(v) for v in self.i.values())
+        if not self.i:
+            return -1
+        return max(self._max_of(v) for v in self.i.values())
+
+    def max_key_lstig(self):
+        if not self.lstig:
+            return -1
+        return max(self._max_of(v) for v in self.lstig.values())
 
     def lookup_var(self, name):
         """Finds a variable by name"""
@@ -134,10 +144,6 @@ class Info(object):
                if store else ""
 
     def instrument(self):
-        def format(fmt, var, index):
-            return ",".join(
-                fmt.format(TYPE, index + i, var.rnd_value())
-                for i in range(var.size))
 
         def fmt(location, var, offset=0):
             return [
@@ -167,6 +173,9 @@ class Spawn:
 
     def __init__(self, d):
         self._dict = d
+    
+    def picks_of(self, agent_type):
+        return self._picks[agent_type]
 
     def __getitem__(self, key):
         """spawn[tid] returns the agent definition for agent tid
@@ -176,13 +185,18 @@ class Spawn:
                 return v
         raise KeyError
 
-    def tids(self, agent_type):
-        """Returns all ids of agents of the given type
+    def range_of(self, agent_type):
+        """Returns the id range for the given type
         """
         for (a, b), v in self.items():
             if v.name == str(agent_type):
-                return tuple(range(a, b))
+                return range(a, b)
         raise KeyError
+
+    def tids(self, agent_type):
+        """Returns all ids of agents of the given type
+        """
+        return tuple(self.range_of(agent_type))
 
     def num_agents(self):
         """Returns the total number of agents in the system
@@ -200,13 +214,19 @@ class Spawn:
         return self._dict.items()
 
     @staticmethod
-    def parse(c):
+    def parse(c, picks=""):
         result = {}
+        picks = dict([x.split(" ", 1) for x in picks.split(";")])
+        picks = {k: v.split("),(") for k,v in picks.items()}
+        reg = re.compile(r'\(+([^,]+),')
+        for k in picks:
+            matches = [reg.match(x) for x in picks[k] if reg.match(x)]
+            picks[k] = [m.group(1) for m in matches]
 
         for comp, iface, lstig in zip(c[::3], c[1::3], c[2::3]):
             name, rng = comp.split(" ")
             compmin, compmax = rng.split(",")
-            result[(int(compmin), int(compmax))] = Agent(name, iface, lstig)
+            result[(int(compmin), int(compmax))] = Agent(name, iface, lstig, picks[name])
 
         return Spawn(result)
 
@@ -219,7 +239,7 @@ class Variable:
         self.index = int(index)
         self.size = 1
         self.store = store
-        visitor = LabsExprVisitor(self.index)
+        self.init = init
         if "[" in name:
             self.name, size = name.split("[")
             self.size = int(size[:-1])
@@ -227,24 +247,28 @@ class Variable:
         else:
             self.name = name
             self.is_array = False
-        if init[0] == "[":
-            self.values = [
+
+    def values(self, id):
+        visitor = LabsExprVisitor(id)
+        if self.init[0] == "[":
+            return [
                 visitor.visit_string(v)
-                for v in init[1:-1].split(",")]
-        elif ".." in init:
-            low, up = init.split("..")
-            self.values = range(
+                for v in self.init[1:-1].split(",")]
+        elif ".." in self.init:
+            low, up = self.init.split("..")
+            return range(
                 visitor.visit_string(low),
                 visitor.visit_string(up))
-        elif init == "undef":
-            self.values = [-32767]  # UNDEF
+        elif self.init == "undef":
+            return [-32767]  # UNDEF
         else:
-            self.values = [visitor.visit_string(init)]
+            return [visitor.visit_string(self.init)]
 
-    def rnd_value(self):
+    def rnd_value(self, id):
         """Returns a random, feasible initial value for the variable.
         """
-        return choice(self.values)
+        val = choice(self.values(id))
+        return val
 
 
 def get_var(lst, index):
@@ -262,7 +286,7 @@ def get_var(lst, index):
 
     _len = sum(v.size for v in lst)
     if not (0 <= index < _len):
-        raise KeyError("Out of bounds")
+        raise KeyError("Out of bounds: "+lst+"["+index+"]")
     count = 0
     for v in lst:
         count += v.size
@@ -272,10 +296,11 @@ def get_var(lst, index):
 
 class Agent:
 
-    def __init__(self, name, iface, lstig):
+    def __init__(self, name, iface, lstig, picks=[]):
         self.name = name
         self.iface = {}
         self.lstig = {}
+        self.picks = picks
 
         if iface != "":
             for txt in iface.split(";"):
