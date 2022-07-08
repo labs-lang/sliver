@@ -3,14 +3,15 @@ import random
 import re
 import time
 
-from cli import Args, ExitStatus, SliverError
-from info import get_var
 from z3 import (And, Bool, If, Implies, Int, Not, Or, Solver, Sum, sat,
                 set_option, simplify)
 from z3.z3 import IntVector
 
-from atlas.atlas import (QUANT, BinOp, BuiltIn, Nary, OfNode, contains,
-                         make_dict, remove_quant)
+from .atlas import (QUANT, BinOp, BuiltIn, Nary, OfNode, contains,
+                    make_dict, remove_quant)
+
+from ..sliver.cli import Args, ExitStatus, SliverError
+from ..sliver.info import get_var
 
 log = logging.getLogger('backend')
 RND_SEED = int(time.time())

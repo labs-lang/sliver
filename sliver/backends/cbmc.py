@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 import os
 import platform
+from importlib import resources
 from subprocess import STDOUT, CalledProcessError, check_output
 
-from atlas.concretizer import Concretizer
-from cex import translateCPROVER54, translateCPROVERNEW
-from cli import Args, ExitStatus, SliverError
-
-from backends.common import Backend, Language, log_call
+from ..atlas.concretizer import Concretizer
+from ..sliver.cex import translateCPROVER54, translateCPROVERNEW
+from ..sliver.cli import Args, ExitStatus, SliverError
+from .common import Backend, Language, log_call
 
 
 class Cbmc(Backend):
@@ -26,7 +26,7 @@ class Cbmc(Backend):
 
     def get_cmdline(self, fname, _):
         cmd = [os.environ.get("CBMC") or (
-            str(self.cwd / "vendor" / "cbmc" / "cbmc-simulator")
+            resources.path("sliver.cbmc", "cbmc-simulator")
             if "Linux" in platform.system()
             else "cbmc")]
         CBMC_V, CBMC_SUBV = self.get_cbmc_version(cmd)

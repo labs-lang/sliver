@@ -5,7 +5,7 @@ import sys
 from dataclasses import dataclass
 from enum import Enum
 
-from __about__ import __date__, __summary__, __version__
+from .__about__ import __date__, __summary__, __version__
 
 log = logging.getLogger('backend')
 

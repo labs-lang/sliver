@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 from itertools import repeat
-from atlas.atlas import get_formula, OfNode, BinOp, Nary, BuiltIn
+from .atlas import get_formula, OfNode, BinOp, Nary, BuiltIn
 
 
 def sprint_predicate(params, body):

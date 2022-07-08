@@ -2,9 +2,9 @@
 
 from collections import namedtuple
 
-from pyparsing import (
-    alphanums, alphas, Combine, delimitedList, Forward, Group, infixNotation,
-    Keyword, oneOf, opAssoc, Optional, Suppress, Word, ParserElement)
+from pyparsing import (Combine, Forward, Group, Keyword, Optional,
+                       ParserElement, Suppress, Word, alphanums, alphas,
+                       delimitedList, infixNotation, oneOf, opAssoc)
 from pyparsing import pyparsing_common as ppc
 
 ParserElement.enablePackrat()

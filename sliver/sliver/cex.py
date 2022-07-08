@@ -48,6 +48,7 @@ SEP = Keyword("----------------------------------------------------")
 ASGN = Regex(r'(?P<lhs>[^\s=]+)=(?P<rhs>.+)')
 TRACE = OneOrMore(Group(Group(HEADER) + SEP.suppress() + Group(ASGN))).ignore(OneOrMore(SKIP))  # noqa: E501
 TRACE_OLD = OneOrMore(Group(Group(HEADER_OLD) + SEP.suppress() + Group(ASGN))).ignore(OneOrMore(SKIP))  # noqa: E501
+# TODO: fix property parser for "new" versions of CBMC
 PROP = Suppress(SkipTo(LineEnd())) + Suppress(SkipTo(LineStart())) + STUFF + Suppress(SkipTo(StringEnd()))  # noqa: E501
 
 
@@ -138,6 +139,7 @@ def translateCPROVER(cex, info, parser=TRACE):
     violation = cex[cex_end_pos + 18:]
     prop = PROP.parseString(violation)
     if prop[0] != "__sliver_simulation__":
+        yield(str(prop))
         yield f"\n<property violated: '{prop[0]}'>"
     # yield f"\n<Translation took {time.time()-tr_start} s>"
     # yield f"\n<Full time is {time.time()-start} s>"

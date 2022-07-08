@@ -2,14 +2,16 @@
 
 import argparse
 from pathlib import Path
-from sys import stderr, exit
+from sys import exit, stderr
+
 import pyparsing as pp
-from pyparsing import (
-    Suppress, OneOrMore, Forward, Word, alphanums, Group, SkipTo,
-    Keyword, alphas, Combine, Optional, Literal,
-    delimitedList, ZeroOrMore, infixNotation, opAssoc, oneOf, FollowedBy,
-    pythonStyleComment, ungroup, ParserElement, ParseResults, printables)
+from pyparsing import (Combine, FollowedBy, Forward, Group, Keyword, Literal,
+                       OneOrMore, Optional, ParserElement, ParseResults,
+                       SkipTo, Suppress, Word, ZeroOrMore, alphanums, alphas,
+                       delimitedList, infixNotation, oneOf, opAssoc,
+                       printables)
 from pyparsing import pyparsing_common as ppc
+from pyparsing import pythonStyleComment, ungroup
 
 ParserElement.enablePackrat()
 

@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 import logging
 from pathlib import Path
-from subprocess import (STDOUT, CalledProcessError, TimeoutExpired,
-                        check_output)
+from subprocess import STDOUT, CalledProcessError, TimeoutExpired, check_output
 
-from atlas.atlas import get_quant_formula, get_state_vars
-from atlas.mcl import translate_property
-from atlas.svl import svl
-from cex import translate_cadp
-from cli import Args, ExitStatus, SliverError
-from info import get_var
-from utils.value_analysis import value_analysis
+from ..atlas.atlas import get_quant_formula, get_state_vars
+from ..atlas.mcl import translate_property
+from ..atlas.svl import svl
+from ..sliver.cex import translate_cadp
+from ..sliver.cli import Args, ExitStatus, SliverError
+from ..sliver.info import get_var
+from ..utils.value_analysis import value_analysis
 
-from backends.common import Backend, Language, log_call
-
+from .common import Backend, Language, log_call
 
 log = logging.getLogger('backend')
 

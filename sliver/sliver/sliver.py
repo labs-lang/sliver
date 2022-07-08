@@ -5,10 +5,10 @@ import sys
 from pathlib import Path
 
 import click
+from ..backends.backends import ALL_BACKENDS
 
-from __about__ import __title__, __version__
-from backends.backends import ALL_BACKENDS
-from cli import CLICK, LONGDESCR, Args, CliArgs, ExitStatus, SliverError
+from .__about__ import __date__, __title__, __version__
+from .cli import CLICK, LONGDESCR, Args, CliArgs, ExitStatus, SliverError
 
 if not hasattr(sys.modules[__name__], '__file__'):
     __file__ = inspect.getfile(inspect.currentframe())
@@ -105,6 +105,9 @@ def main(file, **kwargs):
             print(ExitStatus.format(status, simulate))
             print()
             sys.exit(status.value)
+
+
+__all__ = [__title__, __version__, __date__, main]
 
 
 if __name__ == "__main__":

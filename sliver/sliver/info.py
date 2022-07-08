@@ -3,9 +3,9 @@
 """Functions and classes to obtain and represent structured information
 about a LAbS system
 """
-from random import choice
-from ast import NodeVisitor, parse
 import re
+from ast import NodeVisitor, parse
+from random import choice
 
 
 class LabsExprVisitor(NodeVisitor):

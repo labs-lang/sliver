@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-from functools import cached_property
 import logging
 import os
 import re
 from dataclasses import dataclass
 from enum import Enum
+from functools import cached_property
+from importlib import resources
 from pathlib import Path
 from subprocess import PIPE, STDOUT, CalledProcessError, check_output, run
 
-from atlas.concretizer import Concretizer
-from cex import translateCPROVER
-from cli import Args, ExitStatus, SliverError
-from info import Info
+from ..atlas.concretizer import Concretizer
+from ..sliver.cex import translateCPROVER54
+from ..sliver.cli import Args, ExitStatus, SliverError
+from ..sliver.info import Info
 
 log = logging.getLogger('backend')
 
@@ -124,7 +125,7 @@ class Backend:
 
     def _labs_cmdline(self):
         call = [
-            self.base_dir / "labs" / "LabsTranslate",
+            resources.path("sliver.labs", "LabsTranslate"),
             "--file", self.cli.file,
             "--bound", str(self.cli[Args.STEPS]),
             "--enc", self.language.value.encoding]
@@ -255,11 +256,16 @@ class Cseq(Backend):
         self.name = "cseq"
         self.modalities = ("always", "finally", "eventually")
         self.language = Language.C
-        self.cwd /= Path("backends") / "cseq"
+        executable = self.get_cmdline(fname="a.c", info=None)[0]
+        self.cwd /= Path(executable).parent
 
     def get_cmdline(self, fname, info):
+        executable = (
+            os.environ.get("CSEQ") or
+            resources.path("sliver.cseq", "cseq.py"))
+
         result = [
-            os.environ.get("CSEQ") or str(self.cwd / "cseq.py"),
+            executable,
             "-l", "labs_parallel",
             "-i", fname
         ]
@@ -275,7 +281,8 @@ class Cseq(Backend):
             if arg[1] is not None:
                 result.extend(arg)
         # TODO change split according to info
-        result += ["--split", "I", "--info", info.raw]
+        if info is not None:
+            result += ["--split", "I", "--info", info.raw]
         return result
 
     def cleanup(self, fname):
@@ -296,7 +303,7 @@ class Cseq(Backend):
             )
 
     def translate_cex(self, cex, info):
-        return translateCPROVER(cex, info)
+        return translateCPROVER54(cex, info)
 
     def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode in (1, 10):

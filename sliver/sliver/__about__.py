@@ -1,5 +1,5 @@
 __all__ = [
-    "__title__", "__summary__", "__uri__", "__version__"
+    "__title__", "__summary__", "__uri__", "__version__", "__date__"
 ]
 
 __title__ = "SLiVER"
