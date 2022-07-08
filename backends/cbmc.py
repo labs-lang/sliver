@@ -26,7 +26,7 @@ class Cbmc(Backend):
 
     def get_cmdline(self, fname, _):
         cmd = [os.environ.get("CBMC") or (
-            str(self.cwd / "backends" / "cbmc" / "cbmc-simulator")
+            str(self.cwd / "vendor" / "cbmc" / "cbmc-simulator")
             if "Linux" in platform.system()
             else "cbmc")]
         CBMC_V, CBMC_SUBV = self.get_cbmc_version(cmd)
