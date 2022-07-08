@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import inspect
 import logging
 import sys
 from pathlib import Path
@@ -6,8 +7,11 @@ from pathlib import Path
 import click
 
 from __about__ import __title__, __version__
-from backends import ALL_BACKENDS
+from backends.backends import ALL_BACKENDS
 from cli import CLICK, LONGDESCR, Args, CliArgs, ExitStatus, SliverError
+
+if not hasattr(sys.modules[__name__], '__file__'):
+    __file__ = inspect.getfile(inspect.currentframe())
 
 __DIR = Path(__file__).parent.resolve()
 __existing = click.Path(exists=True)
