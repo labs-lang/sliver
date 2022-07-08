@@ -26,10 +26,11 @@ def exp_main(has_stigmergy, has_env, num_agents, not_hidden, cli):
 
     processes = [
         "tick -> sched [tick]" if cli[Args.FAIR] else "",
-        "refresh, request -> Timestamps [refresh, request, debug]" if has_stigmergy else "",
+        "refresh, request -> Timestamps [refresh, request, debug]"
+        if has_stigmergy else "",
         "getenv, setenv -> Env [getenv, setenv]" if has_env else "",
     ]
-    processes = "\n||\n".join(p for p in processes if p)  
+    processes = "\n||\n".join(p for p in processes if p)
 
     agents = "\n  ||\n".join(
         exp_agent(has_stigmergy, has_env, not_hidden, i)
