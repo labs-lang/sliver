@@ -25,10 +25,11 @@ class Cbmc(Backend):
         return CBMC_V, CBMC_SUBV
 
     def get_cmdline(self, fname, _):
-        cmd = [os.environ.get("CBMC") or (
-            resources.path("sliver.cbmc", "cbmc-simulator")
-            if "Linux" in platform.system()
-            else "cbmc")]
+        with resources.path("sliver.cbmc", "cbmc-simulator") as cbmc_exec:
+            cmd = [
+                os.environ.get("CBMC") or cbmc_exec
+                if "Linux" in platform.system()
+                else "cbmc"]
         CBMC_V, CBMC_SUBV = self.get_cbmc_version(cmd)
         if not (int(CBMC_V) <= 5 and int(CBMC_SUBV) <= 4):
             cmd += ["--trace", "--stop-on-fail"]

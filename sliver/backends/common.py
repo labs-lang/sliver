@@ -2,12 +2,15 @@
 import logging
 import os
 import re
+import shutil
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
 from importlib import resources
 from pathlib import Path
 from subprocess import PIPE, STDOUT, CalledProcessError, check_output, run
+from pyparsing import ParseException
+
 
 from ..atlas.concretizer import Concretizer
 from ..app.cex import translateCPROVER54, translateCPROVERNEW
@@ -53,9 +56,9 @@ class Backend:
     @cached_property
     def timeout_cmd(self):
         for name in ("timeout", "gtimeout"):
-            proc = run(["which", name], **self._run_args)
-            if proc.returncode == 0:
-                return proc.stdout.decode().replace("\n", "")
+            path = shutil.which(name)
+            if path is not None:
+                return path
         raise SliverError(
             status=ExitStatus.FAILED,
             error_message="Cannot find timeout command."
@@ -124,11 +127,12 @@ class Backend:
         return f"{result}.{self.language.value.extension}"
 
     def _labs_cmdline(self):
-        call = [
-            resources.path("sliver.labs", "LabsTranslate"),
-            "--file", self.cli.file,
-            "--bound", str(self.cli[Args.STEPS]),
-            "--enc", self.language.value.encoding]
+        with resources.path("sliver.labs", "LabsTranslate") as labs_exec:
+            call = [
+                labs_exec,
+                "--file", self.cli.file,
+                "--bound", str(self.cli[Args.STEPS]),
+                "--enc", self.language.value.encoding]
         flags = [
             (self.cli[Args.FAIR], "--fair"),
             (self.cli[Args.SIMULATE], "--simulation"),
@@ -256,19 +260,20 @@ class Cseq(Backend):
         self.name = "cseq"
         self.modalities = ("always", "finally", "eventually")
         self.language = Language.C
-        executable = self.get_cmdline(fname="a.c", info=None)[0]
-        self.cwd /= Path(executable).parent
+        try:
+            executable = self.get_cmdline(fname="a.c", info=None)[0]
+            self.cwd /= Path(executable).parent
+        except ModuleNotFoundError:
+            # CSeq is not available
+            pass
 
     def get_cmdline(self, fname, info):
-        executable = (
-            os.environ.get("CSEQ") or
-            resources.path("sliver.cseq", "cseq.py"))
-
-        result = [
-            executable,
-            "-l", "labs_parallel",
-            "-i", fname
-        ]
+        with resources.path("sliver.cseq", "cseq.py") as cseq_exec:
+            result = [
+                os.environ.get("CSEQ") or cseq_exec,
+                "-l", "labs_parallel",
+                "-i", fname
+            ]
 
         args = (
             ("--steps", self.cli[Args.STEPS]),
@@ -303,7 +308,10 @@ class Cseq(Backend):
             )
 
     def translate_cex(self, cex, info):
-        return translateCPROVER54(cex, info)
+        try:
+            return translateCPROVERNEW(cex, info)
+        except ParseException:
+            return translateCPROVER54(cex, info)
 
     def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode in (1, 10):
