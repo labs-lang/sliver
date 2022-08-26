@@ -5,7 +5,7 @@ from collections import namedtuple
 from functools import reduce
 from itertools import product
 
-from ..sliver.cli import Args
+from ..app.cli import Args
 
 from .parser import FILE
 
@@ -325,7 +325,7 @@ def value_analysis(cli, info):
                     proc[0].startswith("assign"))))
 
     # We use a chaos automaton of all assignments
-    # to overapproximate the range of feasible values 
+    # to overapproximate the range of feasible values
     fixpoint = False
     old_states = set([s0])
     # TODO make analysis bound configurable

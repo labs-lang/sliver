@@ -1,7 +1,7 @@
 from pathlib import Path
 import platform
 
-from ..sliver.cli import Args
+from ..app.cli import Args
 
 
 def exp_agent(has_stigmergy, has_env, not_hidden, id_):

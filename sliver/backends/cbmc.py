@@ -5,8 +5,8 @@ from importlib import resources
 from subprocess import STDOUT, CalledProcessError, check_output
 
 from ..atlas.concretizer import Concretizer
-from ..sliver.cex import translateCPROVER54, translateCPROVERNEW
-from ..sliver.cli import Args, ExitStatus, SliverError
+from ..app.cex import translateCPROVER54, translateCPROVERNEW
+from ..app.cli import Args, ExitStatus, SliverError
 from .common import Backend, Language, log_call
 
 

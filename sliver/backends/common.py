@@ -10,9 +10,9 @@ from pathlib import Path
 from subprocess import PIPE, STDOUT, CalledProcessError, check_output, run
 
 from ..atlas.concretizer import Concretizer
-from ..sliver.cex import translateCPROVER54
-from ..sliver.cli import Args, ExitStatus, SliverError
-from ..sliver.info import Info
+from ..app.cex import translateCPROVER54, translateCPROVERNEW
+from ..app.cli import Args, ExitStatus, SliverError
+from ..app.info import Info
 
 log = logging.getLogger('backend')
 

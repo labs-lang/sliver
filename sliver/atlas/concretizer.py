@@ -10,8 +10,8 @@ from z3.z3 import IntVector
 from .atlas import (QUANT, BinOp, BuiltIn, Nary, OfNode, contains,
                     make_dict, remove_quant)
 
-from ..sliver.cli import Args, ExitStatus, SliverError
-from ..sliver.info import get_var
+from ..app.cli import Args, ExitStatus, SliverError
+from ..app.info import get_var
 
 log = logging.getLogger('backend')
 RND_SEED = int(time.time())

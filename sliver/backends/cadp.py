@@ -6,9 +6,9 @@ from subprocess import STDOUT, CalledProcessError, TimeoutExpired, check_output
 from ..atlas.atlas import get_quant_formula, get_state_vars
 from ..atlas.mcl import translate_property
 from ..atlas.svl import svl
-from ..sliver.cex import translate_cadp
-from ..sliver.cli import Args, ExitStatus, SliverError
-from ..sliver.info import get_var
+from ..app.cex import translate_cadp
+from ..app.cli import Args, ExitStatus, SliverError
+from ..app.info import get_var
 from ..utils.value_analysis import value_analysis
 
 from .common import Backend, Language, log_call
