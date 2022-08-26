@@ -19,17 +19,18 @@ LBRACE, \
     RBRACE, LBRACK, RBRACK, EQ, COLON,\
     SEMICOLON, COMMA, LPAR, RPAR, RAWPREFIX = map(Suppress, "{}[]=:;,()$")
 NoWhite = pp.NotAny(pp.White())
+"i)"
+kws_lower = oneOf("and or not id true false pick where if then else")
+kws_upper = oneOf("Skip Nil")
 
-kws = oneOf("and or not id true false")
-
-VARNAME = Word(alphas.lower(), alphanums + "_").ignore(kws)
+VARNAME = Word(alphas.lower(), alphanums + "_").ignore(kws_lower)
 # TODO reserve keywords in IDENTIFIER
-IDENTIFIER = Word(alphas.upper(), alphanums).ignore(Keyword("Skip"))
+IDENTIFIER = Word(alphas.upper(), alphanums + "_").ignore(kws_upper)
 EXTERN = Combine(Literal("_") + VARNAME)
 
 
 def konst(val):
-    def f(*args, **kwargs):
+    def f(*_, **__):
         return val
     return f
 
@@ -162,27 +163,52 @@ def group_list(toks):
         return x
 
 
-PROCBASE = (
-    (
-        FollowedBy(BEXPR) + BEXPR + Suppress("->") + Group(PROC)
-    ).setParseAction(to_sexpr("#guard")).setName("guarded") |
-    (Keyword("Skip").setParseAction(konst(["skip"]))) |
-    IDENTIFIER.copy().setParseAction(to_sexpr("#call")).setName("call") |
+ASSIGN = (
     (
         delimitedList(VARREF).setParseAction(group_list) +
         Suppress("<--") +
         delimitedList(ungroup(EXPR)).setParseAction(group_list)
-    ).setParseAction(to_sexpr("assign-env")).setName("assign-env") | (
+    ).setParseAction(to_sexpr("assign-env")).setName("assign-env") |
+    (
         delimitedList(VARREF).setParseAction(group_list) +
         Suppress("<~") +
         delimitedList(ungroup(EXPR)).setParseAction(group_list)
-    ).setParseAction(to_sexpr("assign-lstig")).setName("assign-lstig") | (
+    ).setParseAction(to_sexpr("assign-lstig")).setName("assign-lstig") |
+    (
         delimitedList(VARREF).setParseAction(group_list) +
         Suppress("<-") +
         delimitedList(ungroup(EXPR)).setParseAction(group_list)
     ).setParseAction(to_sexpr("assign-attr")).setName("assign-attr")
 )
 
+
+ASSIGN_BLOCK = (
+    ASSIGN |
+    (
+        delimitedList(VARREF).setParseAction(group_list) +
+        Suppress(":=") +
+        delimitedList(ungroup(EXPR)).setParseAction(group_list)
+    ).setParseAction(to_sexpr("assign-local")).setName("assign-local")
+)
+
+
+PROCBASE = (
+    (
+        FollowedBy(BEXPR) + BEXPR + Suppress("->") + Group(PROC)
+    ).setParseAction(to_sexpr("#guard")).setName("guarded") |
+    (
+        Keyword("Skip")
+    ).setParseAction(konst(["skip"])) |
+    (
+        IDENTIFIER.copy()
+    ).setParseAction(to_sexpr("#call")).setName("call") |
+    ASSIGN |
+    (
+        LBRACE +
+        delimitedList(ASSIGN_BLOCK, SEMICOLON) +
+        RBRACE
+    )
+)
 
 PAREN = (LPAR + Group(PROC) + RPAR).setName("__paren__")
 SEQ = (delimitedList(PAREN | Group(PROCBASE), SEMICOLON)).setParseAction(combinator("#seq"))  # noqa: E501
@@ -194,7 +220,8 @@ PROCDEF = (
     Group(PROC).setName("def-body").setResultsName("body")
 )
 
-SYSTEM = Group(Keyword("system").suppress() + LBRACE + (
+SYSTEM = Group(
+    Keyword("system").suppress() + LBRACE + (
         Optional(named_list("extern", EXTERN, COMMA)) &
         Optional(named_list("environment", Group(VARREF + COLON + INITIALIZER)))  # noqa: E501
     ) +
@@ -234,9 +261,9 @@ CHECK = (
     RBRACE)
 
 FILE = (
-    SYSTEM.setResultsName("system") +
+    SYSTsssssEM.setResultsName("system") +
     ZeroOrMore(Group(STIGMERGY)).setResultsName("stigmergies") +
-    OneOrMore(Group(AGENT)).setResultsName("agents") +
+    OneOrMore(Group(AGENT)).setResultsName("agents") +fla
     Optional(ASSUME.setResultsName("assume")) +
     CHECK.setResultsName("check")
 ).ignore(pythonStyleComment)
