@@ -182,7 +182,7 @@ def translate_property(info, externs, parsed=None):
     # Sort variables by agent id and index
 
     def key_of(v):
-        name, agent_id = v.rsplit("_",1)
+        name, agent_id = v.rsplit("_", 1)
         idx = info.lookup_var(name).index
         return int(agent_id), idx
 
