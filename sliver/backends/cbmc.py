@@ -43,7 +43,9 @@ class Cbmc(Backend):
         c = Concretizer(info, self.cli, True)
         for i in range(self.cli[Args.SIMULATE]):
             try:
-                c.concretize_file(fname)  # Concretization step
+                # Concretization step
+                if not self.cli[Args.NO_CONCRETIZE]:
+                    c.concretize_file(fname)
                 if self.cli[Args.TIMEOUT] > 0:
                     cmd = [self.timeout_cmd, str(self.cli[Args.TIMEOUT]), *cmd]
                 log_call(cmd)

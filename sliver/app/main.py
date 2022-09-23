@@ -25,6 +25,7 @@ log = logging.getLogger("sliver")
 @click.option('--backend',
               type=click.Choice(tuple(ALL_BACKENDS.keys())),
               **CLICK(Args.BACKEND))
+@click.option('--no-concretize', **CLICK(Args.NO_CONCRETIZE, is_flag=True))
 @click.option('--debug', **CLICK(Args.DEBUG, is_flag=True))
 @click.option('--fair/--no-fair', **CLICK(Args.FAIR))
 @click.option('--bv/--no-bv', **CLICK(Args.BV))

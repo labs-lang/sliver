@@ -314,6 +314,9 @@ class Concretizer:
         program = re_init.sub(f'\n{inits}\n', program)
         program = re_sched.sub('\nfirstAgent = sched[__LABS_step];\n', program)
         program = re_sym_sched.sub('\n', program)
+        if not self.cli[Args.NO_CONCRETIZE]:
+            re_sym_init = make_regex("symbolic-init")
+            program = re_sym_init.sub('\n', program)
 
         return program
 

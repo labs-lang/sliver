@@ -188,8 +188,9 @@ class Backend:
                     log.info(f"Gathering information on {self.cli.file}...")
                     info = self.get_info(parsed=True)
                     self.check_info(info)
-                    c = Concretizer(info, self.cli, True)
-                    out = c.concretize_program(out)
+                    if not self.cli[Args.NO_CONCRETIZE]:
+                        c = Concretizer(info, self.cli, True)
+                        out = c.concretize_program(out)
                 print(out)
             else:
                 log.debug(f"Writing emulation program to {fname}...")

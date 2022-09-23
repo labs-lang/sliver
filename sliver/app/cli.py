@@ -20,6 +20,7 @@ class Args(Enum):
     KEEP_FILES = "keep_files"
     INCLUDE = "include"
     PROPERTY = "property"
+    NO_CONCRETIZE = "no_concretize"
     NO_PROPERTIES = "no_properties"
     SHOW = "show"
     SIMULATE = "simulate"
@@ -61,6 +62,8 @@ HELPMSG = {
 
     Args.PROPERTY: "Property to consider, others will be ignored.",
 
+    Args.NO_CONCRETIZE: "Disable concretization step (only for simulation).",
+
     Args.NO_PROPERTIES: "Ignore all properties.",
 
     Args.SHOW: "Print emulation program and exit.",
@@ -100,6 +103,7 @@ DEFAULTS = {
     Args.INCLUDE: tuple(),
     Args.KEEP_FILES: False,
     Args.PROPERTY: None,
+    Args.NO_CONCRETIZE: False,
     Args.NO_PROPERTIES: False,
     Args.SHOW: False,
     Args.SIMULATE: 0,
