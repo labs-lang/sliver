@@ -261,9 +261,9 @@ CHECK = (
     RBRACE)
 
 FILE = (
-    SYSTsssssEM.setResultsName("system") +
+    SYSTEM.setResultsName("system") +
     ZeroOrMore(Group(STIGMERGY)).setResultsName("stigmergies") +
-    OneOrMore(Group(AGENT)).setResultsName("agents") +fla
+    OneOrMore(Group(AGENT)).setResultsName("agents") +
     Optional(ASSUME.setResultsName("assume")) +
     CHECK.setResultsName("check")
 ).ignore(pythonStyleComment)

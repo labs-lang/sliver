@@ -21,7 +21,7 @@ EnvNode = namedtuple("Env", ["var", "offset"])
 OfNode = namedtuple("Of", ["var", "offset", "agent"])
 BinOp = namedtuple("BinOp", ["e1", "op", "e2"])
 BuiltIn = namedtuple("BuiltIn", ["fn", "args"])
-Nary = namedtuple("Nary", "fn", "args"])
+Nary = namedtuple("Nary", ["fn", "args"])
 Quant = namedtuple("Quant", ["quantifier", "typename", "varname", "inner"])
 Prop = namedtuple("Prop", ["modality", "quant"])
 
@@ -30,7 +30,7 @@ def pprint(node):
     if isinstance(node, EnvNode):
         return f"{node.var}"
     if isinstance(node, OfNode):
-        return f"{[node.var} of {node.agent}"
+        return f"{node.var} of {node.agent}"
     if isinstance(node, BinOp):
         return f"({pprint(node.e1)} {node.op} {pprint(node.e2)})"
     elif isinstance(node, BuiltIn):

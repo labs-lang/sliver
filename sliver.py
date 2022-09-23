@@ -3,4 +3,3 @@
 from sliver.app.main import main
 
 main(prog_name="sliver")
-

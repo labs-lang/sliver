@@ -116,10 +116,7 @@ DEFAULTS = {
 def CLICK(name, **kwargs):
     return {
         "help": HELPMSG[name],
-        "show_default": (
-            DEFAULTS[name] is False or
-            DEFAULTS[name] == 0 or
-            DEFAULTS[name]),
+        "show_default": name in DEFAULTS,
         **({} if DEFAULTS[name] is None else {"default": DEFAULTS[name]}),
         **kwargs
     }
