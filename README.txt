@@ -1,6 +1,6 @@
 
-            SLiVER  4.0-220923
-            23 September 2022
+            SLiVER  4.0-221010
+            10 October 2022
 
 The SLiVER LAbS VERification tool
 
