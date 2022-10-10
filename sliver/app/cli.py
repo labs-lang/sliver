@@ -20,6 +20,7 @@ class Args(Enum):
     KEEP_FILES = "keep_files"
     INCLUDE = "include"
     PROPERTY = "property"
+    CONCRETIZATION = "concretization"
     NO_CONCRETIZE = "no_concretize"
     NO_PROPERTIES = "no_properties"
     SHOW = "show"
@@ -45,6 +46,8 @@ HELPMSG = {
     Args.BACKEND: "Backend to use in verification mode.",
 
     Args.BV: "Enable bitvector optimization where supported.",
+
+    Args.CONCRETIZATION: "Type of concretization (only for simulation).",
 
     Args.CORES: "Number of CPU cores for parallel analysis.",
 
@@ -96,6 +99,7 @@ HELPMSG = {
 DEFAULTS = {
     Args.BACKEND: "cbmc",
     Args.BV: True,
+    Args.CONCRETIZATION: "src",
     Args.CORES: 1,
     Args.DEBUG: False,
     Args.FAIR: False,
