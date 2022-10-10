@@ -17,6 +17,11 @@ log = logging.getLogger('backend')
 RND_SEED = int(time.time())
 
 
+def make_regex(placeholder):
+    p = re.escape(placeholder)
+    return re.compile(f'(?<=// ___{p}___)(.*?)(?=// ___end {p}___)', re.DOTALL)
+
+
 def symbolic_reduce(vs, fn):
     m = vs[0]
     for v in vs[1:]:
@@ -125,12 +130,12 @@ class Concretizer:
             random.seed(RND_SEED)
             log.debug(f"Concretization: random seed is {RND_SEED}")
 
-    def setup(self, picks):
+    def setup(self, program):
         if self.is_setup:
             return
         self._concretize_initial_state()
         self._concretize_scheduler()
-        for p in picks:
+        for p in self._scan_picks(program):
             self.add_pick(*p)
         self.is_setup = True
 
@@ -281,40 +286,56 @@ class Concretizer:
             ))
         self.picks[name] = (p, size, typ)
 
-    def concretize_program(self, program):
-
-        def make_regex(placeholder):
-            p = re.escape(placeholder)
-            return re.compile(
-                f'(?<=// ___{p}___)(.*?)(?=// ___end {p}___)',
-                re.DOTALL)
-
+    def _scan_picks(self, program):
         re_pick = re.compile(
             r'TYPEOFVALUES '
             r'([^\[\n]+)\[.+\]; \/\* Pick ([0-9]+)\s+(\S*)?\s*(where .+)?\*\/'
         )
+        return re_pick.findall(program)
 
-        picks = re_pick.findall(program)
-        for pick_name, *_ in picks:
-            usages = re.compile(
-                f'(?<!TYPEOFVALUES ){re.escape(pick_name)}' +
-                r'\[')
-            program = usages.sub(f"{pick_name}[__LABS_step][", program)
-
-        globs, inits = self.get_concretization(picks)
-
+    def concretize_program(self, program):
+        if self.cli[Args.CONCRETIZATION] == "none":
+            return program
         re_globals = make_regex("concrete-globals")
-        re_init = make_regex("concrete-init")
         re_sched = make_regex("concrete-scheduler")
         re_sym_sched = make_regex("symbolic-scheduler")
-        re_sym_pick = make_regex("symbolic-pick")
 
-        program = re_sym_pick.sub('\n', program)
-        program = re_globals.sub(f'\n{globs}\n', program, 1)
-        program = re_init.sub(f'\n{inits}\n', program)
-        program = re_sched.sub('\nfirstAgent = sched[__LABS_step];\n', program)
-        program = re_sym_sched.sub('\n', program)
-        if not self.cli[Args.NO_CONCRETIZE]:
+
+        if self.cli[Args.CONCRETIZATION] == "sat" and not self.cli[Args.FAIR]:
+            program = re_sym_sched.sub('\n', program)
+            program = re_sched.sub('\nfirstAgent = sched[__LABS_step];\n', program)
+            program = re.sub(
+                r"init\(\);",
+                f"""init();
+    TYPEOFAGENTID sched[BOUND];
+    for (unsigned i = 0; i < BOUND; ++i) {{
+        sched[i] = __CPROVER_nondet_int();
+        __CPROVER_assume(sched[i] < MAXCOMPONENTS);
+    }}
+""",
+                program)
+
+        elif self.cli[Args.CONCRETIZATION] == "src":
+            picks = self._scan_picks(program)
+            for pick_name, *_ in picks:
+                usages = re.compile(
+                    f'(?<!TYPEOFVALUES ){re.escape(pick_name)}' +
+                    r'\[')
+                program = usages.sub(f"{pick_name}[__LABS_step][", program)
+
+            globs, inits = self.get_concretization(program)
+            
+            re_init = make_regex("concrete-init")
+            # re_sched = make_regex("concrete-scheduler")
+            
+            re_sym_pick = make_regex("symbolic-pick")
+
+            program = re_sym_sched.sub('\n', program)
+            program = re_sym_pick.sub('\n', program)
+            program = re_globals.sub(f'\n{globs}\n', program, 1)
+            program = re_init.sub(f'\n{inits}\n', program)
+            program = re_sched.sub('\nfirstAgent = sched[__LABS_step];\n', program)
+            
             re_sym_init = make_regex("symbolic-init")
             program = re_sym_init.sub('\n', program)
 
@@ -327,7 +348,7 @@ class Concretizer:
         with open(fname, "w") as file:
             file.write(program)
 
-    def get_concretization(self, picks):
+    def get_concretization(self, program, return_model=False):
         def fmt_globals(m):
             STEPS = self.cli[Args.STEPS]
 
@@ -359,7 +380,7 @@ class Concretizer:
                 f"E[{index(attr)}] = {m[attr]};"
                 for attr in self.envs))
 
-        self.setup(picks)
+        self.setup(program)
 
         if self.randomize:
             self._reset_soft_constraints()
@@ -395,7 +416,7 @@ class Concretizer:
             if block:
                 self.s.add(Or(block))
 
-            return fmt_globals(m), fmt_inits(m)
+            return m if return_model else (fmt_globals(m), fmt_inits(m))
         else:
             log.debug(f"Unsat core is {self.s.unsat_core()}")
             raise SliverError(
