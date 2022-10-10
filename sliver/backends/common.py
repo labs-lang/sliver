@@ -188,8 +188,8 @@ class Backend:
                     log.info(f"Gathering information on {self.cli.file}...")
                     info = self.get_info(parsed=True)
                     self.check_info(info)
-                    if not self.cli[Args.NO_CONCRETIZE]:
-                        c = Concretizer(info, self.cli, True)
+                    c = Concretizer(info, self.cli, True)
+                    if self.cli[Args.CONCRETIZATION] != "none":
                         out = c.concretize_program(out)
                 print(out)
             else:
