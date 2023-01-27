@@ -4,12 +4,65 @@ import platform
 import stat
 import tempfile
 from importlib import resources
+from functools import reduce
+from operator import mul
 from subprocess import STDOUT, CalledProcessError, check_output
+from functools import lru_cache
 
 from ..app.cex import translateCPROVER54, translateCPROVERNEW
 from ..app.cli import Args, ExitStatus, SliverError
 from ..atlas.concretizer import Concretizer
 from .common import Backend, Language, log_call
+
+
+def to_cbmc_hex(numeric_string):
+    return hex(int(numeric_string))[2:].upper()
+
+
+class DimacsMapping:
+    def __init__(self, file_obj):
+        self.mapping = {}
+        for ln in file_obj:
+            ln = ln.decode()
+            if ln[0] == "c":
+                ln = ln.split()
+                self.mapping[ln[1]] = [
+                    x if x == "FALSE" or x == "TRUE" else int(x)
+                    for x in ln[2:]]
+
+    def get_element(self, name, indexes, dims):
+        fmt_offset = "".join(f"[[{to_cbmc_hex(i)}]]" for i in indexes)
+        try:
+            # The easy way
+            return self.mapping[name+"#2"+fmt_offset]
+        except KeyError:
+            # Bummer, we have to go the hard way
+            pass
+        try:
+            arr = self.mapping[self.get_array(name)]
+        except KeyError as e:
+            raise e
+        assert len(dims) > 0
+        assert len(dims) == len(indexes)
+        assert all(0 <= i < d for i, d in zip(indexes, dims))
+        offset = indexes[-1]
+        for x, idx in enumerate(indexes[:-1]):
+            offset += idx * reduce(mul, dims[x+1:])
+        # infer bitwidth from dimensions and size
+        bw = len(arr) // reduce(mul, dims)
+        start = bw * offset
+        return arr[start:start+bw]
+
+    @lru_cache(maxsize=128)
+    def get_array(self, name):
+        """Find the first version of array "name" that is fully initialized"""
+        def get_version(var_name):
+            return int(var_name.split("#")[-1])
+
+        candidates = [
+            n for n in self.mapping
+            if n.startswith(name) and "FALSE" not in self.mapping[n]]
+        return min(candidates, key=get_version)
 
 
 class Cbmc(Backend):
@@ -27,11 +80,20 @@ class Cbmc(Backend):
         return CBMC_V, CBMC_SUBV
 
     def get_cmdline(self, fname, _):
-        with resources.path("sliver.cbmc", "cbmc-simulator") as cbmc_exec:
-            cmd = [
-                os.environ.get("CBMC") or cbmc_exec
-                if "Linux" in platform.system()
-                else "cbmc"]
+        from_environment = os.environ.get("CBMC")
+        if from_environment:
+            cmd = [from_environment]
+        elif "Linux" in platform.system():
+            with (
+                resources.path("sliver.cbmc", "cbmc-simulator") as cbmc_exec,
+                resources.path("sliver.cbmc", "cbmc-5-74") as cbmc_new_exec,
+            ):
+                cmd = [
+                    cbmc_new_exec
+                    if self.cli[Args.CONCRETIZATION] == "sat"
+                    else cbmc_exec]
+        else:
+            cmd = ["cbmc"]
         CBMC_V, CBMC_SUBV = self.get_cbmc_version(cmd)
         if not (int(CBMC_V) <= 5 and int(CBMC_SUBV) <= 4):
             cmd += ["--trace", "--stop-on-fail"]
@@ -47,15 +109,7 @@ class Cbmc(Backend):
             cmd.extend(("--dimacs", "--outfile", dimacs_file.name))
             _ = check_output(cmd)
             dimacs_file.seek(0)
-            mapping = {}
-            for ln in dimacs_file:
-                ln = ln.decode()
-                if ln[0] == "c":
-                    ln = ln.split()
-                    mapping[ln[1]] = [
-                        x if x == "FALSE" or x == "TRUE" else int(x)
-                        for x in ln[2:]]
-        return mapping
+            return DimacsMapping(dimacs_file)
 
     def source_level_concretization(self, fname, info):
         cmd = self.get_cmdline(fname, info)
@@ -96,26 +150,7 @@ $MINISAT -model -rnd-freq=F -no-elim -rnd-init -rnd-seed=$RANDOM -try-assume="$W
             self.temp_files.append(f.name)
             return f.name
 
-    def craft_satrap_incantation(self, weaks):
-        weaks_fmt = " ".join(
-            f"w{var if value != 0 else -var}"
-            for var, value in weaks)
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as f:  # noqa: E501
-            f.write(
-                "#!/bin/bash\n\n"
-                "/Users/lucad/git/satrap-csharp/SATrap/SATrap/bin/Release/net6.0/osx-x64/publish/SATrap"
-                " $1 -- ")
-            f.write(weaks_fmt)
-            f.write("\n")
-            # give exec permissions
-            st = os.stat(f.name)
-            os.chmod(f.name, st.st_mode | stat.S_IEXEC)
-            self.temp_files.append(f.name)
-            return f.name
-
     def sat_level_concretization(self, fname, info, concretizer):
-        def to_cbmc_hex(numeric_string):
-            return hex(int(numeric_string))[2:].upper()
 
         def to_bv(num, width=16):
             """Converts num to a (LSB-first) bitvector of the given width.
@@ -156,17 +191,26 @@ $MINISAT -model -rnd-freq=F -no-elim -rnd-init -rnd-seed=$RANDOM -try-assume="$W
             # TODO environment and stigmergy variables
             if str(x).startswith("I_"):
                 loc, agent, index = str(x).split("_")
-                vars_ = mapping[f"{loc}#2[[{to_cbmc_hex(agent)}]][[{to_cbmc_hex(index)}]]"]  # noqa: E501
+                try:
+                    dims = (
+                        info.spawn.num_agents(),
+                        info.max_key_i() + 1)
+                    vars_ = mapping.get_element(loc, (int(agent), int(index)), dims)  # noqa: E501
+                except KeyError:
+                    self.verbose_output(
+                        f"Warning: concretization could not find {x}")
+                    vars_ = None
             elif str(x).startswith("sched__") and not self.cli[Args.FAIR]:
                 _, step = str(x).split("__")
-                vars_ = (
-                    mapping[f"main::1::sched!0@1#2[[{to_cbmc_hex(step)}]]"]
-                    if self.info.spawn.num_agents() > 1
-                    else mapping["main::1::sched!0@1#2"])
+                vars_ = mapping.get_element(
+                    "main::1::sched!0@1",
+                    (int(step), ),
+                    (int(self.cli[Args.STEPS]), ))
             else:
                 continue
-            w = zip(vars_, to_bv(int(m[x].as_string()), len(vars_)))
-            weaks.extend(w)
+            if vars_ is not None:
+                w = zip(vars_, to_bv(int(m[x].as_string()), len(vars_)))
+                weaks.extend(w)
         return weaks
 
     def simulate(self, fname, info):
@@ -180,11 +224,6 @@ $MINISAT -model -rnd-freq=F -no-elim -rnd-init -rnd-seed=$RANDOM -try-assume="$W
                 if self.cli[Args.CONCRETIZATION] == "sat":
                     weaks = self.sat_level_concretization(fname, info, c)
                     script = self.minisat_incantation(weaks)
-
-                    # ----FOR OLD CBMC (5.4), EXPERIMENTAL
-                    # cmd.append("--init")
-                    # cmd.extend(f"{v}={1 if val else 0}" for v, val in weaks)
-                    # ----END
                     cmd.extend(["--external-sat-solver", script])
 
                 if self.cli[Args.TIMEOUT] > 0:
