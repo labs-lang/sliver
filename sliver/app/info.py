@@ -173,7 +173,7 @@ class Spawn:
 
     def __init__(self, d):
         self._dict = d
-    
+
     def picks_of(self, agent_type):
         return self._picks[agent_type]
 

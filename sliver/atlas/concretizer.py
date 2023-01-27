@@ -300,13 +300,14 @@ class Concretizer:
         re_sched = make_regex("concrete-scheduler")
         re_sym_sched = make_regex("symbolic-scheduler")
 
-
         if self.cli[Args.CONCRETIZATION] == "sat" and not self.cli[Args.FAIR]:
             program = re_sym_sched.sub('\n', program)
-            program = re_sched.sub('\nfirstAgent = sched[__LABS_step];\n', program)
+            program = re_sched.sub(
+                '\nfirstAgent = sched[__LABS_step];\n',
+                program)
             program = re.sub(
                 r"init\(\);",
-                f"""init();
+                """init();
     TYPEOFAGENTID sched[BOUND];
     for (unsigned i = 0; i < BOUND; ++i) {{
         sched[i] = __CPROVER_nondet_int();
@@ -324,10 +325,10 @@ class Concretizer:
                 program = usages.sub(f"{pick_name}[__LABS_step][", program)
 
             globs, inits = self.get_concretization(program)
-            
+
             re_init = make_regex("concrete-init")
             # re_sched = make_regex("concrete-scheduler")
-            
+
             re_sym_pick = make_regex("symbolic-pick")
 
             program = re_sym_sched.sub('\n', program)
@@ -335,7 +336,7 @@ class Concretizer:
             program = re_globals.sub(f'\n{globs}\n', program, 1)
             program = re_init.sub(f'\n{inits}\n', program)
             program = re_sched.sub('\nfirstAgent = sched[__LABS_step];\n', program)
-            
+
             re_sym_init = make_regex("symbolic-init")
             program = re_sym_init.sub('\n', program)
 
