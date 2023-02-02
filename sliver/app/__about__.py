@@ -6,5 +6,5 @@ __title__ = "SLiVER"
 __summary__ = "The SLiVER LAbS VERification tool"
 __uri__ = "https://github.com/labs-lang/sliver"
 
-__version__ = "4.0-230127"
-__date__ = "27 January 2023"
+__version__ = "4.0-230202"
+__date__ = "2 February 2023"
