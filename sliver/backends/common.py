@@ -325,21 +325,3 @@ class Cseq(Backend):
             return ExitStatus.BACKEND_ERROR
         else:
             return super().handle_error(err, fname, info)
-
-
-class Esbmc(Backend):
-    def __init__(self, cwd, cli):
-        super().__init__(cwd, cli)
-        self.name = "esbmc"
-        self.modalities = ("always", "eventually", "finally")
-        self.language = Language.C
-
-    def get_cmdline(self, fname, _):
-        cmd = [
-            os.environ.get("ESBMC") or "esbmc", fname,
-            "--no-pointer-check", "--no-align-check",
-            "--no-unwinding-assertions", "--z3"
-        ]
-        if not self.cli[Args.DEBUG]:
-            cmd.extend(("--no-bounds-check", "--no-div-by-zero-check"))
-        return cmd
