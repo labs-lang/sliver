@@ -2,7 +2,7 @@ import re
 from pyparsing import (
     LineEnd, LineStart, Word, alphanums, delimitedList, OneOrMore, ZeroOrMore,
     Forward, Suppress, Group, ParserElement, Keyword, dblQuotedString,
-    removeQuotes, SkipTo, StringEnd, Regex, printables, replaceWith)
+    removeQuotes, SkipTo, StringEnd, Regex, printables, replaceWith, Optional)
 from pyparsing import pyparsing_common as ppc
 
 
@@ -42,11 +42,11 @@ SKIP = Regex(r'Assumption:|(SIMULATION)') + SkipTo(STATE)
 # TRACE = OneOrMore(Group(Group(INFO) + SEP.suppress() + Group(ASGN)))
 # PROP = Suppress(INFO) + STUFF + Suppress(SkipTo(StringEnd()))
 
-HEADER = Regex(r'(?:State (?P<state>\d+) )?file (?P<file>[^\s]+) function (?P<function>[^\s]+) line (?P<line>\d+) (?:thread (?P<thread>\d+))?')  # noqa: E501
-HEADER_OLD = Regex(r'(?:State (?P<state>\d+) )?file (?P<file>[^\s]+) line (?P<line>\d+) function (?P<function>[^\s]+) (?:thread (?P<thread>\d+))?')  # noqa: E501
+HEADER = Regex(r'(?:State (?P<state>\d+) )?file (?P<file>[^\s]+)( function (?P<function>[^\s]+))? line (?P<line>\d+) (?:thread (?P<thread>\d+))?')  # noqa: E501
+HEADER_OLD = Regex(r'(?:State (?P<state>\d+) )?file (?P<file>[^\s]+) line (?P<line>\d+)( function (?P<function>[^\s]+))? (?:thread (?P<thread>\d+))?')  # noqa: E501
 SEP = Keyword("----------------------------------------------------")
-ASGN = Regex(r'(?P<lhs>[^\s=]+)=(?P<rhs>.+)')
-TRACE = OneOrMore(Group(Group(HEADER) + SEP.suppress() + Group(ASGN))).ignore(OneOrMore(SKIP))  # noqa: E501
+ASGN = Regex(r'(?P<lhs>[^\s=]+)\s?=\s?(?P<rhs>.+)')
+TRACE = OneOrMore(Group(Group(HEADER) + SEP.suppress() + Optional(Group(ASGN)))).ignore(OneOrMore(SKIP))  # noqa: E501
 TRACE_OLD = OneOrMore(Group(Group(HEADER_OLD) + SEP.suppress() + Group(ASGN))).ignore(OneOrMore(SKIP))  # noqa: E501
 # TODO: fix property parser for "new" versions of CBMC
 PROP = Suppress(SkipTo(LineEnd())) + Suppress(SkipTo(LineStart())) + STUFF + Suppress(SkipTo(StringEnd()))  # noqa: E501
@@ -90,9 +90,12 @@ def translateCPROVER(cex, info, parser=TRACE):
     cex_start_pos = cex.find("Counterexample:") + 15
     cex_end_pos = cex.rfind("Violated property:")
     # start = time.time()
-    states = parser.parseString(cex[cex_start_pos:cex_end_pos], parseAll=True)
+    states = parser.parseString(cex[cex_start_pos:cex_end_pos], parseAll=False)
     # yield f"<parsing took {time.time()-start} s>\n"
     # tr_start = time.time()
+    # for s in states:
+    #     print(s)
+    #     input()
 
     inits = (
         (s[1].lhs, get_value(s[1].rhs)) for s in states
@@ -139,7 +142,6 @@ def translateCPROVER(cex, info, parser=TRACE):
     violation = cex[cex_end_pos + 18:]
     prop = PROP.parseString(violation)
     if prop[0] != "__sliver_simulation__":
-        yield(str(prop))
         yield f"\n<property violated: '{prop[0]}'>"
     # yield f"\n<Translation took {time.time()-tr_start} s>"
     # yield f"\n<Full time is {time.time()-start} s>"
