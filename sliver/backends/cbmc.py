@@ -69,7 +69,7 @@ class Cbmc(Backend):
     def __init__(self, cwd, cli):
         super().__init__(cwd, cli)
         self.name = "cbmc"
-        self.modalities = ("always", "finally", "eventually")
+        self.modalities = ("always", "finally", "eventually", "between")
         self.language = Language.C
 
     def get_cbmc_version(self, cmd):
