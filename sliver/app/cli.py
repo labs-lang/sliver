@@ -142,6 +142,12 @@ class CliArgs(dict):
     def __getitem__(self, key: Args):
         return self.get(key.value, DEFAULTS[key])
 
+    def __setitem__(self, key: Args, value):
+        if isinstance(key, Args):
+            self[key.value] = value
+        else:
+            super().__setitem__(key, value)
+
 
 class ExitStatus(Enum):
     SUCCESS = 0
