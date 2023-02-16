@@ -140,7 +140,7 @@ WEAKS="{weaks}"
 # TODO adjust rnd-freq based on CNF hardness
 F=0.15
 
-$MINISAT -model -rnd-freq=F -no-elim -rnd-init -rnd-seed=$RANDOM -try-assume="$WEAKS" $1
+$MINISAT -model -rnd-freq=$F -no-elim -rnd-init -rnd-seed=$RANDOM -try-assume="$WEAKS" $1
 """
 
         with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as f:  # noqa: E501
