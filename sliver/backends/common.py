@@ -237,13 +237,14 @@ class Backend:
             return self.handle_error(err, fname, info)
 
     def verbose_output(self, output, decorate=None):
-        if decorate:
-            log.debug(f"""
+        if output:
+            if decorate:
+                log.debug(f"""
 ------{decorate}------
 {output}
 ---------------------------""")
-        else:
-            log.debug(output)
+            else:
+                log.debug(output)
 
     def handle_success(self, *args) -> ExitStatus:
         return ExitStatus.SUCCESS
