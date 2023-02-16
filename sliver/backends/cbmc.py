@@ -3,11 +3,11 @@ import os
 import platform
 import stat
 import tempfile
+from functools import lru_cache, reduce
 from importlib import resources
-from functools import reduce
 from operator import mul
-from subprocess import STDOUT, CalledProcessError, check_output
-from functools import lru_cache
+from subprocess import (DEVNULL, PIPE, STDOUT, CalledProcessError,
+                        check_output, run)
 
 from ..app.cex import translateCPROVER54, translateCPROVERNEW
 from ..app.cli import Args, ExitStatus, SliverError
@@ -107,7 +107,7 @@ class Cbmc(Backend):
         with tempfile.NamedTemporaryFile() as dimacs_file:
             cmd = self.get_cmdline(fname, info)
             cmd.extend(("--dimacs", "--outfile", dimacs_file.name))
-            _ = check_output(cmd)
+            _ = check_output(cmd, stderr=DEVNULL)
             dimacs_file.seek(0)
             return DimacsMapping(dimacs_file)
 
@@ -229,10 +229,16 @@ $MINISAT -model -rnd-freq=$F -no-elim -rnd-init -rnd-seed=$RANDOM -try-assume="$
                 if self.cli[Args.TIMEOUT] > 0:
                     cmd = [self.timeout_cmd, str(self.cli[Args.TIMEOUT]), *cmd]
                 log_call(cmd)
-                out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
+                
+                # out = check_output(cmd, cwd=self.cwd, stderr=stderr).decode()
+                result = run(
+                    cmd, cwd=self.cwd, check=True, stderr=PIPE, stdout=PIPE)
+                out = result.stdout.decode()
+                self.verbose_output(result.stderr.decode(), "Backend stderr")
                 self.verbose_output(out, "Backend output")
             except CalledProcessError as err:
                 out = err.output.decode("utf-8")
+                self.verbose_output(err.stderr.decode(), "Backend stderr")
                 self.verbose_output(out, "Backend output")
                 try:
                     header = f"====== Trace #{i+1} ======"
