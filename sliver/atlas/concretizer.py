@@ -327,7 +327,6 @@ class Concretizer:
             globs, inits = self.get_concretization(program)
 
             re_init = make_regex("concrete-init")
-            # re_sched = make_regex("concrete-scheduler")
 
             re_sym_pick = make_regex("symbolic-pick")
 
