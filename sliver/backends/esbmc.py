@@ -1,6 +1,7 @@
 
 import io
 import os
+import platform
 from importlib import resources
 from shutil import which
 from subprocess import CalledProcessError
@@ -27,11 +28,17 @@ class Esbmc(Backend):
             esbmc = os.environ.get("ESBMC") or esbmc or which("esbmc")
             if esbmc is None:
                 raise SliverError(ExitStatus.BACKEND_ERROR, "esbmc not found")
-            cmd = [
+            cmd = []
+            if platform.processor() == "arm" and platform.system() == "Darwin":
+                cmd.extend(["arch", "-x86_64"])
+            cmd.extend([
                 esbmc, fname,
-                "--no-pointer-check", "--no-align-check",
-                "--no-unwinding-assertions", "--k-induction"
-            ]
+                "--no-align-check", "--no-pointer-check",
+                "--no-unwinding-assertions", "--bv"
+            ])
+
+            if self.cli[Args.STEPS] == 0:
+                cmd.extend(["--k-induction"])
             if not self.cli[Args.DEBUG]:
                 cmd.extend(("--no-bounds-check", "--no-div-by-zero-check"))
             return cmd
