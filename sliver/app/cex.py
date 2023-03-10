@@ -1,8 +1,10 @@
+import copy
 import re
 from pyparsing import (
     LineEnd, LineStart, Word, alphanums, delimitedList, OneOrMore, ZeroOrMore,
     Forward, Suppress, Group, ParserElement, Keyword, dblQuotedString,
-    removeQuotes, SkipTo, StringEnd, Regex, printables, replaceWith, Optional)
+    removeQuotes, SkipTo, StringEnd, Regex, printables, replaceWith, Optional,
+    FollowedBy, Literal, alphas, Char)
 from pyparsing import pyparsing_common as ppc
 
 
@@ -14,33 +16,6 @@ STUFF = Word(printables)
 STATE = Keyword("State").suppress()
 SKIP = Regex(r'Assumption:|(SIMULATION)') + SkipTo(STATE)
 
-######### OLD parser, kept for reference  # noqa: E266
-# BOOLEAN = (
-#     Keyword("TRUE").setParseAction(replaceWith(True)) |
-#     Keyword("FALSE").setParseAction(replaceWith(False)))
-# FILE, FN, LINE, THREAD, ASSUMPTION, SIMULATION = (
-#     Keyword(tk).suppress() for tk in
-#     ("file", "function", "line", "thread", "Assumption:", "(SIMULATION)"))
-# LBRACE = Suppress("{")
-# SKIP = (ASSUMPTION | SIMULATION) + SkipTo(STATE)
-# INFO = (
-#     Optional(STATE + ppc.number().setResultsName("state")) +
-#     (FILE + STUFF.setResultsName("file")) +
-#     (
-#         # At some point they brilliantly swapped "line" and "function"...
-#         (FN + STUFF.setResultsName("function")) &
-#         (LINE + ppc.number().setResultsName("line"))) +
-#     Optional(THREAD + ppc.number().setResultsName("thread"))
-# )
-# VAR = Word(printables, excludeChars="=")
-# VAL = (
-#     (ppc.number() + Optional(Suppress("u"))) |
-#     BOOLEAN |
-#     dblQuotedString |
-#     (LBRACE + restOfLine))
-# ASGN = VAR + Suppress("=") + VAL + SkipTo(LineEnd()).suppress()
-# TRACE = OneOrMore(Group(Group(INFO) + SEP.suppress() + Group(ASGN)))
-# PROP = Suppress(INFO) + STUFF + Suppress(SkipTo(StringEnd()))
 
 HEADER = Regex(r'(?:State (?P<state>\d+) )?file (?P<file>[^\s]+)( function (?P<function>[^\s]+))? line (?P<line>\d+) (?:thread (?P<thread>\d+))?')  # noqa: E501
 HEADER_OLD = Regex(r'(?:State (?P<state>\d+) )?file (?P<file>[^\s]+) line (?P<line>\d+)( function (?P<function>[^\s]+))? (?:thread (?P<thread>\d+))?')  # noqa: E501
@@ -89,13 +64,7 @@ def translateCPROVER(cex, info, parser=TRACE):
 
     cex_start_pos = cex.find("Counterexample:") + 15
     cex_end_pos = cex.rfind("Violated property:")
-    # start = time.time()
     states = parser.parseString(cex[cex_start_pos:cex_end_pos], parseAll=False)
-    # yield f"<parsing took {time.time()-start} s>\n"
-    # tr_start = time.time()
-    # for s in states:
-    #     print(s)
-    #     input()
 
     inits = (
         (s[1].lhs, get_value(s[1].rhs)) for s in states
@@ -149,27 +118,6 @@ def translateCPROVER(cex, info, parser=TRACE):
 
 
 def translate_cadp(cex, info):
-    def pprint_init_agent(args):
-        tid, iface = args[1], args[2][1:]
-        agent = pprint_agent(info, tid)
-        init = "".join(
-            f"{agent}:\t{info.pprint_assign('I', int(k), v)}\n"
-            for k, v in enumerate(iface))
-        if len(args) == 4:
-            return init
-
-        lstig = args[3][1:]
-        init += "".join(
-            f"{agent}:\t{info.pprint_assign('L', int(k), v[1])},{v[2]}\n"
-            for k, v in enumerate(lstig)
-        )
-        return init
-
-    def pprint_init_env(args):
-        return "".join(
-            f"\t{info.pprint_assign('E', int(k), v)}\n"
-            for k, v in enumerate(args[1:]))
-
     lines = cex.split('\n')
     first_line = next(
         i+1 for i, l in enumerate(lines)
