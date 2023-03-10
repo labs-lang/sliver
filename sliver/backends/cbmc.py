@@ -126,6 +126,8 @@ class Cbmc(Backend):
             weaks = " ".join((
                 str(var) if value != 0 else f"-{var}"
                 for var, value in weaks
+                # Skip stuff that has already been resolved by CBMC
+                if var not in ("TRUE", "FALSE")
             ))
             script = f"""
 #!/bin/bash
