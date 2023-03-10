@@ -38,7 +38,7 @@ class Esbmc(Backend):
             ])
 
             if self.cli[Args.STEPS] == 0:
-                cmd.extend(["--k-induction"])
+                cmd.extend(["--k-induction", "--interval-analysis"])
             if not self.cli[Args.DEBUG]:
                 cmd.extend(("--no-bounds-check", "--no-div-by-zero-check"))
             return cmd
