@@ -28,7 +28,6 @@ log = logging.getLogger("sliver")
 @click.option('--concretization',
               type=click.Choice(("src", "sat", "none")),
               **CLICK(Args.CONCRETIZATION))
-@click.option('--no-concretize', **CLICK(Args.NO_CONCRETIZE, is_flag=True))
 @click.option('--debug', **CLICK(Args.DEBUG, is_flag=True))
 @click.option('--fair/--no-fair', **CLICK(Args.FAIR))
 @click.option('--bv/--no-bv', **CLICK(Args.BV))
