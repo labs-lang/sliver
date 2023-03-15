@@ -28,17 +28,21 @@ class Esbmc(Backend):
             esbmc = os.environ.get("ESBMC") or esbmc or which("esbmc")
             if esbmc is None:
                 raise SliverError(ExitStatus.BACKEND_ERROR, "esbmc not found")
-            cmd = []
-            if platform.processor() == "arm" and platform.system() == "Darwin":
-                cmd.extend(["arch", "-x86_64"])
-            cmd.extend([
+            cmd = [
                 esbmc, fname,
-                "--no-align-check", "--no-pointer-check",
-                "--no-unwinding-assertions", "--bv"
-            ])
+                "--no-align-check", "--no-pointer-check", "--no-library",
+                "--no-unwinding-assertions", "--no-pointer-relation-check",
+                "--slice-assumes", "--bv", "--16", "--quiet"
+            ]
+            # if which("z3"):
+            #     # Use integer/real arithmetics with range analysis
+            #     cmd.extend(["--z3", "--ir", "--interval-analysis"])
 
             if self.cli[Args.STEPS] == 0:
-                cmd.extend(["--k-induction", "--interval-analysis"])
+                # Enable bidirectional k-induction, otherwise just do BMC
+                cmd.extend([
+                    "--k-induction", "--bidirectional", "--unlimited-k-steps"
+                ])
             if not self.cli[Args.DEBUG]:
                 cmd.extend(("--no-bounds-check", "--no-div-by-zero-check"))
             return cmd
@@ -55,11 +59,12 @@ class Esbmc(Backend):
 
         esbmc_conf = """
         (without-bitwise)
-        (replace-calls 
+        (replace-calls
             (__CPROVER_nondet nondet_int)
             (__CPROVER_assert __ESBMC_assert)
             (__CPROVER_assume __ESBMC_assume)
         )
+        (without-arrays)
         """
         return absentee.parse_and_execute(f.read(), esbmc_conf)
 
