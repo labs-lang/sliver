@@ -24,6 +24,8 @@ class DimacsMapping:
         self.mapping = {}
         for ln in file_obj:
             ln = ln.decode()
+            if ln[0] == "p":
+                self.info = ln
             if ln[0] == "c":
                 ln = ln.split()
                 self.mapping[ln[1]] = [
@@ -188,6 +190,8 @@ $MINISAT -model -rnd-freq=$F -no-elim -rnd-init -rnd-seed=$RANDOM -try-assume="$
 
         m = concretizer.get_concretization(program, return_model=True)
         mapping = self.get_dimacs_mapping(fname, info)
+        self.verbose_output(f"DIMACS header: {mapping.info}")
+
         weaks = []
         for x in m:
             # TODO environment and stigmergy variables
