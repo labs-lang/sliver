@@ -63,6 +63,12 @@ class Esbmc(Backend):
         """
         return absentee.parse_and_execute(f.read(), esbmc_conf)
 
+    def handle_success(self, out, info) -> ExitStatus:
+        result = super().handle_success(out, info)
+        if "VERIFICATION UNKNOWN" in out:
+            return ExitStatus.INCONCLUSIVE
+        return result
+
     def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode == 1:
             out = err.output.decode("utf-8")

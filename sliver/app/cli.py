@@ -149,6 +149,7 @@ class ExitStatus(Enum):
     SUCCESS = 0
     BACKEND_ERROR = 1
     INVALID_ARGS = 2
+    INCONCLUSIVE = 5
     PARSING_ERROR = 6
     FAILED = 10
     TIMEOUT = 124
@@ -162,6 +163,7 @@ class ExitStatus(Enum):
             ExitStatus.SUCCESS:
                 "Done." if simulate else "Verification successful.",
             ExitStatus.BACKEND_ERROR: "Backend failed.",
+            ExitStatus.INCONCLUSIVE: "Verification inconclusive.",
             ExitStatus.INVALID_ARGS: "Invalid arguments.",
             ExitStatus.PARSING_ERROR: "Could not parse input file.",
             ExitStatus.FAILED: f"{task} failed.",
