@@ -17,10 +17,9 @@ from ..app.cex import translateCPROVER54, translateCPROVERNEW
 from ..app.cli import Args, ExitStatus, SliverError
 from ..app.info import Info
 
-log = logging.getLogger('backend')
-
 
 def log_call(cmd):
+    log = logging.getLogger('sliver')
     log.debug(f"Executing {' '.join(str(x) for x in cmd)}")
 
 
@@ -52,6 +51,9 @@ class Backend:
         self.cwd = base_dir
         self.temp_files = []
         self.modalities = tuple()
+        self.logger = logging.getLogger('sliver')
+        self.logger.setLevel(
+            logging.DEBUG if cli[Args.VERBOSE] else logging.INFO)
 
     @cached_property
     def timeout_cmd(self):
@@ -67,14 +69,14 @@ class Backend:
     def cleanup(self, _):
         if self.cli[Args.KEEP_FILES]:
             for f in self.temp_files:
-                log.info(f"Keeping {f}")
+                self.logger.info(f"Keeping {f}")
         else:
             self._safe_remove(self.temp_files)
 
     def _safe_remove(self, files):
         for f in files:
             try:
-                log.debug(f"Removing {f}...")
+                self.logger.debug(f"Removing {f}...")
                 os.remove(f)
             except FileNotFoundError:
                 pass
@@ -94,7 +96,7 @@ class Backend:
     def check_info(self, info):
         if not self.cli[Args.SIMULATE]:
             if self.cli[Args.NO_PROPERTIES] or not info.properties:
-                log.info("No property to verify!")
+                self.logger.info("No property to verify!")
                 raise SliverError(status=ExitStatus.SUCCESS)
             self.check_property_support(info)
 
@@ -155,12 +157,12 @@ class Backend:
             info = info_call.stdout.decode()
             if parsed:
                 info = info.replace("\n", "|")[:-1]
-                log.debug(f"{info=}")
+                self.logger.debug(f"{info=}")
                 return Info.parse(info, self.cli[Args.VALUES])
             else:
                 return info
         except CalledProcessError as e:
-            log.error(e)
+            self.logger.error(e)
             msg = e.stderr.decode()
             status = (
                 ExitStatus.INVALID_ARGS if msg.startswith("Property")
@@ -185,7 +187,7 @@ class Backend:
             if self.cli[Args.SHOW]:
                 # TODO add concretize cli options
                 if self.cli[Args.SIMULATE] and self.language == Language.C:
-                    log.info(f"Gathering information on {self.cli.file}...")
+                    self.logger.info(f"Gathering information on {self.cli.file}...")  # noQA: E501
                     info = self.get_info(parsed=True)
                     self.check_info(info)
                     c = Concretizer(info, self.cli, True)
@@ -193,13 +195,13 @@ class Backend:
                         out = c.concretize_program(out)
                 print(out)
             else:
-                log.debug(f"Writing emulation program to {fname}...")
+                self.logger.debug(f"Writing emulation program to {fname}...")
                 with open(fname, 'w') as out_file:
                     out_file.write(out)
                 self.temp_files.append(fname)
             return fname
         except CalledProcessError as e:
-            log.error(e)
+            self.logger.error(e)
             msg = e.stderr.decode()
             status = (
                 ExitStatus.INVALID_ARGS if msg.startswith("Property")
@@ -231,7 +233,7 @@ class Backend:
                 self.verbose_output(out, "Backend output")
             return self.handle_success(out, info)
         except CalledProcessError as err:
-            log.debug(err)
+            self.logger.debug(err)
             if not suppress_output:
                 self.verbose_output(err.output.decode(), "Backend output")
             return self.handle_error(err, fname, info)
@@ -239,12 +241,12 @@ class Backend:
     def verbose_output(self, output, decorate=None):
         if output:
             if decorate:
-                log.debug(f"""
+                self.logger.debug(f"""
 ------{decorate}------
 {output}
 ---------------------------""")
             else:
-                log.debug(output)
+                self.logger.debug(output)
 
     def handle_success(self, *args) -> ExitStatus:
         return ExitStatus.SUCCESS
@@ -322,7 +324,7 @@ class Cseq(Backend):
                 print(ln, sep="", end="")
             return ExitStatus.FAILED
         elif err.returncode == 6:
-            log.info("Backend failed with parsing error.")
+            self.logger.info("Backend failed with parsing error.")
             return ExitStatus.BACKEND_ERROR
         else:
             return super().handle_error(err, fname, info)
