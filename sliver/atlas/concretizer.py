@@ -334,7 +334,7 @@ class Concretizer:
             program = re_sym_pick.sub('\n', program)
             program = re_globals.sub(f'\n{globs}\n', program, 1)
             program = re_init.sub(f'\n{inits}\n', program)
-            program = re_sched.sub('\nfirstAgent = sched[__LABS_step];\n', program)
+            program = re_sched.sub('\nfirstAgent = sched[__LABS_step];\n', program)  # noQA: E501
 
             re_sym_init = make_regex("symbolic-init")
             program = re_sym_init.sub('\n', program)

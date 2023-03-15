@@ -4,7 +4,7 @@ from pyparsing import (
     LineEnd, LineStart, Word, alphanums, delimitedList, OneOrMore, ZeroOrMore,
     Forward, Suppress, Group, ParserElement, Keyword, dblQuotedString,
     removeQuotes, SkipTo, StringEnd, Regex, printables, replaceWith, Optional,
-    FollowedBy, Literal, alphas, Char)
+    alphas, Char)
 from pyparsing import pyparsing_common as ppc
 
 
