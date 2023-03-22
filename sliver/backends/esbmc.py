@@ -1,7 +1,6 @@
 
 import io
 import os
-import platform
 from importlib import resources
 from shutil import which
 from subprocess import CalledProcessError
