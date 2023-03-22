@@ -14,18 +14,13 @@ Typically, a SLiVER release will contain the following files and directories:
 
 |Filename|Description
 |---------------------|----------------------------------|
-|`atlas/`, `cadp/`    |Files used by CADP backends|
-|`cbmc-simulator`     |CBMC5.4 binary|
-|`cseq/`              |CSeq analysis tool|
 |`examples/`          |Example LAbS specifications|
-|`labs/`              |LAbS parser and translator|
 |`HISTORY`            |Change log|
-|`LICENSE`            |The software license for SLiVER|
-|`LICENSE_cbmc`       |The software license for CBMC|
 |`README.md`          |This document|
 |`README.txt`         |Release-specific instructions|
 |`requirements.txt`   |Python dependencies|
 |`sliver.py`          |SLiVER command-line front-end|
+|`sliver/`            |SLiVER code|
 |`*.py`               |SLiVER support files| 
 |*other files and directories*      |Python libraries used by SLiVER|
 
@@ -33,7 +28,7 @@ Typically, a SLiVER release will contain the following files and directories:
 
 To install SLiVER, please follow the steps below:
 
-1. Install Python 3.8 or higher.
+1. Install Python 3.10 or higher.
     
 2. (Optional) Install Python 2.7 (required by the bundled CSeq backend).
 
