@@ -95,7 +95,7 @@ def translateCPROVER(cex, info, parser=TRACE):
         elif var == "guessedkey":
             system = func
             yield f"\n<{pprint_agent(info, agent)}: {func} '{info.lstig[int(value)].name}'>"  # noqa: E501
-        elif var in ("firstAgent", "guessedcomp"):
+        elif var in ("firstAgent", "scheduled"):
             agent = value
         # simulation: printf messages
         elif var == "format" and value.startswith('"(SIMULATION)'):
