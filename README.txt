@@ -1,20 +1,17 @@
 
-            SLiVER  4.0-230216
-             16 February 2023
+            SLiVER  4.0-230310
+               10 March 2023
 
 The SLiVER LAbS VERification tool
 
     * Package contents *
 
-atlas/            Python files for parsing properties
-
-backends/         Analysis backends and related files
 
 examples/         LAbS example specifications
 
-labs/             LAbS parser and translator
-
 HISTORY           SLiVER changelog
+
+README.md         General description of SLiVER
 
 README.txt        this file
 
@@ -22,13 +19,15 @@ requirements.txt  Python packages required by SLiVER
 
 sliver.py         SLiVER command-line front-end
 
+sliver/           SLiVER code
+
 (Other files)     Libraries used by SLiVER
 
     * Installation *
 
 To install SLiVER, please follow the steps below:
 
-    1. install Python 3.8 or higher
+    1. install Python 3.10 or higher
 
     2. create a directory, suppose this is called /workspace
 
