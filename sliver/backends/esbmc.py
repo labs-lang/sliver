@@ -10,6 +10,7 @@ import pcpp
 from ..absentee import absentee
 from ..app.cex import translateCPROVER54
 from ..app.cli import Args, ExitStatus, SliverError
+from ..utils.value_analysis import value_analysis
 from .common import Backend, Language
 
 
@@ -50,11 +51,79 @@ class Esbmc(Backend):
         return translateCPROVER54(cex, info)
 
     def preprocess(self, code, _):
+        # preprocess the generated C code
         preproc = pcpp.Preprocessor()
         preproc.parse(code)
         f = io.StringIO("")
         preproc.write(oh=f)
         f.seek(0)
+        code = f.read()
+
+        info = self.get_info(parsed=True)
+        ranges, fixpoint, *etc = value_analysis(self.cli, info)
+        self.verbose_output(
+            f"Value analysis: {ranges=}, {fixpoint=}, {etc=}")
+
+        def fmt_var(var, stripes, tid=None):
+            rename = {"i": "I", "e": "E", "l": "Lvalue"}
+
+            def fmt_one(index):
+                loc = rename[var.store]
+                if var.store == "e":
+                    return " | ".join(
+                        f"{loc}[{index}] == {i.min}"
+                        if i.min == i.max
+                        else f"({loc}[{index}] >= {i.min}) & ({loc}[{index}] <= {i.max})"  # noqa: E501
+                        for i in stripes)
+                else:
+                    return " | ".join(
+                        f"{loc}[{tid}][{index}] == {i.min}"
+                        if i.min == i.max
+                        else f"({loc}[{tid}][{index}] >= {i.min}) & ({loc}[{tid}][{index}] <= {i.max})"  # noqa: E501
+                        for i in stripes)
+            if not var.is_array:
+                yield fmt_one(var.index)
+            else:
+                yield from (
+                    fmt_one(i)
+                    for i in range(var.index, var.index + var.size))
+
+        if fixpoint:
+            self.verbose_output((ranges, fixpoint, ))
+            loop_assumptions = []
+            # Shared variables
+            for f in ranges._fields:
+                try:
+                    var = info.lookup_var(f)
+                    if var.store == "e":
+                        loop_assumptions.extend(
+                            f"__CPROVER_assume({x});"
+                            for x in fmt_var(var, getattr(ranges, f).stripes))  # noqa: E501
+                except KeyError:
+                    continue
+
+            # Agent variables
+            for tid in range(info.spawn.num_agents()):
+                agent = info.spawn[tid]
+                for f in ranges._fields:
+                    try:
+                        var = info.lookup_var(f)
+                        if var.store == "e" or var.index not in agent.iface:
+                            continue
+                        loop_assumptions.extend((
+                            f"__CPROVER_assume({x});"
+                            for x in fmt_var(var, getattr(ranges, f).stripes, tid)))  # noqa: E501
+                    except KeyError:
+                        # Local variable
+                        continue
+            loop_assumptions = "\n    ".join(loop_assumptions)
+            loop_assumptions = f"""
+void loopAssumptions(void) {{
+    {loop_assumptions}
+}}"""
+            code = code.replace(
+                """void loopAssumptions(void) { return; }""",
+                loop_assumptions)
 
         esbmc_conf = """
         (without-bitwise)
@@ -65,7 +134,7 @@ class Esbmc(Backend):
         )
         (without-arrays)
         """
-        return absentee.parse_and_execute(f.read(), esbmc_conf)
+        return absentee.parse_and_execute(code, esbmc_conf)
 
     def handle_success(self, out, info) -> ExitStatus:
         result = super().handle_success(out, info)
