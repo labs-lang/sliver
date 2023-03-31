@@ -214,11 +214,11 @@ class Stripes:
     def equality(self, other):
         return Stripes(*self._combine(other, lambda a, b: a.equality(b)))
 
-    def is_within(self, other):
-        if self == other:
+    def is_within(self, other, strict=False):
+        if self == other and not strict:
             return True
         for x in self.stripes:
-            if x not in other.stripes:
+            if not any(x.is_within(y) for y in other.stripes):
                 return False
         return True
 
@@ -228,12 +228,29 @@ class Stripes:
     def __lt__(self, other):
         my_min, my_max = self.extrema()
         other_min, other_max = other.extrema()
-        if my_max < other_min:
-            return Stripes(I(1))
+        # Degenerate case: self is a single integer
+        if my_min == my_max:
+            if other_min == other_max:
+                return Stripes(I(int(my_min < other_min)))
+            elif my_min >= other_max:
+                return NO
+            elif my_max < other_min:
+                return YES
+            else:
+                return MAYBE
+        elif other_min == other_max:
+            if my_min >= other_min:
+                return NO
+            elif my_max < other_min:
+                return YES
+            else:
+                return MAYBE
+        elif my_max < other_min:
+            return YES
         elif my_min > other_max:
-            return Stripes(I(0))
+            return NO
         else:
-            return Stripes(I(0, 1))
+            return MAYBE
 
     def __gt__(self, other):
         return other < self
@@ -246,6 +263,9 @@ class Stripes:
 
     def __neg__(self):
         return Stripes(*self._prune(set(-x for x in self.stripes)))
+
+    def __invert__(self):
+        return Stripes(*self._prune(set(~x for x in self.stripes)))
 
     def __abs__(self):
         return Stripes(*self._prune(set(abs(x) for x in self.stripes)))
@@ -271,21 +291,21 @@ class Stripes:
     def And(self, other):
         if 0 in self or 0 in other:
             if 1 in self and 1 in other:
-                return Stripes(I(0, 1))
+                return MAYBE
             else:
-                return Stripes(I(0))
+                return NO
         else:
-            return Stripes(I(1))
+            return YES
 
     def Or(self, other):
         my_min, my_max = self.extrema()
         other_min, other_max = other.extrema()
         if my_min == my_max == other_min == other_max == 0:
-            return Stripes(I(0))
-        elif 0 not in self and 0 not in other:
-            return Stripes(I(1))
+            return NO
+        elif 0 not in self or 0 not in other:
+            return YES
         else:
-            return Stripes(I(0, 1))
+            return MAYBE
 
 
 def I(mn, mx=None):  # noqa: E741, E743
@@ -299,6 +319,7 @@ def S(mn, mx=None):
 YES = S(1)
 NO = S(0)
 MAYBE = S(0, 1)
+
 
 def merge(s0, s1, State):
     result = {k: getattr(s0, k) for k in s0._fields}
