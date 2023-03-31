@@ -369,7 +369,7 @@ def make_init(info, local_names):
                     s0[var.name] = stripe
 
     s0["id"] = S(0, info.spawn.num_agents() - 1)
-    State = namedtuple("State", [*local_names, *s0.keys(), "id"])
+    State = namedtuple("State", [*local_names, *s0.keys()])
     for x in local_names:
         s0[x] = NO
     s0 = State(**s0)
