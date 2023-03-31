@@ -157,8 +157,9 @@ class Stripes:
     They carry some resemblance to "donut" domains
     (Ghorbal et al., VMCAI 2012), although we allow multiple "holes".
     """
+
     def __init__(self, *args) -> None:
-        self.stripes = self._prune(set(args))
+        self.stripes = frozenset(args)
 
     def extrema(self):
         # if not self.stripes:
