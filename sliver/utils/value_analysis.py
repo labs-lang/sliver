@@ -86,6 +86,14 @@ class Interval:
     def __neg__(self):
         return Interval(-self.max, -self.min)
 
+    def __invert__(self):
+        if 1 in self and 0 not in self:
+            return I(0)
+        elif 0 in self and 1 not in self:
+            return I(1)
+        else:
+            return I(0, 1)
+
     def __sub__(self, other):
         return self + (-other)
 
@@ -287,6 +295,10 @@ def I(mn, mx=None):  # noqa: E741, E743
 def S(mn, mx=None):
     return Stripes(I(mn, mx))
 
+
+YES = S(1)
+NO = S(0)
+MAYBE = S(0, 1)
 
 def merge(s0, s1, State):
     result = {k: getattr(s0, k) for k in s0._fields}
