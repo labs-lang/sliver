@@ -168,6 +168,19 @@ class Stripes:
             min(i.min for i in self.stripes),
             max(i.max for i in self.stripes))
 
+    def bisect(self):
+        if len(self.stripes) > 1:
+            lst = list(self.stripes)
+            mid = len(lst) // 2
+            return Stripes(*lst[:mid]), Stripes(*lst[mid:])
+        else:
+            st = next(iter(self.stripes))
+            if st.min != st.max:
+                mid = (st.min + st.max) // 2
+                i0, i1 = I(st.min, mid), I(mid+1, st.max)
+                return Stripes(i0), Stripes(i1)
+            else:
+                return None, None
     @staticmethod
     def _prune(stripes: set, prune_adjacent=False) -> frozenset:
         # enter = True
