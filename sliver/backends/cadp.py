@@ -213,7 +213,7 @@ class CadpCompositional(CadpMonitor):
     def preprocess(self, code, fname):
         code = super().preprocess(code, fname)
         info = self.get_info(parsed=True)
-        ranges, fixpoint = value_analysis(self.cli, info)
+        ranges, fixpoint, *_ = value_analysis(self.cli, info)
         self.verbose_output(str(ranges), "Value analysis")
         if not fixpoint:
             raise SliverError(

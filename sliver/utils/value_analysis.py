@@ -689,7 +689,7 @@ def value_analysis(cli, info):
         x: getattr(s1, x).join_adjacent()
         for x in s1._fields
     })
-    return s1, fixpoint
+    return s1, fixpoint, depends, wont_change
 
 
 if __name__ == "__main__":
