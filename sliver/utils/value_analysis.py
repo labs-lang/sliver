@@ -368,17 +368,6 @@ def make_init(info, local_names):
     return State, s0
 
 
-def find(proc, filter):
-    try:
-        if filter(proc):
-            yield proc.asList()
-        elif not isinstance(proc, str):
-            for x in proc:
-                yield from find(x, filter)
-    except TypeError:
-        pass
-
-
 def eval_expr(expr, s, externs) -> Stripes:
     OPS = {
         "+": lambda x, y: x+y,
