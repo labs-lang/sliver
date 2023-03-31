@@ -54,9 +54,6 @@ class Interval:
     def __eq__(self, other):
         return self.min == other.min and self.max == other.max
 
-    def __ne__(self, other):
-        return not self == other
-
     # We cannot use __eq__ because it messes up sets
     def equality(self, other):
         if isinstance(other, int):
