@@ -32,7 +32,7 @@ class Esbmc(Backend):
                 esbmc, fname,
                 "--no-align-check", "--no-pointer-check", "--no-library",
                 "--no-unwinding-assertions", "--no-pointer-relation-check",
-                "--slice-assumes", "--bv", "--16", "--quiet"
+                "--bv", "--32", "--quiet"
             ]
             
             if self.cli[Args.STEPS] == 0:
