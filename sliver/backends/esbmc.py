@@ -34,10 +34,7 @@ class Esbmc(Backend):
                 "--no-unwinding-assertions", "--no-pointer-relation-check",
                 "--slice-assumes", "--bv", "--16", "--quiet"
             ]
-            # if which("z3"):
-            #     # Use integer/real arithmetics with range analysis
-            #     cmd.extend(["--z3", "--ir", "--interval-analysis"])
-
+            
             if self.cli[Args.STEPS] == 0:
                 # Enable bidirectional k-induction, otherwise just do BMC
                 cmd.extend([

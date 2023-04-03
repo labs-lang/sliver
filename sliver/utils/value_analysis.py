@@ -179,10 +179,8 @@ class Stripes:
 
     @staticmethod
     def _prune(stripes: set, prune_adjacent=False) -> frozenset:
-        # enter = True
         enter = len(stripes) > 1
         changed = True
-        # print("Before prune", stripes)
         while enter or changed:
             enter = False
             joins = set(
@@ -194,7 +192,6 @@ class Stripes:
                 if a.is_within(b) and not a == b)
             stripes -= subsets
             changed = len(joins) + len(subsets) > 0
-        # print("After prune", stripes)
         return frozenset(stripes)
 
     def join_adjacent(self):

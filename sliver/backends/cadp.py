@@ -54,7 +54,7 @@ class CadpMonitor(Backend):
         return translate_cadp(cex, info)
 
     def simulate(self, fname, info):
-        if not(self.check_cadp()):
+        if not self.check_cadp():
             return ExitStatus.BACKEND_ERROR
         cmd = [
             "lnt.open", fname, "executor",
