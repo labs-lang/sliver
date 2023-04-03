@@ -167,7 +167,7 @@ def apply_guard(guards, stmt, s0, externs, info, State):
         bisections = [x for v in g_vars for x in bisect_by(s, v, State)]
         bisections = [x for x in bisections if x is not None]
         if len(bisections) == 0:
-            raise ValueError(f"This should be unreachable {s}")
+            return s
 
         with ThreadPoolExecutor() as exc:
             recurse = exc.map(recursive_apply, bisections)
