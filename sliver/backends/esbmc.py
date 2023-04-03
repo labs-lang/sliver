@@ -57,9 +57,9 @@ class Esbmc(Backend):
         code = f.read()
 
         info = self.get_info(parsed=True)
-        ranges, fixpoint, *etc = value_analysis(self.cli, info)
+        ranges, fixpoint, depends, wont_change = value_analysis(self.cli, info)
         self.verbose_output(
-            f"Value analysis: {ranges=}, {fixpoint=}, {etc=}")
+            f"Value analysis: {ranges=}, {fixpoint=}, {depends=}, , {wont_change=}")  # noqa: E501
 
         def fmt_var(var, stripes, tid=None):
             rename = {"i": "I", "e": "E", "l": "Lvalue"}
