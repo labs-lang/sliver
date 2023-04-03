@@ -130,10 +130,6 @@ class Interval:
     def Max(self, other):
         return Interval(max(self.min, other.min), max(self.max, other.max))
 
-    def abstract(self, *values):
-        intervals = set(I(val) for val in values)
-        return Stripes(*self._prune(intervals, True))
-
 
 def enumerate(state, State):
     for p in product(*(state[i] for i in range(len(state)))):
@@ -171,6 +167,11 @@ class Stripes:
                 return Stripes(i0), Stripes(i1)
             else:
                 return None, None
+
+    @staticmethod
+    def abstract(*values):
+        intervals = set(I(val) for val in values)
+        return Stripes(*Stripes._prune(intervals, True))
 
     @staticmethod
     def _prune(stripes: set, prune_adjacent=False) -> frozenset:
