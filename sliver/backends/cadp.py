@@ -9,7 +9,7 @@ from ..atlas.svl import svl
 from ..app.cex import translate_cadp
 from ..app.cli import Args, ExitStatus, SliverError
 from ..app.info import get_var
-from ..utils.value_analysis import value_analysis
+from ..analysis.value_analysis import value_analysis
 
 from .common import Backend, Language, log_call
 

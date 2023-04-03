@@ -1,5 +1,5 @@
 import unittest
-from sliver.utils.value_analysis import YES, NO, MAYBE, S
+from sliver.analysis.value_analysis import YES, NO, MAYBE, S
 
 
 S4_5 = S(4, 5)
@@ -7,8 +7,8 @@ S4 = S(4)
 S5 = S(5)
 S6 = S(6)
 
+
 class TestStripes(unittest.TestCase):
-    
     def setUp(self) -> None:
         pass
 

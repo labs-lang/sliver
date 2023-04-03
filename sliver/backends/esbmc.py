@@ -10,7 +10,7 @@ import pcpp
 from ..absentee import absentee
 from ..app.cex import translateCPROVER54
 from ..app.cli import Args, ExitStatus, SliverError
-from ..utils.value_analysis import value_analysis
+from ..analysis.value_analysis import value_analysis
 from .common import Backend, Language
 
 
