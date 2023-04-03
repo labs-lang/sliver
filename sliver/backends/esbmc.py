@@ -7,6 +7,8 @@ from subprocess import CalledProcessError
 
 import pcpp
 
+from sliver.analysis.domains import Stripes
+
 from ..absentee import absentee
 from ..app.cex import translateCPROVER54
 from ..app.cli import Args, ExitStatus, SliverError
@@ -61,7 +63,7 @@ class Esbmc(Backend):
         code = f.read()
 
         info = self.get_info(parsed=True)
-        ranges, fixpoint, depends, wont_change = value_analysis(self.cli, info)
+        ranges, fixpoint, depends, wont_change = value_analysis(self.cli, info, Stripes)  # noqa: E501
         self.verbose_output(
             f"Value analysis: {ranges=}, {fixpoint=}, {depends=}, , {wont_change=}")  # noqa: E501
 

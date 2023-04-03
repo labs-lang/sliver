@@ -9,7 +9,6 @@ from itertools import product
 from ..app.cli import Args
 from ..labsparse.labs_ast import Expr, QueryResult
 from ..labsparse.labs_parser import Attr, NodeType, parse_to_dict
-from .domains import Stripes, NO, S, I
 
 
 def merge(s0, s1, State):
@@ -32,7 +31,7 @@ def entailed_by(s1, states):
     return False
 
 
-def make_init(info, local_names):
+def make_init(info, local_names, domain):
     """Get value analysis in the initial state"""
     stores = (info.lstig, info.e, *(a.iface for a in info.spawn.values()))
     s0 = {}
@@ -40,25 +39,30 @@ def make_init(info, local_names):
         for var in store.values():
             for id_ in range(info.spawn.num_agents()):
                 vals = var.values(id_)
-                stripe = (
-                    S(min(vals), max(vals))
-                    if isinstance(vals, range)
-                    else Stripes(*(I(x) for x in vals)))
+                stripe = domain.abstract(*vals)
+                # stripe = (
+                #     S(min(vals), max(vals))
+                #     if isinstance(vals, range)
+                #     else Stripes(*(I(x) for x in vals)))
                 if var.name in s0:
                     s0[var.name] |= stripe
                 else:
                     s0[var.name] = stripe
 
-    s0["id"] = S(0, info.spawn.num_agents() - 1)
+    s0["id"] = domain.abstract(*range(0, info.spawn.num_agents() - 1))
     State = namedtuple("State", [*local_names, *s0.keys()])
     for x in local_names:
-        s0[x] = NO
+        s0[x] = domain.NO
     s0 = State(**s0)
 
     return State, s0
 
 
-def eval_expr(expr, s, externs) -> Stripes:
+def domain_of(state):
+    return type(getattr(state, next(iter(state._fields))))
+
+
+def eval_expr(expr, s, externs):
     OPS = {
         "+": lambda x, y: x+y,
         "-": lambda x, y: x-y,
@@ -85,8 +89,9 @@ def eval_expr(expr, s, externs) -> Stripes:
         "abs": abs
     }
 
+    domain = domain_of(s)
     if expr(NodeType.LITERAL):
-        return S(expr[Attr.VALUE])
+        return domain.abstract(expr[Attr.VALUE])
     elif expr(NodeType.REF) and expr[Attr.NAME] in s._fields:
         return getattr(s, expr[Attr.NAME])
     elif expr(NodeType.REF) or expr(NodeType.REF_EXT):
@@ -114,7 +119,7 @@ def eval_expr(expr, s, externs) -> Stripes:
             raise ValueError(expr.as_labs())
     elif expr(NodeType.QFORMULA):
         # TODO can we recover some information?
-        return S(0, 1)
+        return domain.MAYBE
     else:
         raise NotImplementedError(expr.as_labs())
 
@@ -227,11 +232,11 @@ def dependency_analysis(assignments, blocks):
     return depends
 
 
-def value_analysis(cli, info):
+def value_analysis(cli, info, domain):
     externs = {}
     for ext in cli[Args.VALUES]:
         name, value = ext.split("=")
-        externs["_" + name] = S(int(value))
+        externs["_" + name] = domain.abstract(int(value))
     ast = parse_to_dict(cli.file)
 
     # Extract all assignment, blocks, and guards
@@ -303,7 +308,7 @@ def value_analysis(cli, info):
         for n in blk[Attr.BODY]
         for lhs in n[Attr.LHS]
         if n[Attr.TYPE] == "local")
-    State, s0 = make_init(info, local_names)
+    State, s0 = make_init(info, local_names, domain)
 
     # We use a chaos automaton of all assignments/blocks
     # to overapproximate the range of feasible values
