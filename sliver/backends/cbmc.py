@@ -82,7 +82,7 @@ class Cbmc(Backend):
         return CBMC_V, CBMC_SUBV
 
     def get_cmdline(self, fname, _):
-        from_environment = os.environ.get("CBMC")
+        from_environment = os.environ.get("SLIVER_CBMC")
         if from_environment:
             cmd = [from_environment]
         elif "Linux" in platform.system():

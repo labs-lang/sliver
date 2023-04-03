@@ -25,7 +25,7 @@ class Esbmc(Backend):
     def get_cmdline(self, fname, _):
         with resources.path("sliver.esbmc", "esbmc") as esbmc:
             esbmc = esbmc if os.path.exists(esbmc) else None
-            esbmc = os.environ.get("ESBMC") or esbmc or which("esbmc")
+            esbmc = os.environ.get("SLIVER_ESBMC") or esbmc or which("esbmc")
             if esbmc is None:
                 raise SliverError(ExitStatus.BACKEND_ERROR, "esbmc not found")
             cmd = [
