@@ -65,7 +65,7 @@ def domain_of(state):
     return type(getattr(state, next(iter(state._fields))))
 
 
-def eval_expr(expr, s, externs):
+def eval_expr(expr, s, externs, info):
     OPS = {
         "+": lambda x, y: x+y,
         "-": lambda x, y: x-y,
@@ -92,6 +92,9 @@ def eval_expr(expr, s, externs):
         "abs": abs
     }
 
+    def recurse(e):
+        return eval_expr(e, s, externs, info)
+
     domain = domain_of(s)
     if expr(NodeType.LITERAL):
         return domain.abstract(expr[Attr.VALUE])
@@ -100,29 +103,37 @@ def eval_expr(expr, s, externs):
     elif expr(NodeType.REF) or expr(NodeType.REF_EXT):
         return externs[expr[Attr.NAME]]
     elif expr(NodeType.BUILTIN) and expr[Attr.NAME] in UNARY_OPS:
-        return UNARY_OPS[expr[Attr.NAME]](eval_expr(expr[Attr.OPERANDS][0], s, externs))  # noqa: E501
+        return UNARY_OPS[expr[Attr.NAME]](recurse(expr[Attr.OPERANDS][0]))  # noqa: E501
     elif (expr(NodeType.EXPR) or expr(NodeType.BUILTIN)
             and expr[Attr.NAME] in OPS):
-        operands = [eval_expr(e, s, externs) for e in expr[Attr.OPERANDS]]
+        operands = [recurse(e) for e in expr[Attr.OPERANDS]]
         return reduce(OPS[expr[Attr.NAME]], operands)
     elif expr(NodeType.COMPARISON) and expr[Attr.NAME] in CMP:
-        operands = [eval_expr(e, s, externs) for e in expr[Attr.OPERANDS]]
+        operands = [recurse(e) for e in expr[Attr.OPERANDS]]
         return reduce(CMP[expr[Attr.NAME]], operands)
     elif expr(NodeType.IF):
-        condition = eval_expr(expr[Attr.CONDITION], s, externs)
+        condition = recurse(expr[Attr.CONDITION])
         if 1 in condition and 0 in condition:
             return (
-                eval_expr(expr[Attr.THEN], s, externs) |
-                eval_expr(expr[Attr.ELSE], s, externs))
+                recurse(expr[Attr.THEN]) |
+                recurse(expr[Attr.ELSE]))
         elif 1 in condition:
-            return eval_expr(expr[Attr.THEN], s, externs)
+            return recurse(expr[Attr.THEN])
         elif 0 in condition:
-            return eval_expr(expr[Attr.ELSE], s, externs)
+            return recurse(expr[Attr.ELSE])
         else:
             raise ValueError(expr.as_labs())
     elif expr(NodeType.QFORMULA):
         # TODO can we recover some information?
         return domain.MAYBE
+    elif expr(NodeType.PICK):
+        if expr[Attr.TYPE] is None:
+            result = getattr(s, "id")
+        else:
+            rng = info.spawn.range_of(expr[Attr.TYPE])
+            result = domain.abstract(*rng)
+        print(f"{expr.as_labs()}\n{result}")
+        return result
     else:
         raise NotImplementedError(expr.as_labs())
 
@@ -139,7 +150,7 @@ def bisect_by(s0, var, State):
     return State(**s1), State(**s2)
 
 
-def apply_guard(guards, stmt, s0, externs, State):
+def apply_guard(guards, stmt, s0, externs, info, State):
     """Filters s0 down to the abstract state where stmt's guard always holds"""
     g = guards.get(stmt)
     if g is None:
@@ -151,7 +162,7 @@ def apply_guard(guards, stmt, s0, externs, State):
     g_vars = set(x[Attr.NAME] for x in (new_guard // (NodeType.REF, )))
 
     def recursive_apply(s):
-        eval_whole = eval_expr(new_guard, s, externs)
+        eval_whole = eval_expr(new_guard, s, externs, info)
         if 1 in eval_whole and 0 not in eval_whole:
             # Guard always holds
             return s
@@ -183,27 +194,27 @@ def lhs_of(stmt):
         return set().union(*(lhs_of(a) for a in (stmt // (NodeType.ASSIGN, ))))
 
 
-def apply_assignment(asgn, s0, externs, guards, old, State):
+def apply_assignment(asgn, s0, externs, guards, old, info, State):
     # If asgn is guarded, reduce s0 to the states where the guard holds
-    s0 = apply_guard(guards, asgn, s0, externs, State)
+    s0 = apply_guard(guards, asgn, s0, externs, info, State)
     # The guard did not hold anywhere, so we cannot interpret asgn
     if s0 is None:
         return None
     s1 = {k: getattr(s0, k) for k in s0._fields}
     for lhs, rhs in zip(asgn[Attr.LHS], asgn[Attr.RHS]):
-        s1[lhs[Attr.NAME]] = eval_expr(rhs, s0, externs)
+        s1[lhs[Attr.NAME]] = eval_expr(rhs, s0, externs, info)
     s1 = State(**s1)
     return None if old is not None and entailed_by(s1, old) else s1
 
 
-def apply_block(blk, s0, externs, guards, old, State):
+def apply_block(blk, s0, externs, guards, old, info, State):
     # If blk is guarded, reduce s0 to the states where the guard holds
-    s0 = apply_guard(guards, blk, s0, externs, State)
+    s0 = apply_guard(guards, blk, s0, externs, info, State)
     # The guard did not hold anywhere, so we cannot interpret blk
     if s0 is None:
         return None
     for asgn in blk[Attr.BODY]:
-        s1 = apply_assignment(asgn, s0, externs, guards, None, State)
+        s1 = apply_assignment(asgn, s0, externs, guards, None, info, State)
         s0 = s1
     return None if old is not None and entailed_by(s1, old) else s1
 
@@ -329,7 +340,7 @@ def value_analysis(cli, info, domain):
             old_merge = reduce(mergeStates, old_states)
 
             futures = []
-            common_args = (externs, guard_map, old_states, State)
+            common_args = (externs, guard_map, old_states, info, State)
             futures = [
                 exc.submit(apply_assignment, a, s, *common_args)
                 for a, s in product(assignments, old_states)]
@@ -347,7 +358,7 @@ def value_analysis(cli, info, domain):
 
             # Detect which variables won't change anymore
             next_merge = reduce(mergeStates, old_states)
-            common_args = (externs, {}, (next_merge, ), State)
+            common_args = (externs, {}, (next_merge, ), info, State)
             no_dep_vars = [v for v in depends if len(depends[v]) == 0]
             for v in no_dep_vars:
                 futures = [
