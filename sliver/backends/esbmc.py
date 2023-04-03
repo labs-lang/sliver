@@ -28,6 +28,10 @@ class Esbmc(Backend):
             esbmc = os.environ.get("SLIVER_ESBMC") or esbmc or which("esbmc")
             if esbmc is None:
                 raise SliverError(ExitStatus.BACKEND_ERROR, "esbmc not found")
+            # SLIVER_ESBMC_ARGS completely overrides CLI arguments
+            env_args = os.environ.get("SLIVER_ESBMC_ARGS")
+            if env_args:
+                return [esbmc, fname, *env_args.split()]
             cmd = [
                 esbmc, fname,
                 "--no-align-check", "--no-pointer-check", "--no-library",
