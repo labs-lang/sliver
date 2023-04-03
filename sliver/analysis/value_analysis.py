@@ -42,11 +42,6 @@ def make_init(info, local_names, domain):
                 abstract = (
                     domain.abstract_range(vals) if isinstance(vals, range)
                     else domain.abstract(*vals))
-                # stripe = domain.abstract(*vals)
-                # stripe = (
-                #     S(min(vals), max(vals))
-                #     if isinstance(vals, range)
-                #     else Stripes(*(I(x) for x in vals)))
                 if var.name in s0:
                     s0[var.name] |= abstract
                 else:
@@ -323,6 +318,9 @@ def value_analysis(cli, info, domain):
         for lhs in n[Attr.LHS]
         if n[Attr.TYPE] == "local")
     State, s0 = make_init(info, local_names, domain)
+    # TODO enforce assumes
+    # CAUTION assumes can only be considered when in the form
+    # "forall Foo x, ..." AND Foo is the only kind of agent in the system
 
     # We use a chaos automaton of all assignments/blocks
     # to overapproximate the range of feasible values
