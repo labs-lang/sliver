@@ -174,6 +174,12 @@ class Stripes:
         return Stripes(*Stripes._prune(intervals, True))
 
     @staticmethod
+    def abstract_range(rng):
+        if not isinstance(rng, range):
+            raise ValueError(f"{rng} is not a range")
+        return S(min(rng), max(rng))
+
+    @staticmethod
     def _prune(stripes: set, prune_adjacent=False) -> frozenset:
         enter = len(stripes) > 1
         changed = True

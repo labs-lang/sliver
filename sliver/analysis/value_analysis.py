@@ -39,15 +39,18 @@ def make_init(info, local_names, domain):
         for var in store.values():
             for id_ in range(info.spawn.num_agents()):
                 vals = var.values(id_)
-                stripe = domain.abstract(*vals)
+                abstract = (
+                    domain.abstract_range(vals) if isinstance(vals, range)
+                    else domain.abstract(*vals))
+                # stripe = domain.abstract(*vals)
                 # stripe = (
                 #     S(min(vals), max(vals))
                 #     if isinstance(vals, range)
                 #     else Stripes(*(I(x) for x in vals)))
                 if var.name in s0:
-                    s0[var.name] |= stripe
+                    s0[var.name] |= abstract
                 else:
-                    s0[var.name] = stripe
+                    s0[var.name] = abstract
 
     s0["id"] = domain.abstract(*range(0, info.spawn.num_agents() - 1))
     State = namedtuple("State", [*local_names, *s0.keys()])
