@@ -236,24 +236,24 @@ class Stripes:
             if other_min == other_max:
                 return Stripes(I(int(my_min < other_min)))
             elif my_min >= other_max:
-                return NO
+                return self.NO
             elif my_max < other_min:
-                return YES
+                return self.YES
             else:
-                return MAYBE
+                return self.MAYBE
         elif other_min == other_max:
             if my_min >= other_min:
-                return NO
+                return self.NO
             elif my_max < other_min:
-                return YES
+                return self.YES
             else:
-                return MAYBE
+                return self.MAYBE
         elif my_max < other_min:
-            return YES
+            return self.YES
         elif my_min > other_max:
-            return NO
+            return self.NO
         else:
-            return MAYBE
+            return self.MAYBE
 
     def __gt__(self, other):
         return other < self
@@ -294,7 +294,7 @@ class Stripes:
     def Range(self, other):
         # Evaluates [self..other] (note that range is exclusive)
         mins = (i.min for i in self.stripes)
-        other_minus_1 = other - YES
+        other_minus_1 = other - self.YES
         maxs = (i.max for i in other_minus_1.stripes)
         stripes = set(I(mn, mx) for mn, mx in product(mins, maxs) if mx > mn)
         if len(stripes) == 0:
@@ -304,21 +304,21 @@ class Stripes:
     def And(self, other):
         if 0 in self or 0 in other:
             if 1 in self and 1 in other:
-                return MAYBE
+                return self.MAYBE
             else:
-                return NO
+                return self.NO
         else:
-            return YES
+            return self.YES
 
     def Or(self, other):
         my_min, my_max = self.extrema()
         other_min, other_max = other.extrema()
         if my_min == my_max == other_min == other_max == 0:
-            return NO
+            return self.NO
         elif 0 not in self or 0 not in other:
-            return YES
+            return self.YES
         else:
-            return MAYBE
+            return self.MAYBE
 
 
 def I(mn, mx=None):  # noqa: E741, E743
@@ -329,6 +329,6 @@ def S(mn, mx=None):
     return Stripes(I(mn, mx))
 
 
-YES = S(1)
-NO = S(0)
-MAYBE = S(0, 1)
+Stripes.YES = S(1)
+Stripes.NO = S(0)
+Stripes.MAYBE = S(0, 1)
