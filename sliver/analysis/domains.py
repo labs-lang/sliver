@@ -238,16 +238,12 @@ class Interval:
             self.is_within(other) or
             other.is_within(self) or
             other.min <= self.min <= other.max or
-            other.min <= self.max <= other.max
-        )
+            other.min <= self.max <= other.max)
 
     def adjacent(self, other):
         return not self.overlaps(other) and (
             self.max == other.min - 1 or
             self.min == other.max + 1)
-
-    def join(self, other):
-        return Interval(min(self.min, other.min), max(self.max, other.max))
 
     def __eq__(self, other):
         return self.min == other.min and self.max == other.max
@@ -262,6 +258,9 @@ class Interval:
             return I(1)
         else:
             return I(0, 1)
+
+    def join_adjacent(self):
+        return self
 
     def __ne__(self, other: object) -> bool:
         eq = self.equality(other)
@@ -356,7 +355,7 @@ class Stripes:
     def __init__(self, *args) -> None:
         self.stripes = frozenset(args)
 
-    def extrema(self):
+    def _extrema(self):
         return (
             min(i.min for i in self.stripes),
             max(i.max for i in self.stripes))
@@ -388,12 +387,15 @@ class Stripes:
 
     @staticmethod
     def _prune(stripes: set, prune_adjacent=False) -> frozenset:
+        def join_intervals(a, b):
+            return Interval(min(a.min, b.min), max(a.max, b.max))
+
         enter = len(stripes) > 1
         changed = True
         while enter or changed:
             enter = False
             joins = set(
-                a.join(b) for a, b in permutations(stripes, 2)
+                join_intervals(a, b) for a, b in permutations(stripes, 2)
                 if a.overlaps(b) or (a.adjacent(b) and prune_adjacent))
             stripes |= joins
             subsets = set(
@@ -442,8 +444,8 @@ class Stripes:
         return self.stripes == other.stripes
 
     def __lt__(self, other):
-        my_min, my_max = self.extrema()
-        other_min, other_max = other.extrema()
+        my_min, my_max = self._extrema()
+        other_min, other_max = other._extrema()
         # Degenerate case: self is a single integer
         if my_min == my_max:
             if other_min == other_max:
@@ -524,8 +526,8 @@ class Stripes:
             return self.YES
 
     def Or(self, other):
-        my_min, my_max = self.extrema()
-        other_min, other_max = other.extrema()
+        my_min, my_max = self._extrema()
+        other_min, other_max = other._extrema()
         if my_min == my_max == other_min == other_max == 0:
             return self.NO
         elif 0 not in self or 0 not in other:
