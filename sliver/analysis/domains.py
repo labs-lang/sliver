@@ -544,6 +544,13 @@ def S(mn, mx=None):
     return Stripes(I(mn, mx))
 
 
+Sign.YES = Sign(plus=True)
+Sign.NO = Sign(zero=True)
+Sign.NEG = Sign(minus=True)
+Sign.MAYBE = Sign(plus=True, zero=True)
+Sign.TOP = Sign(minus=True, plus=True, zero=True)
+
+
 Stripes.YES = S(1)
 Stripes.NO = S(0)
 Stripes.MAYBE = S(0, 1)
