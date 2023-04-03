@@ -38,7 +38,7 @@ class Esbmc(Backend):
                 "--no-unwinding-assertions", "--no-pointer-relation-check",
                 "--bv", "--32", "--quiet"
             ]
-            
+
             if self.cli[Args.STEPS] == 0:
                 # Enable bidirectional k-induction, otherwise just do BMC
                 cmd.extend([

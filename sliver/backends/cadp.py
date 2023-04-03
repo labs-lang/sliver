@@ -306,7 +306,7 @@ class CadpCompositional(CadpMonitor):
         svl_fname = self._svl_fname(fname)
         sweep = ["svl", "-sweep", svl_fname]
         clean = ["svl", "-clean", svl_fname]
-        if not(self.cli[Args.KEEP_FILES]):
+        if not self.cli[Args.KEEP_FILES]:
             for cmd in (sweep, clean):
                 try:
                     log_call(cmd)
