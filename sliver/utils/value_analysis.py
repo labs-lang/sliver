@@ -211,7 +211,7 @@ class Stripes:
         return hash(self.stripes)
 
     def __or__(self, other):
-        return Stripes(*(self.stripes | other.stripes))
+        return Stripes(*self._prune(self.stripes | other.stripes))
 
     def __repr__(self):
         return f"{{ {', '.join(str(x) for x in self.stripes)} }}"
@@ -297,6 +297,16 @@ class Stripes:
 
     def Max(self, other):
         return Stripes(*self._combine(other, lambda a, b: a.Max(b)))
+
+    def Range(self, other):
+        # Evaluates [self..other] (note that range is exclusive)
+        mins = (i.min for i in self.stripes)
+        other_minus_1 = other - YES
+        maxs = (i.max for i in other_minus_1.stripes)
+        stripes = set(I(mn, mx) for mn, mx in product(mins, maxs) if mx > mn)
+        if len(stripes) == 0:
+            raise ValueError(f"[{self}..{other}] is an empty range")
+        return Stripes(*self._prune(stripes))
 
     def And(self, other):
         if 0 in self or 0 in other:
@@ -387,7 +397,8 @@ def eval_expr(expr, s, externs) -> Stripes:
         "min": lambda x, y: x.Min(y),
         "max": lambda x, y: x.Max(y),
         "and": lambda x, y: x.And(y),
-        "or": lambda x, y: x.Or(y)
+        "or": lambda x, y: x.Or(y),
+        "nondet-from-range": lambda x, y: x.Range(y)
     }
     CMP = {
         ">": lambda x, y: x > y,
@@ -486,6 +497,13 @@ def apply_guard(guards, stmt, s0, externs, State):
     return recursive_apply(s0)
 
 
+def lhs_of(stmt):
+    if stmt(NodeType.ASSIGN):
+        return set(n[Attr.NAME] for n in stmt[Attr.LHS])
+    elif stmt(NodeType.BLOCK):
+        return set().union(*(lhs_of(a) for a in (stmt // (NodeType.ASSIGN, ))))  # noqa: E501
+
+
 def apply_assignment(asgn, s0, externs, guards, old, State):
     # If asgn is guarded, reduce s0 to the states where the guard holds
     s0 = apply_guard(guards, asgn, s0, externs, State)
@@ -533,7 +551,7 @@ def dependency_analysis(assignments, blocks):
     while old_depends != depends:
         old_depends = {**depends}
         for v, v_deps in old_depends.items():
-            for w in v_deps:
+            for w in frozenset(v_deps):
                 depends[v].update(old_depends.get(w, []))
     return depends
 
@@ -608,24 +626,18 @@ def value_analysis(cli, info):
     depends = dependency_analysis(assignments, blocks)
 
     # Retrieve local variable names and build initial state
-    local_names = [
+    local_names = set(
         lhs[Attr.NAME]
         for blk in blocks
         for n in blk[Attr.BODY]
         for lhs in n[Attr.LHS]
-        if n[Attr.TYPE] == "local"]
+        if n[Attr.TYPE] == "local")
     State, s0 = make_init(info, local_names)
 
     # We use a chaos automaton of all assignments/blocks
     # to overapproximate the range of feasible values
     fixpoint = False
     old_states = set([s0])
-
-    def lhs_of(asgn_or_blk):
-        if asgn_or_blk(NodeType.ASSIGN):
-            return set(n[Attr.NAME] for n in asgn_or_blk[Attr.LHS])
-        elif asgn_or_blk(NodeType.BLOCK):
-            return set().union(*(lhs_of(a) for a in (asgn_or_blk // (NodeType.ASSIGN, ))))  # noqa: E501
 
     def mergeStates(s0, s1):
         return merge(s0, s1, State)
@@ -634,8 +646,6 @@ def value_analysis(cli, info):
     with ThreadPoolExecutor() as exc:
         # TODO make analysis bound configurable
         for i in range(10):
-            print()
-            print("loop", i, len(old_states))
             # Prune away old states entailed by others
             old_merge = reduce(mergeStates, old_states)
 
