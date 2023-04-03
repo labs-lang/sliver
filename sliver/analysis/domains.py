@@ -2,6 +2,213 @@
 from itertools import product, permutations
 
 
+class Sign:
+    def __init__(self, minus=False, plus=False, zero=False):
+        self.minus = minus
+        self.plus = plus
+        self.zero = zero
+
+    def __repr__(self):
+        if self.minus and self.plus and self.zero:
+            return "<T>"
+        else:
+            return f"<{'-' if self.minus else ''}{'0' if self.zero else ''}{'+' if self.plus else ''}>"  # noqa: E501
+
+    def __hash__(self) -> int:
+        return hash((self.minus, self.plus, self.zero))
+
+    def __contains__(self, n):
+        if n < 0:
+            return self.minus
+        elif n == 0:
+            return self.zero
+        else:
+            return self.plus
+
+    def __iter__(self):
+        raise NotImplementedError()
+
+    def bisect(self):
+        if self._is_zero() or self._is_positive() or self._is_negative():
+            return None, None
+        if self.minus and self.plus and self.zero:
+            return Sign.NEG, Sign.MAYBE
+        if self.minus and self.plus:
+            return Sign.NEG, Sign.YES
+        if self.minus and self.zero:
+            return Sign.NEG, Sign.NO
+        if self.plus and self.zero:
+            return Sign.NO, Sign.YES
+        raise ValueError("This should be unreachable")
+
+    @staticmethod
+    def abstract(*values):
+        # copy just in case vals is a lazy iterable
+        vals = [*values]
+        return Sign(
+            minus=any(x < 0 for x in vals),
+            plus=any(x > 0 for x in vals),
+            zero=any(x == 0 for x in vals))
+
+    @staticmethod
+    def abstract_range(rng):
+        if not isinstance(rng, range):
+            raise ValueError(f"{rng} is not a range")
+        return Sign(
+            minus=min(rng) < 0,
+            plus=max(rng) > 0,
+            zero=min(rng) * max(rng) <= 0)
+
+    def is_within(self, other):
+        return all((
+            (not self.minus) or other.minus,
+            (not self.plus) or other.plus,
+            (not self.zero) or other.zero))
+
+    def overlaps(self, other):
+        return any((
+            self.is_within(other),
+            other.is_within(self),
+            self.zero and other.zero))
+
+    def adjacent(self, other):
+        return not self.overlaps(other) and self.zero and other.zero
+
+    def __eq__(self, other):
+        return all((
+            self.minus == other.minus,
+            self.plus == other.plus,
+            self.zero == other.zero))
+
+    def __lt__(self, other):
+        if other.plus:
+            return Sign.MAYBE if self.plus else Sign.YES
+        if other.zero:
+            return Sign.MAYBE if self.zero else Sign.YES
+        # other is <->
+        return Sign.MAYBE if self.minus else Sign.NO
+
+    def __le__(self, other):
+        return self.equality(other) or self < other
+
+    def __gt__(self, other):
+        return other < self
+
+    def __ge__(self, other):
+        return self.equality(other) or self > other
+
+    def _is_zero(self):
+        return self.zero and not self.plus and not self.minus
+
+    def _is_positive(self):
+        return self.plus and not self.zero and not self.minus
+
+    def _is_negative(self):
+        return self.minus and not self.zero and not self.plus
+
+    def equality(self, other):
+        if self._is_zero() and other._is_zero():
+            return Sign.YES
+        elif self.overlaps(other):
+            return Sign.MAYBE
+        else:
+            return Sign.NO
+
+    def join_adjacent(self):
+        return self
+
+    def __ne__(self, other):
+        return ~self.equality(other)
+
+    def __neg__(self):
+        return Sign(
+            minus=self.plus,
+            plus=self.minus,
+            zero=self.zero)
+
+    def __invert__(self):
+        if self == Sign.YES:
+            return Sign.NO
+        elif self == Sign.NO:
+            return Sign.YES
+        else:
+            return Sign.MAYBE
+
+    def __or__(self, other):
+        return Sign(
+            minus=self.minus or other.minus,
+            plus=self.plus or other.plus,
+            zero=self.zero or other.zero)
+
+    def __add__(self, other):
+        if self._is_zero():
+            return other
+        if other._is_zero():
+            return self
+        return Sign(
+            minus=(self.minus or other.minus),
+            plus=(self.plus or other.plus),
+            zero=(self.plus and other.minus) or (self.minus and other.plus))
+
+    def __sub__(self, other):
+        return self + (-other)
+
+    def __mul__(self, other):
+        if self._is_zero() or other._is_zero():
+            return Sign.NO
+        return Sign(
+            plus=(self.plus and other.plus) or (self.minus and other.minus),
+            minus=(self.plus and other.minus) or (self.minus and other.plus),
+            zero=self.zero or other.zero)
+
+    def __mod__(self, _):
+        return self if self._is_zero() else Sign.MAYBE
+
+    def __abs__(self):
+        return self if self._is_zero() else Sign.MAYBE
+
+    def Min(self, other):
+        if self.minus or other.minus:
+            return Sign.NEG
+        # both self and other are <0+>
+        if self.zero or other.zero:
+            return Sign.NO
+        # both self and other are <+>
+        return Sign.YES
+
+    def Max(self, other):
+        if self.plus or other.plus:
+            return Sign.YES
+        # both self and other are <-0>
+        if self.zero or other.zero:
+            return Sign.NO
+        # both self and other are <->
+        return Sign.NEG
+
+    def Or(self, other):
+        if self._is_positive() or other._is_positive():
+            return Sign.YES
+        if self._is_zero() and other._is_zero():
+            return Sign.NO
+        return Sign.MAYBE
+
+    def And(self, other):
+        if self._is_positive() and other._is_positive():
+            return Sign.YES
+        if self._is_zero() and other._is_zero():
+            return Sign.NO
+        return Sign.MAYBE
+
+    def Range(self, other):
+        minus = self.minus or other.minus
+        plus = self.plus or other.plus
+        zero = self.zero or other.zero or (plus and minus)
+        return Sign(
+            minus=minus,
+            plus=plus,
+            zero=zero)
+
+
 class Interval:
     def __init__(self, mn, mx=None):
         if not isinstance(mn, int):
