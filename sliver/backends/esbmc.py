@@ -85,42 +85,43 @@ class Esbmc(Backend):
                     fmt_one(i)
                     for i in range(var.index, var.index + var.size))
 
-        if fixpoint:
-            self.verbose_output((ranges, fixpoint, ))
-            loop_assumptions = []
-            # Shared variables
+        wont_change = ranges._fields if fixpoint else wont_change
+
+        # if fixpoint:
+        loop_assumptions = []
+        # Shared variables
+        for f in wont_change:
+            try:
+                var = info.lookup_var(f)
+                if var.store == "e":
+                    loop_assumptions.extend(
+                        f"__CPROVER_assume({x});"
+                        for x in fmt_var(var, getattr(ranges, f).stripes))  # noqa: E501
+            except KeyError:
+                continue
+
+        # Agent variables
+        for tid in range(info.spawn.num_agents()):
+            agent = info.spawn[tid]
             for f in ranges._fields:
                 try:
                     var = info.lookup_var(f)
-                    if var.store == "e":
-                        loop_assumptions.extend(
-                            f"__CPROVER_assume({x});"
-                            for x in fmt_var(var, getattr(ranges, f).stripes))  # noqa: E501
-                except KeyError:
-                    continue
-
-            # Agent variables
-            for tid in range(info.spawn.num_agents()):
-                agent = info.spawn[tid]
-                for f in ranges._fields:
-                    try:
-                        var = info.lookup_var(f)
-                        if var.store == "e" or var.index not in agent.iface:
-                            continue
-                        loop_assumptions.extend((
-                            f"__CPROVER_assume({x});"
-                            for x in fmt_var(var, getattr(ranges, f).stripes, tid)))  # noqa: E501
-                    except KeyError:
-                        # Local variable
+                    if var.store == "e" or var.index not in agent.iface:
                         continue
-            loop_assumptions = "\n    ".join(loop_assumptions)
-            loop_assumptions = f"""
+                    loop_assumptions.extend((
+                        f"__CPROVER_assume({x});"
+                        for x in fmt_var(var, getattr(ranges, f).stripes, tid)))  # noqa: E501
+                except KeyError:
+                    # Local variable
+                    continue
+        loop_assumptions = "\n    ".join(loop_assumptions)
+        loop_assumptions = f"""
 void loopAssumptions(void) {{
-    {loop_assumptions}
+{loop_assumptions}
 }}"""
-            code = code.replace(
-                """void loopAssumptions(void) { return; }""",
-                loop_assumptions)
+        code = code.replace(
+            """void loopAssumptions(void) { return; }""",
+            loop_assumptions)
 
         esbmc_conf = """
         (without-bitwise)
