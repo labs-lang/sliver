@@ -7,6 +7,7 @@ from pyparsing import (
     alphas, Char)
 from pyparsing import pyparsing_common as ppc
 
+from ..app.info import get_var
 
 ATTR = re.compile(r"I\[([0-9]+)l?\]\[([0-9]+)l?\]")
 LSTIG = re.compile(r"Lvalue\[([0-9]+)l?\]\[([0-9]+)l?\]")
@@ -66,9 +67,22 @@ def translateCPROVER(cex, info, parser=TRACE):
     cex_end_pos = cex.rfind("Violated property:")
     states = parser.parseString(cex[cex_start_pos:cex_end_pos], parseAll=False)
 
-    inits = (
+    inits = [
         (s[1].lhs, get_value(s[1].rhs)) for s in states
-        if s[0].function == "init" and not(LTSTAMP.match(s[1][0])))
+        if s[0].function == "init" and not LTSTAMP.match(s[1][0])]
+    # Hack to display variables which were initialized to 0
+    for (store, loc) in ((info.e, "E"), (info.i, "I"), (info.lstig, "L")):
+        for tid in range(info.spawn.num_agents()):
+            for var in store.values():
+                vals = var.values(tid)
+                if len(vals) == 1 and vals[0] == 0:
+                    size = var.size if var.is_array else 1
+                    for off in range(0, size):
+                        tid_fmt = f"[{tid}]" if loc != "E" else ""
+                        inits.append((f"{loc}{tid_fmt}[{var.index + off}]", "0"))  # noqa: E501
+            if store == info.e:
+                break
+
     others = [
         (s[0].function, s[0].line, s[1].lhs, get_value(s[1].rhs))
         for s in states
