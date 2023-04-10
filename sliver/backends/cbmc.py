@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import os
 import platform
+from random import getrandbits
 import stat
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache, reduce
 from importlib import resources
 from operator import mul
@@ -11,6 +13,7 @@ from subprocess import (DEVNULL, PIPE, STDOUT, CalledProcessError,
 
 from ..app.cex import translateCPROVER54, translateCPROVERNEW
 from ..app.cli import Args, ExitStatus, SliverError
+from ..app.info import get_var
 from ..atlas.concretizer import Concretizer
 from .common import Backend, Language, log_call
 
@@ -133,7 +136,11 @@ class Cbmc(Backend):
         out = check_output(cmd, stderr=STDOUT, cwd=self.cwd).decode()
         self.verbose_output(out, "Backend output")
 
-    def minisat_incantation(self, weaks):
+    def _set_executable(self, filename):
+        st = os.stat(filename)
+        os.chmod(filename, st.st_mode | stat.S_IEXEC)
+
+    def minisat_incantation(self, weaks, script_file):
         with resources.path("sliver.minisat", "minisat") as minisat:
             weaks = " ".join((
                 str(var) if value != 0 else f"-{var}"
@@ -141,6 +148,12 @@ class Cbmc(Backend):
                 # Skip stuff that has already been resolved by CBMC
                 if var not in ("TRUE", "FALSE")
             ))
+            if weaks:
+                with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as weaks_f:  # noqa: E501
+                    weaks_f.write(weaks)
+                    self.temp_files.append(weaks_f.name)
+            tryassume = f"""-try-assume-from="{weaks_f.name}" """ if weaks else ""  # noqa: E501
+
             script = f"""
 #!/bin/bash
 
@@ -150,21 +163,18 @@ class Cbmc(Backend):
 
 # Invokes minisat with weak assumptions and nondet heuristics
 MINISAT="{minisat}"
-WEAKS="{weaks}"
 # TODO adjust rnd-freq based on CNF hardness
 F=0.15
 
-$MINISAT -model -rnd-freq=$F -no-elim -rnd-init -rnd-seed=$RANDOM -try-assume="$WEAKS" $1
+$MINISAT -model -rnd-freq=$F -no-elim -rnd-init -rnd-seed=$RANDOM {tryassume}$1
 """
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as f:  # noqa: E501
-            f.write(script)
-            st = os.stat(f.name)
-            os.chmod(f.name, st.st_mode | stat.S_IEXEC)
-            self.temp_files.append(f.name)
-            return f.name
+            with open(script_file, "w") as f:
+                f.write(script)
+            self._set_executable(script_file)
+            self._set_executable(script_file)
 
-    def sat_level_concretization(self, fname, info, concretizer):
+    def sat_level_concretization(self, fname, info, concretizer, script):
 
         def to_bv(num, width=16):
             """Converts num to a (LSB-first) bitvector of the given width.
@@ -202,11 +212,23 @@ $MINISAT -model -rnd-freq=$F -no-elim -rnd-init -rnd-seed=$RANDOM -try-assume="$
         mapping = self.get_dimacs_mapping(fname, info)
         self.verbose_output(f"DIMACS header: {mapping.info}")
 
-        weaks = []
+        def bit_train():
+            while True:
+                yield getrandbits(1)
+
+        nondets = (
+            zip(mapping[name], bit_train())
+            for name in mapping.mapping
+            if "nondetInRange::1::x" in name)
+        weaks = [(a, b) for n in nondets for a, b in n]
         for x in m:
             # TODO environment and stigmergy variables
             if str(x).startswith("I_"):
                 loc, agent, index = str(x).split("_")
+                var = get_var(info.spawn[int(agent)].iface, int(index))
+                # Skip if value is already deterministic
+                if len(var.values(int(agent))) == 1:
+                    continue
                 try:
                     dims = (
                         info.spawn.num_agents(),
@@ -227,6 +249,7 @@ $MINISAT -model -rnd-freq=$F -no-elim -rnd-init -rnd-seed=$RANDOM -try-assume="$
             if vars_ is not None:
                 w = zip(vars_, to_bv(int(m[x].as_string()), len(vars_)))
                 weaks.extend(w)
+        self.minisat_incantation(weaks, script)
         return weaks
 
     def simulate(self, fname, info):
@@ -238,9 +261,21 @@ $MINISAT -model -rnd-freq=$F -no-elim -rnd-init -rnd-seed=$RANDOM -try-assume="$
                 if self.cli[Args.CONCRETIZATION] != "none":
                     c.concretize_file(fname)
                 if self.cli[Args.CONCRETIZATION] == "sat":
-                    weaks = self.sat_level_concretization(fname, info, c)
-                    script = self.minisat_incantation(weaks)
-                    cmd.extend(["--external-sat-solver", script])
+                    exc = ThreadPoolExecutor()
+                    with (tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as sleepy,  # noqa: E501
+                          tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as script):  # noqa: E501
+                        self.temp_files.append(sleepy.name)
+                        self.temp_files.append(script.name)
+                        sleepy.write(
+                            "#!/bin/sh\n\n"
+                            f"while [ ! -x {script.name} ]; "  # noqa: E501
+                            "do sleep 1; done;\n"
+                            f"{script.name} $1\n")
+                        sleepy.close()
+                        self._set_executable(sleepy.name)
+                        exc.submit(self.sat_level_concretization, fname, info, c, script.name)  # noqa: E501
+
+                    cmd.extend(["--external-sat-solver", sleepy.name])
 
                 if self.cli[Args.TIMEOUT] > 0:
                     cmd = [self.timeout_cmd, str(self.cli[Args.TIMEOUT]), *cmd]
