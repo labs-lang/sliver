@@ -1,13 +1,10 @@
-import copy
 import re
 from pyparsing import (
     LineEnd, LineStart, Word, alphanums, delimitedList, OneOrMore, ZeroOrMore,
     Forward, Suppress, Group, ParserElement, Keyword, dblQuotedString,
-    removeQuotes, SkipTo, StringEnd, Regex, printables, replaceWith, Optional,
-    alphas, Char)
+    removeQuotes, SkipTo, StringEnd, Regex, printables, replaceWith, Optional)
 from pyparsing import pyparsing_common as ppc
 
-from ..app.info import get_var
 
 ATTR = re.compile(r"I\[([0-9]+)l?\]\[([0-9]+)l?\]")
 LSTIG = re.compile(r"Lvalue\[([0-9]+)l?\]\[([0-9]+)l?\]")

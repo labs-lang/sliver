@@ -281,7 +281,6 @@ $MINISAT -model -rnd-freq=$F -no-elim -rnd-init -rnd-seed=$RANDOM {tryassume}$1
                     cmd = [self.timeout_cmd, str(self.cli[Args.TIMEOUT]), *cmd]
                 log_call(cmd)
 
-                # out = check_output(cmd, cwd=self.cwd, stderr=stderr).decode()
                 result = run(
                     cmd, cwd=self.cwd, check=True, stderr=PIPE, stdout=PIPE)
                 out = result.stdout.decode()
