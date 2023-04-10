@@ -21,27 +21,38 @@ def to_cbmc_hex(numeric_string):
 
 class DimacsMapping:
     def __init__(self, file_obj):
+        self.get_array = lru_cache(maxsize=128)(self._get_array)
+        self.get_element = lru_cache(maxsize=128)(self._get_element)
+        self.info = file_obj.readline().decode().strip()
         self.mapping = {}
         for ln in file_obj:
             ln = ln.decode()
-            if ln[0] == "p":
-                self.info = ln
             if ln[0] == "c":
-                ln = ln.split()
-                self.mapping[ln[1]] = [
-                    x if x == "FALSE" or x == "TRUE" else int(x)
-                    for x in ln[2:]]
+                ln = ln.split(maxsplit=2)
+                self.mapping[ln[1]] = ln[2]
 
-    def get_element(self, name, indexes, dims):
+    def __getitem__(self, key):
+        item = self.mapping[key]
+        if isinstance(item, list):
+            return item
+        self.mapping[key] = self._parse_vars(key, item)
+        return self.mapping[key]
+
+    def _parse_vars(self, name, vars_str):
+        return tuple(
+            x if x in ("FALSE", "TRUE") else int(x)
+            for x in vars_str.split())
+
+    def _get_element(self, name, indexes, dims):
         fmt_offset = "".join(f"[[{to_cbmc_hex(i)}]]" for i in indexes)
         try:
             # The easy way
-            return self.mapping[name+"#2"+fmt_offset]
+            return self[name+"#2"+fmt_offset]
         except KeyError:
             # Bummer, we have to go the hard way
             pass
         try:
-            arr = self.mapping[self.get_array(name)]
+            arr = self[self.get_array(name)]
         except KeyError as e:
             raise e
         assert len(dims) > 0
@@ -55,15 +66,14 @@ class DimacsMapping:
         start = bw * offset
         return arr[start:start+bw]
 
-    @lru_cache(maxsize=128)
-    def get_array(self, name):
+    def _get_array(self, name):
         """Find the first version of array "name" that is fully initialized"""
         def get_version(var_name):
             return int(var_name.split("#")[-1])
 
         candidates = [
             n for n in self.mapping
-            if n.startswith(name) and "FALSE" not in self.mapping[n]]
+            if n.startswith(name) and "FALSE" not in self[n]]
         return min(candidates, key=get_version)
 
 
