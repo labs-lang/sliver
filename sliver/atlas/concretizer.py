@@ -152,12 +152,18 @@ class Concretizer:
             a = self.info.spawn[tid]
             for i, attr in enumerate(self.attrs[tid]):
                 v = get_var(a.iface, i)
+                if len(v.values(tid)) == 1:
+                    # var is deterministic, no need for additional constraints
+                    continue
                 fresh_bool = Bool(f"{v.store}_{tid}_{v.index}_%%soft%%")
                 self.softs.add(fresh_bool)
                 self.s.add(Implies(fresh_bool, attr == v.rnd_value(tid)))
 
         for i, env_var in enumerate(self.envs):
             v = get_var(self.info.e, i)
+            if len(v.values(0)) == 1:
+                # var is deterministic, no need for additional constraints
+                continue
             fresh_bool = Bool(f"{v.store}_{v.index}_%%soft%%")
             self.softs.add(fresh_bool)
             self.s.add(Implies(fresh_bool, attr == v.rnd_value(tid)))
@@ -239,7 +245,8 @@ class Concretizer:
         self.sched = IntVector("sched", steps)
         self.s.add(*(self.isAnAgent(x) for x in self.sched))
         # Round robin scheduler
-        if self.cli[Args.FAIR]:
+        # TODO This does not work with stigmergic systems
+        if self.cli[Args.FAIR] and len(self.info.lstig) == 0:
             self.s.add(self.sched[0] == 0)
             self.s.add(*(
                 (self.sched[i] == (self.sched[i - 1] + 1) % self.agents)
@@ -300,21 +307,28 @@ class Concretizer:
         re_sched = make_regex("concrete-scheduler")
         re_sym_sched = make_regex("symbolic-scheduler")
 
-        if self.cli[Args.CONCRETIZATION] == "sat" and not self.cli[Args.FAIR]:
-            program = re_sym_sched.sub('\n', program)
-            program = re_sched.sub(
-                '\nfirstAgent = sched[__LABS_step];\n',
-                program)
-            program = re.sub(
-                r"init\(\);",
-                """init();
+        if self.cli[Args.CONCRETIZATION] == "sat":
+            if not self.cli[Args.FAIR]:
+                program = re_sym_sched.sub('\n', program)
+                program = re_sched.sub('\nscheduled = sched[__LABS_step];\n', program)  # noqa: E501
+                program = re.sub(
+                    r"init\(\);",
+                    """init();
     TYPEOFAGENTID sched[BOUND];
     for (unsigned i = 0; i < BOUND; ++i) {{
         sched[i] = __CPROVER_nondet_int();
         __CPROVER_assume(sched[i] < MAXCOMPONENTS);
     }}
 """,
-                program)
+                    program)
+            elif len(self.info.lstig) == 0:
+                program = re_sym_sched.sub('\n', program)
+                program = re_sched.sub('\nscheduled = sched[__LABS_step];\n', program)  # noqa: E501
+                steps = self.cli[Args.STEPS]
+                sched = ", ".join(str(i % self.agents) for i in range(steps))
+                program = re_globals.sub(
+                    f"\nTYPEOFAGENTID sched[{steps}] = {{ {sched} }};\n",
+                    program)
 
         elif self.cli[Args.CONCRETIZATION] == "src":
             picks = self._scan_picks(program)
@@ -334,7 +348,7 @@ class Concretizer:
             program = re_sym_pick.sub('\n', program)
             program = re_globals.sub(f'\n{globs}\n', program, 1)
             program = re_init.sub(f'\n{inits}\n', program)
-            program = re_sched.sub('\nfirstAgent = sched[__LABS_step];\n', program)  # noQA: E501
+            program = re_sched.sub('\nscheduled = sched[__LABS_step];\n', program)  # noQA: E501
 
             re_sym_init = make_regex("symbolic-init")
             program = re_sym_init.sub('\n', program)
@@ -371,14 +385,20 @@ class Concretizer:
             return ("\n".join(
                 f"I[{tid}][{index(attr)}] = {m[attr]};"
                 for tid in range(self.agents)
-                for attr in self.attrs[tid])
+                for attr in self.attrs[tid]
+                # Skip values that would be initialized to zero
+                if str(m[attr]) != "0")
                 + "\n" + "\n".join(
-                f"Lvalue[{tid}][{index(attr)}] = {m[attr]};"
-                for tid in range(self.agents)
-                for attr in self.lstigs[tid])
+                    f"Lvalue[{tid}][{index(attr)}] = {m[attr]};"
+                    for tid in range(self.agents)
+                    for attr in self.lstigs[tid]
+                    # Skip values that would be initialized to zero
+                    if str(m[attr]) != "0")
                 + "\n" + "\n".join(
-                f"E[{index(attr)}] = {m[attr]};"
-                for attr in self.envs))
+                    f"E[{index(attr)}] = {m[attr]};"
+                    for attr in self.envs
+                    # Skip values that would be initialized to zero
+                    if str(m[attr]) != "0"))
 
         self.setup(program)
 
