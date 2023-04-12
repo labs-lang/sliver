@@ -127,7 +127,6 @@ def eval_expr(expr, s, externs, info):
         else:
             rng = info.spawn.range_of(expr[Attr.TYPE])
             result = domain.abstract(*rng)
-        print(f"{expr.as_labs()}\n{result}")
         return result
     else:
         raise NotImplementedError(expr.as_labs())
@@ -147,14 +146,9 @@ def bisect_by(s0, var, State):
 
 def apply_guard(guards, stmt, s0, externs, info, State):
     """Filters s0 down to the abstract state where stmt's guard always holds"""
-    g = guards.get(stmt)
-    if g is None:
+    new_guard, g_vars = guards.get(stmt, (None, None))
+    if new_guard is None:
         return s0
-    new_guard = Expr("", "", "", {})
-    new_guard[Attr.SYNTHETIC] = True
-    new_guard[Attr.NAME] = "and"
-    new_guard[Attr.OPERANDS] = g
-    g_vars = set(x[Attr.NAME] for x in (new_guard // (NodeType.REF, )))
 
     def recursive_apply(s):
         eval_whole = eval_expr(new_guard, s, externs, info)
@@ -182,6 +176,7 @@ def apply_guard(guards, stmt, s0, externs, info, State):
     return recursive_apply(s0)
 
 
+@lru_cache()
 def lhs_of(stmt):
     if stmt(NodeType.ASSIGN):
         return set(n[Attr.NAME] for n in stmt[Attr.LHS])
@@ -189,7 +184,7 @@ def lhs_of(stmt):
         return set().union(*(lhs_of(a) for a in (stmt // (NodeType.ASSIGN, ))))
 
 
-def apply_assignment(asgn, s0, externs, guards, old, info, State):
+def apply_assignment(asgn, s0, externs, guards, info, State):
     # If asgn is guarded, reduce s0 to the states where the guard holds
     s0 = apply_guard(guards, asgn, s0, externs, info, State)
     # The guard did not hold anywhere, so we cannot interpret asgn
@@ -199,19 +194,19 @@ def apply_assignment(asgn, s0, externs, guards, old, info, State):
     for lhs, rhs in zip(asgn[Attr.LHS], asgn[Attr.RHS]):
         s1[lhs[Attr.NAME]] = eval_expr(rhs, s0, externs, info)
     s1 = State(**s1)
-    return None if old is not None and entailed_by(s1, old) else s1
+    return s1
 
 
-def apply_block(blk, s0, externs, guards, old, info, State):
+def apply_block(blk, s0, externs, guards, info, State):
     # If blk is guarded, reduce s0 to the states where the guard holds
     s0 = apply_guard(guards, blk, s0, externs, info, State)
     # The guard did not hold anywhere, so we cannot interpret blk
     if s0 is None:
         return None
     for asgn in blk[Attr.BODY]:
-        s1 = apply_assignment(asgn, s0, externs, guards, None, info, State)
+        s1 = apply_assignment(asgn, s0, externs, {}, info, State)
         s0 = s1
-    return None if old is not None and entailed_by(s1, old) else s1
+    return s1
 
 
 def dependency_analysis(assignments, blocks):
@@ -238,7 +233,19 @@ def dependency_analysis(assignments, blocks):
         for v, v_deps in old_depends.items():
             for w in frozenset(v_deps):
                 depends[v].update(old_depends.get(w, []))
+    # id never depends on anything
+    depends["id"] = set()
     return depends
+
+
+@lru_cache(maxsize=None)
+def make_guard(g):
+    new_guard = Expr("", "", "", {})
+    new_guard[Attr.SYNTHETIC] = True
+    new_guard[Attr.NAME] = "and"
+    new_guard[Attr.OPERANDS] = g
+    g_vars = set(x[Attr.NAME] for x in (new_guard // (NodeType.REF, )))
+    return new_guard, g_vars
 
 
 def value_analysis(cli, info, domain):
@@ -308,6 +315,10 @@ def value_analysis(cli, info, domain):
         for x in get_guarded_assignments(g[Attr.BODY], agent):
             guard_map[x].append(g[Attr.CONDITION])
 
+    guard_map = {
+        key: (None if val is None else make_guard(tuple(val)))
+        for key, val in guard_map.items()}
+
     depends = dependency_analysis(assignments, blocks)
 
     # Retrieve local variable names and build initial state
@@ -324,69 +335,79 @@ def value_analysis(cli, info, domain):
 
     # We use a chaos automaton of all assignments/blocks
     # to overapproximate the range of feasible values
-    fixpoint = False
-    old_states = set([s0])
-
     def mergeStates(s0, s1):
+        if s0 is None:
+            return s1
+        elif s1 is None:
+            return s0
         return merge(s0, s1, State)
 
-    wont_change = set()
-    with ThreadPoolExecutor() as exc:
-        # TODO make analysis bound configurable
-        for i in range(10):
-            # Prune away old states entailed by others
-            old_merge = reduce(mergeStates, old_states)
+    def parallel_merge(states):
+        if not states:
+            return None
+        elif len(states) == 1:
+            return next(iter(states))
+        else:
+            st_list = list(states)
+            mid = len(st_list) // 2
+            with ThreadPoolExecutor() as exc:
+                rec_left = exc.submit(parallelMerge, st_list[:mid])
+                rec_right = exc.submit(parallelMerge, st_list[mid:])
+                return mergeStates(rec_left.result(), rec_right.result())
 
-            futures = []
-            common_args = (externs, guard_map, old_states, info, State)
-            futures = [
-                exc.submit(apply_assignment, a, s, *common_args)
-                for a, s in product(assignments, old_states)]
-            futures.extend(
-                exc.submit(apply_block, blk, s, *common_args)
-                for blk, s in product(blocks, old_states))
+    def loop(bound, guard_map, s0):
+        visited_states = set()
+        frontier = set((s0, ))
+        fixpoint = False
+        with ThreadPoolExecutor() as exc:
+            # TODO make analysis bound configurable
+            for i in range(bound):
 
-            new_states = (f.result() for f in as_completed(futures))
-            new_states = set(s for s in new_states if s is not None)
-
-            if new_states <= old_states:
-                fixpoint = True
-                break
-            old_states |= new_states
-
-            # Detect which variables won't change anymore
-            next_merge = reduce(mergeStates, old_states)
-            common_args = (externs, {}, (next_merge, ), info, State)
-            no_dep_vars = [v for v in depends if len(depends[v]) == 0]
-            for v in no_dep_vars:
+                futures = []
+                common_args = (externs, guard_map, info, State)
                 futures = [
                     exc.submit(apply_assignment, a, s, *common_args)
-                    for s in old_states
-                    for a in assignments
-                    if any(lhs == v for lhs in lhs_of(a))]
+                    for a, s in product(assignments, frontier)]
                 futures.extend(
-                    exc.submit(apply_block, b, s, *common_args)
-                    for s in old_states
-                    for b in blocks
-                    if any(lhs == v for lhs in lhs_of(b)))
-            result = (f.result() for f in as_completed(futures))
-            result = [s for s in result if s is not None]
-            next2_merge = (
-                reduce(mergeStates, result)
-                if len(result)
-                else next_merge)
-            new_wont_change = [
-                v for v in no_dep_vars
-                if getattr(next2_merge, v).is_within(getattr(next_merge, v))
-                and getattr(next_merge, v).is_within(getattr(old_merge, v))
-                and v not in wont_change]
-            wont_change.update(new_wont_change)
+                    exc.submit(apply_block, blk, s, *common_args)
+                    for blk, s in product(blocks, frontier))
 
-    s1 = old_merge if fixpoint else reduce(mergeStates, old_states)
-    s1 = State(**{
-        x: getattr(s1, x).join_adjacent()
-        for x in s1._fields
-    })
+                new_states = set(f.result() for f in as_completed(futures))
+                new_states.discard(None)
+
+                if new_states <= visited_states:
+                    fixpoint = True
+                    break
+                visited_states |= frontier
+                frontier = new_states
+
+        visited_states |= frontier
+        s1 = reduce(mergeStates, visited_states)
+        s1 = State(**{
+            x: getattr(s1, x).join_adjacent()
+            for x in s1._fields
+        })
+        return s1, fixpoint
+
+    s1, fixpoint = loop(20, guard_map, s0)
+    if not fixpoint:
+        # Lookahead without guards to find out
+        # (an underapproximation of)
+        # the set of variables that won't change anymore
+        s2, _ = loop(1, guard_map, s1)
+        wont_change = set(("id", ))  # id is guaranteed not to change
+        while True:
+            new_wont_change = set(
+                v for v in depends
+                if (all(dep in wont_change or dep == v) for dep in depends[v])
+                and getattr(s2, v).is_within(getattr(s1, v)))
+            if new_wont_change <= wont_change:
+                break
+            else:
+                wont_change |= new_wont_change
+    else:
+        wont_change = set(depends.keys())
+
     return s1, fixpoint, depends, wont_change
 
 
