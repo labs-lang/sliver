@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+from hashlib import sha1
 import platform
 from random import getrandbits
 import stat
@@ -140,7 +141,7 @@ class Cbmc(Backend):
         st = os.stat(filename)
         os.chmod(filename, st.st_mode | stat.S_IEXEC)
 
-    def minisat_incantation(self, weaks, script_file):
+    def minisat_incantation(self, weaks, num_vars, script_file):
         with resources.path("sliver.minisat", "minisat") as minisat:
             weaks = " ".join((
                 str(var) if value != 0 else f"-{var}"
@@ -153,7 +154,9 @@ class Cbmc(Backend):
                     weaks_f.write(weaks)
                     self.temp_files.append(weaks_f.name)
             tryassume = f"""-try-assume-from="{weaks_f.name}" """ if weaks else ""  # noqa: E501
-
+            elim = "-no-elim " if num_vars < 2_000_000 else ""
+            # TODO adjust rnd-freq based on CNF hardness
+            frequency = "-rnd-freq=0.15"
             script = f"""
 #!/bin/bash
 
@@ -162,13 +165,10 @@ class Cbmc(Backend):
 # https://github.com/labs-lang/sliver
 
 # Invokes minisat with weak assumptions and nondet heuristics
-MINISAT="{minisat}"
-# TODO adjust rnd-freq based on CNF hardness
-F=0.15
-
-$MINISAT -model -rnd-freq=$F -no-elim -rnd-init -rnd-seed=$RANDOM {tryassume}$1
+{minisat} -model {frequency} {elim}-rnd-init -rnd-seed=$RANDOM {tryassume}$1
 """
-
+            sat_cmd = script.splitlines()[-1].strip()
+            self.verbose_output(f"SAT solver call: {sat_cmd}")
             with open(script_file, "w") as f:
                 f.write(script)
             self._set_executable(script_file)
@@ -249,7 +249,8 @@ $MINISAT -model -rnd-freq=$F -no-elim -rnd-init -rnd-seed=$RANDOM {tryassume}$1
             if vars_ is not None:
                 w = zip(vars_, to_bv(int(m[x].as_string()), len(vars_)))
                 weaks.extend(w)
-        self.minisat_incantation(weaks, script)
+        num_vars = int(mapping.info.split()[2])
+        self.minisat_incantation(weaks, num_vars, script)
         return weaks
 
     def simulate(self, fname, info):
@@ -291,12 +292,15 @@ $MINISAT -model -rnd-freq=$F -no-elim -rnd-init -rnd-seed=$RANDOM {tryassume}$1
                 self.verbose_output(err.stderr.decode(), "Backend stderr")
                 self.verbose_output(out, "Backend output")
                 try:
+                    trace_hash = sha1()
                     header = f"====== Trace #{i+1} ======"
                     print(header)
                     for x in self.translate_cex(out, info):
+                        trace_hash.update(x.encode())
                         print(x, sep="", end="")
                     # This just prints a line of '=' that is as long as header
                     print(f'{"" :=<{len(header)}}')
+                    self.verbose_output(f"Digest of trace #{i+1}: {trace_hash.hexdigest()}")  # noqa: E501
                 except Exception as e:
                     print(f"Counterexample translation failed: {e}")
         return ExitStatus.SUCCESS
