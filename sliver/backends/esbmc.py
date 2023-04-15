@@ -7,7 +7,7 @@ from subprocess import CalledProcessError
 
 import pcpp
 
-from ..absentee import absentee
+from ..absentee.absentee import absentee
 from ..app.cex import translateCPROVER54
 from ..app.cli import Args, ExitStatus, SliverError
 from ..utils.value_analysis import value_analysis
