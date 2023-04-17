@@ -7,12 +7,10 @@ from subprocess import CalledProcessError
 
 import pcpp
 
-from sliver.analysis.domains import Stripes, Sign
-
-from ..absentee import absentee
+from ..absentee.absentee import absentee
 from ..app.cex import translateCPROVER54
 from ..app.cli import Args, ExitStatus, SliverError
-from ..analysis.value_analysis import value_analysis
+from ..utils.value_analysis import value_analysis
 from .common import Backend, Language
 
 
@@ -30,17 +28,13 @@ class Esbmc(Backend):
             esbmc = os.environ.get("SLIVER_ESBMC") or esbmc or which("esbmc")
             if esbmc is None:
                 raise SliverError(ExitStatus.BACKEND_ERROR, "esbmc not found")
-            # SLIVER_ESBMC_ARGS completely overrides CLI arguments
-            env_args = os.environ.get("SLIVER_ESBMC_ARGS")
-            if env_args:
-                return [esbmc, fname, *env_args.split()]
             cmd = [
                 esbmc, fname,
                 "--no-align-check", "--no-pointer-check", "--no-library",
                 "--no-unwinding-assertions", "--no-pointer-relation-check",
                 "--bv", "--32", "--quiet"
             ]
-
+            
             if self.cli[Args.STEPS] == 0:
                 # Enable bidirectional k-induction, otherwise just do BMC
                 cmd.extend([
@@ -63,19 +57,15 @@ class Esbmc(Backend):
         code = f.read()
 
         info = self.get_info(parsed=True)
-        ranges, fix, depends, wont_change = value_analysis(self.cli, info, Stripes)  # noqa: E501
+        ranges, fixpoint, depends, wont_change = value_analysis(self.cli, info)
         self.verbose_output(
-            f"Value analysis: {ranges=}, {fix=}, {depends=}, {wont_change=}")
-
-        s_analysis, s_fix, *_  = value_analysis(self.cli, info, Sign)
-        self.verbose_output(f"Sign analysis: {s_analysis=}, {s_fix=}")
-
-        rename = {"i": "I", "e": "E", "l": "Lvalue"}
+            f"Value analysis: {ranges=}, {fixpoint=}, {depends=}, , {wont_change=}")  # noqa: E501
 
         def fmt_var(var, stripes, tid=None):
-            loc = rename[var.store]
+            rename = {"i": "I", "e": "E", "l": "Lvalue"}
 
             def fmt_one(index):
+                loc = rename[var.store]
                 if var.store == "e":
                     return " | ".join(
                         f"{loc}[{index}] == {i.min}"
@@ -95,8 +85,9 @@ class Esbmc(Backend):
                     fmt_one(i)
                     for i in range(var.index, var.index + var.size))
 
-        wont_change = ranges._fields if fix else wont_change
+        wont_change = ranges._fields if fixpoint else wont_change
 
+        # if fixpoint:
         loop_assumptions = []
         # Shared variables
         for f in wont_change:
@@ -112,7 +103,7 @@ class Esbmc(Backend):
         # Agent variables
         for tid in range(info.spawn.num_agents()):
             agent = info.spawn[tid]
-            for f in wont_change:
+            for f in ranges._fields:
                 try:
                     var = info.lookup_var(f)
                     if var.store == "e" or var.index not in agent.iface:
@@ -123,67 +114,6 @@ class Esbmc(Backend):
                 except KeyError:
                     # Local variable
                     continue
-
-        # Consider sign analysis as a last resort
-        # TODO refactor common logic here & above
-        def fmt_sign(var, sign, tid=None):
-            loc = rename[var.store]
-
-            def fmt_one(index):
-                if var.store == "e":
-                    return (
-                        f"{loc}[{index}] > 0" if sign.plus and not sign.zero and not sign.minus else  # noqa: E501
-                        f"{loc}[{index}] >= 0" if sign.plus and sign.zero and not sign.minus else  # noqa: E501
-                        f"{loc}[{index}] != 0" if sign.plus and not sign.zero and sign.minus else  # noqa: E501
-                        f"{loc}[{index}] == 0" if not sign.plus and sign.zero and not sign.minus else  # noqa: E501
-                        f"{loc}[{index}] <= 0" if not sign.plus and sign.zero and sign.minus else  # noqa: E501
-                        f"{loc}[{index}] < 0" if not sign.plus and not sign.zero and sign.minus else None)  # noqa: E501
-                else:
-                    return (
-                        f"{loc}[{tid}][{index}] > 0" if sign.plus and not sign.zero and not sign.minus else  # noqa: E501
-                        f"{loc}[{tid}][{index}] >= 0" if sign.plus and sign.zero and not sign.minus else  # noqa: E501
-                        f"{loc}[{tid}][{index}] != 0" if sign.plus and not sign.zero and sign.minus else  # noqa: E501
-                        f"{loc}[{tid}][{index}] == 0" if not sign.plus and sign.zero and not sign.minus else  # noqa: E501
-                        f"{loc}[{tid}][{index}] <= 0" if not sign.plus and sign.zero and sign.minus else  # noqa: E501
-                        f"{loc}[{tid}][{index}] < 0" if not sign.plus and not sign.zero and sign.minus else None)  # noqa: E501
-            if not var.is_array:
-                yield fmt_one(var.index)
-            else:
-                yield from (
-                    fmt_one(i)
-                    for i in range(var.index, var.index + var.size))
-
-        for f in (f for f in s_analysis._fields if f not in wont_change):
-            if f == "id":
-                continue
-            try:
-                var = info.lookup_var(f)
-                sign = getattr(s_analysis, f)
-                if var.store == "e":
-                    loop_assumptions.extend(
-                        f"__CPROVER_assume({x});" for x in fmt_sign(var, sign))
-            except KeyError:
-                # Local variable
-                continue
-
-        # Agent variables
-        for tid in range(info.spawn.num_agents()):
-            agent = info.spawn[tid]
-            for f in (f for f in s_analysis._fields if f not in wont_change):
-                if f == "id":
-                    continue
-                try:
-                    var = info.lookup_var(f)
-                    sign = getattr(s_analysis, f)
-                    if var.store == "e" or (var.index not in agent.iface and var.index not in agent.lstig):  # noqa: E501
-                        continue
-                    loop_assumptions.extend((
-                        f"__CPROVER_assume({x});"
-                        for x in fmt_sign(var, sign, tid)))  # noqa: E501
-                except KeyError:
-                    # Local variable
-                    continue
-
         loop_assumptions = "\n    ".join(loop_assumptions)
         loop_assumptions = f"""
 void loopAssumptions(void) {{
