@@ -14,6 +14,7 @@ labs_templates = $(wildcard labs/LabsTranslate/templates/**/*.c) $(wildcard labs
 labs_examples = $(wildcard labs_examples/**/*.*) labs-examples/LICENSE
 
 VERSION := $(strip $(shell grep version sliver/app/__about__.py | grep = | sed 's/"//g' | awk 'NF{print $$NF}'))
+RELEASENAME = sliver-v$(VERSION)_$(strip $(subst -,_, ${platform}))
 BUILD_DIR = build/$(platform)
 SLIVER_DIR = $(BUILD_DIR)/sliver
 
@@ -69,3 +70,9 @@ linux: rmsentinels \
 	build/linux-x64/examples/README.md \
 	build/linux-x64/sliver/cbmc/cbmc-simulator
 
+zip_linux : linux
+	@rm -rf build/$(RELEASENAME);
+	@rm -f build/$(RELEASENAME).zip;
+	cp -r build/$(platform) build/$(RELEASENAME)
+	cd build && zip -r $(RELEASENAME).zip $(RELEASENAME)
+	rm -rf build/$(RELEASENAME)
