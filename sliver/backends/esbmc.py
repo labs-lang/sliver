@@ -2,6 +2,7 @@
 import io
 import os
 from importlib import resources
+import re
 from shutil import which
 from subprocess import CalledProcessError
 
@@ -185,13 +186,14 @@ class Esbmc(Backend):
                     continue
 
         loop_assumptions = "\n    ".join(loop_assumptions)
-        loop_assumptions = f"""
-void loopAssumptions(void) {{
-{loop_assumptions}
-}}"""
+        loop_assumptions = f"void __invariants(void) {{\n{loop_assumptions}\n}}"
         code = code.replace(
-            """void loopAssumptions(void) { return; }""",
+            """void __invariants(void) { }""",
             loop_assumptions)
+
+        head_of_loop = re.compile(r'while\s*\(1\)\s*{')
+        code = head_of_loop.sub("while (1) {\n __invariants();", code)
+
 
         esbmc_conf = """
         (without-bitwise)
