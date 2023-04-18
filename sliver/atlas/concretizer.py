@@ -8,7 +8,7 @@ from z3 import (And, Bool, If, Implies, Int, Not, Or, Solver, Sum, sat,
 from z3.z3 import IntVector
 
 from .atlas import (QUANT, BinOp, BuiltIn, Nary, OfNode, contains,
-                    make_dict, remove_quant)
+                    make_dict, remove_quant, replace_externs)
 
 from ..app.cli import Args, ExitStatus, SliverError
 from ..app.info import get_var
@@ -48,6 +48,10 @@ def to_z3(node):
         raise ValueError
     if isinstance(node, BinOp):
         ops = {
+            "+": lambda x, y: Sum(x, y),
+            "-": lambda x, y: Sum(x, -y),
+            "*": lambda x, y: x * y,
+            "/": lambda x, y: x / y,
             "=": lambda x, y: x == y,
             "!=": lambda x, y: x != y,
             ">": lambda x, y: x > y,
@@ -66,8 +70,7 @@ def to_z3(node):
             "min": lambda x: symMin(x),
             "not": lambda x: Not(x[0])
         }
-        args = [to_z3(a) for a in node.args]
-        return funs[node.fn](args)
+        return funs[node.fn]([to_z3(a) for a in node.args])
     elif isinstance(node, Nary):
         ops = {
             "and": lambda x: And(*x),
@@ -75,7 +78,11 @@ def to_z3(node):
         }
         return ops[node.fn]([to_z3(a) for a in node.args])
     else:
-        return node
+        try:
+            parse_int = int(node)
+            return parse_int
+        except (ValueError, TypeError):
+            return node
 
 
 def quant_to_z3(quant, info, attrs, lstigs, envs):
@@ -133,7 +140,7 @@ class Concretizer:
     def setup(self, program):
         if self.is_setup:
             return
-        self._concretize_initial_state()
+        self._concretize_initial_state(self.info.externs)
         self._concretize_scheduler()
         for p in self._scan_picks(program):
             self.add_pick(*p)
@@ -205,7 +212,7 @@ class Concretizer:
                 return (attr == int(values))
         self.s.add(*(c(a) for a in attrs))
 
-    def _concretize_initial_state(self):
+    def _concretize_initial_state(self, externs):
         for tid in range(self.agents):
             a = self.info.spawn[tid]
             for v in a.iface.values():
@@ -236,6 +243,7 @@ class Concretizer:
 
         for assume in self.info.assumes:
             formula = QUANT.parseString(assume)[0]
+            formula = replace_externs(formula, externs)
             constraint = quant_to_z3(
                 formula, self.info, self.attrs, self.lstigs, self.envs)
             self.s.add(constraint)

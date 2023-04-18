@@ -159,6 +159,8 @@ def replace_externs(f, externs):
         return BuiltIn(f.fn, [recurse(f) for f in f.args])
     elif isinstance(f, Nary):
         return Nary(f.fn, [recurse(f) for f in f.args])
+    elif isinstance(f, Quant):
+        return Quant(f.quantifier, f.typename, f.varname, recurse(f.inner))
     else:
         return f
 
