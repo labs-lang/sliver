@@ -68,7 +68,7 @@ class Esbmc(Backend):
         self.verbose_output(
             f"Value analysis: {ranges=}, {fix=}, {depends=}, {wont_change=}")
 
-        s_analysis, s_fix, *_  = value_analysis(self.cli, info, Sign)
+        s_analysis, s_fix, *_ = value_analysis(self.cli, info, Sign)
         self.verbose_output(f"Sign analysis: {s_analysis=}, {s_fix=}")
 
         rename = {"i": "I", "e": "E", "l": "Lvalue"}
@@ -180,20 +180,19 @@ class Esbmc(Backend):
                         continue
                     loop_assumptions.extend((
                         f"__CPROVER_assume({x});"
-                        for x in fmt_sign(var, sign, tid)))  # noqa: E501
+                        for x in fmt_sign(var, sign, tid)))
                 except KeyError:
                     # Local variable
                     continue
 
         loop_assumptions = "\n    ".join(loop_assumptions)
-        loop_assumptions = f"void __invariants(void) {{\n{loop_assumptions}\n}}"
+        loop_assumptions = f"void __invariants(void) {{\n{loop_assumptions}\n}}"  # noqa: E501
         code = code.replace(
             """void __invariants(void) { }""",
             loop_assumptions)
 
         head_of_loop = re.compile(r'while\s*\(1\)\s*{')
         code = head_of_loop.sub("while (1) {\n __invariants();", code)
-
 
         esbmc_conf = """
         (without-bitwise)

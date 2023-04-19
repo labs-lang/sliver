@@ -351,8 +351,8 @@ def value_analysis(cli, info, domain):
             st_list = list(states)
             mid = len(st_list) // 2
             with ThreadPoolExecutor() as exc:
-                rec_left = exc.submit(parallelMerge, st_list[:mid])
-                rec_right = exc.submit(parallelMerge, st_list[mid:])
+                rec_left = exc.submit(parallel_merge, st_list[:mid])
+                rec_right = exc.submit(parallel_merge, st_list[mid:])
                 return mergeStates(rec_left.result(), rec_right.result())
 
     def loop(bound, guard_map, s0):
