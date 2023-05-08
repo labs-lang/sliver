@@ -195,14 +195,14 @@ class Esbmc(Backend):
         head_of_loop = re.compile(r'while\s*\(1\)\s*{')
         code = head_of_loop.sub("while (1) {\n __invariants();", code)
 
-        esbmc_conf = """
+        esbmc_conf = f"""
         (without-bitwise)
         (replace-calls
             (__CPROVER_nondet nondet_int)
             (__CPROVER_assert __ESBMC_assert)
             (__CPROVER_assume __ESBMC_assume)
         )
-        (without-arrays)
+        {"(without-arrays)" if self.cli[Args.STEPS] == 0 else ""}
         """
         return absentee.parse_and_execute(code, esbmc_conf)
 
