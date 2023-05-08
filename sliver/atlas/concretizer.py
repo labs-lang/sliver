@@ -121,20 +121,15 @@ class Concretizer:
         self.sched = None
         self.picks = {}
         self.softs = set()
-        self.is_setup = False
+        self.past_models = []
+
         self.s = Solver()
+        self._setup_initial_state(self.info.externs)
+        self._setup_scheduler()
+
         if randomize:
             set_option(":auto_config", False)
             set_option(":smt.phase_selection", 5)
-
-    def setup(self, program):
-        if self.is_setup:
-            return
-        self._concretize_initial_state(self.info.externs)
-        self._concretize_scheduler()
-        for p in self._scan_picks(program):
-            self.add_pick(*p)
-        self.is_setup = True
 
     def isAnAgent(self, var):
         return And(var >= 0, var < self.agents)
@@ -160,7 +155,8 @@ class Concretizer:
                     continue
                 fresh_bool = Bool(f"{v.store}_{tid}_{v.index}_%%soft%%")
                 self.softs.add(fresh_bool)
-                self.s.add(Implies(fresh_bool, attr == v.rnd_value(tid)))
+                rnd = v.rnd_value(tid)
+                self.s.add(Implies(fresh_bool, attr == rnd))
 
         for i, env_var in enumerate(self.envs):
             v = get_var(self.info.e, i)
@@ -194,8 +190,9 @@ class Concretizer:
     def _reset_soft_constraints(self):
         # Remove previous soft constraints
         self.softs = set()
-        while self.s.num_scopes() > 0:
-            self.s.pop()
+        self.s.pop(self.s.num_scopes())
+        for m in self.past_models:
+            self.s.add(m)
 
     def _init_constraint(self, v, attrs, id):
         def c(attr):
@@ -208,7 +205,7 @@ class Concretizer:
                 return (attr == int(values))
         self.s.add(*(c(a) for a in attrs))
 
-    def _concretize_initial_state(self, externs):
+    def _setup_initial_state(self, externs):
         for tid in range(self.agents):
             a = self.info.spawn[tid]
             for v in a.iface.values():
@@ -246,7 +243,7 @@ class Concretizer:
                 formula, self.info, self.attrs, self.lstigs, self.envs)
             self.s.add(constraint)
 
-    def _concretize_scheduler(self):
+    def _setup_scheduler(self):
         steps = self.cli[Args.STEPS]
         self.sched = IntVector("sched", steps)
         self.s.add(*(self.isAnAgent(x) for x in self.sched))
@@ -323,7 +320,7 @@ class Concretizer:
     TYPEOFAGENTID sched[BOUND];
     for (unsigned i = 0; i < BOUND; ++i) {{
         sched[i] = __CPROVER_nondet_int();
-        __CPROVER_assume(sched[i] < MAXCOMPONENTS);
+        sched[i] = sched[i] < MAXCOMPONENTS ? sched[i] : 0;
     }}
 """,
                     program)
@@ -361,11 +358,11 @@ class Concretizer:
 
         return program
 
-    def concretize_file(self, fname):
+    def concretize_file(self, fname, dest=None):
         with open(fname) as file:
             program = file.read()
         program = self.concretize_program(program)
-        with open(fname, "w") as file:
+        with open(dest if dest is not None else fname, "w") as file:
             file.write(program)
 
     def get_concretization(self, program, return_model=False):
@@ -406,12 +403,13 @@ class Concretizer:
                     # Skip values that would be initialized to zero
                     if str(m[attr]) != "0"))
 
-        self.setup(program)
 
         if self.randomize:
             self._reset_soft_constraints()
             self._add_soft_constraints()
             self._set_random_seed()
+        for p in self._scan_picks(program):
+            self.add_pick(*p)
 
         check = None
         softs = list(self.softs)
@@ -429,7 +427,6 @@ class Concretizer:
                 if not softs:
                     break
                 softs.pop()
-                # log.debug(f"unsat, retracting {softs.pop()}...")
 
         if check == sat:
             m = self.s.model()
@@ -438,10 +435,10 @@ class Concretizer:
             for decl in m:
                 const = decl()
                 # Ignore variables used for soft constraints
-                if """%%soft%%""" not in str(const):
+                if "%%soft%%" not in str(const):
                     block.append(const != m[decl])
             if block:
-                self.s.add(Or(block))
+                self.past_models.append(Or(block))
 
             return m if return_model else (fmt_globals(m), fmt_inits(m))
         else:

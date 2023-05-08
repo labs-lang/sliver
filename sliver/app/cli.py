@@ -2,9 +2,9 @@
 
 import logging
 import sys
+import time
 from dataclasses import dataclass
 from enum import Enum
-import time
 
 from .__about__ import __date__, __summary__, __version__
 
@@ -133,9 +133,8 @@ class CliArgs(dict):
 
     def get_seed(self) -> int:
         seed = self[Args.RND_SEED]
-        seed = int(time.time()) if seed is None else seed
+        seed = time.time_ns() % (1 << 32) if seed is None else seed
         return abs(seed)
-
 
 class ExitStatus(Enum):
     SUCCESS = 0

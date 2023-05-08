@@ -260,15 +260,19 @@ class Cbmc(Backend):
         return weaks
 
     def simulate(self, fname, info):
-        cmd = self.get_cmdline(fname, info)
         c = Concretizer(info, self.cli, True)
+        from shutil import copyfile
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as orig:
+            self.temp_files.append(orig.name)
+            copyfile(fname, orig.name)
+            orig.close()
+        exc = ThreadPoolExecutor()
         for i in range(self.cli[Args.SIMULATE]):
             try:
                 # Concretization step
                 if self.cli[Args.CONCRETIZATION] != "none":
-                    c.concretize_file(fname)
+                    c.concretize_file(orig.name, dest=fname)
                 if self.cli[Args.CONCRETIZATION] == "sat":
-                    exc = ThreadPoolExecutor()
                     with (tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as sleepy,  # noqa: E501
                           tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as script):  # noqa: E501
                         self.temp_files.append(sleepy.name)
@@ -281,7 +285,7 @@ class Cbmc(Backend):
                         sleepy.close()
                         self._set_executable(sleepy.name)
                         exc.submit(self.sat_level_concretization, fname, info, c, script.name)  # noqa: E501
-
+                    cmd = self.get_cmdline(fname, info)
                     cmd.extend(["--external-sat-solver", sleepy.name])
 
                 if self.cli[Args.TIMEOUT] > 0:
