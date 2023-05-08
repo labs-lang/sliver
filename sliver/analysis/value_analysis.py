@@ -7,8 +7,8 @@ from functools import reduce, lru_cache
 from itertools import product
 
 from ..app.cli import Args
-from ..labsparse.labs_ast import Expr, QueryResult
-from ..labsparse.labs_parser import Attr, NodeType, parse_to_dict
+from ..labsparse.labsparse.labs_ast import Expr, QueryResult
+from ..labsparse.labsparse.labs_parser import Attr, NodeType, parse_to_dict
 
 
 def merge(s0, s1, State):
