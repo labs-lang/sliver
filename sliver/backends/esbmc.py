@@ -162,7 +162,8 @@ class Esbmc(Backend):
                 sign = getattr(s_analysis, f)
                 if var.store == "e":
                     loop_assumptions.extend(
-                        f"__CPROVER_assume({x});" for x in fmt_sign(var, sign))
+                        f"__CPROVER_assume({x});"
+                        for x in fmt_sign(var, sign) if x is not None)
             except KeyError:
                 # Local variable
                 continue
@@ -180,7 +181,7 @@ class Esbmc(Backend):
                         continue
                     loop_assumptions.extend((
                         f"__CPROVER_assume({x});"
-                        for x in fmt_sign(var, sign, tid)))
+                        for x in fmt_sign(var, sign, tid) if x is not None))
                 except KeyError:
                     # Local variable
                     continue
