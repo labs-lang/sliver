@@ -6,6 +6,8 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 
+import click
+
 from .__about__ import __date__, __summary__, __version__
 
 log = logging.getLogger('backend')
@@ -83,34 +85,53 @@ DEFAULTS = {
     Args.BACKEND: "cbmc",
     Args.BV: True,
     Args.CONCRETIZATION: "src",
-    Args.CORES_FROM: None,
-    Args.CORES_TO: None,
     Args.CORES: 1,
     Args.DEBUG: False,
     Args.FAIR: False,
     Args.INCLUDE: tuple(),
     Args.KEEP_FILES: False,
     Args.NO_PROPERTIES: False,
-    Args.PROPERTY: None,
-    Args.RND_SEED: None,
     Args.SHOW: False,
     Args.SIMULATE: 0,
     Args.STEPS: 0,
     Args.SYNC: False,
     Args.TIMEOUT: 0,
-    Args.TRANSLATE_CEX: None,
     Args.VALUES: tuple(),
     Args.VERBOSE: False
 }
 
 
+__existing = click.Path(exists=True)
+__nonnegative = click.IntRange(min=0)
+
+TYPES = {
+    Args.CONCRETIZATION: click.Choice(("src", "sat", "none")),
+    Args.CORES_FROM: __nonnegative,
+    Args.CORES_TO: __nonnegative,
+    Args.CORES: __nonnegative,
+    Args.INCLUDE: __existing,
+    Args.RND_SEED: click.IntRange(min=1),
+    Args.SIMULATE: __nonnegative,
+    Args.STEPS: __nonnegative,
+    Args.TIMEOUT: __nonnegative,
+    Args.TRANSLATE_CEX: __existing
+}
+
+
 def CLICK(name, **kwargs):
-    return {
-        "help": HELPMSG[name],
+    result = {
         "show_default": name in DEFAULTS,
-        **({} if DEFAULTS[name] is None else {"default": DEFAULTS[name]}),
         **kwargs
     }
+
+    def maybe_add_from(some_dict, kwarg):
+        if name in some_dict:
+            result[kwarg] = some_dict[name]
+
+    maybe_add_from(HELPMSG, "help")
+    maybe_add_from(DEFAULTS, "default")
+    maybe_add_from(TYPES, "type")
+    return result
 
 
 class CliArgs(dict):
@@ -133,8 +154,8 @@ class CliArgs(dict):
 
     def get_seed(self) -> int:
         seed = self[Args.RND_SEED]
-        seed = time.time_ns() % (1 << 32) if seed is None else seed
-        return abs(seed)
+        return time.time_ns() % (1 << 32) if seed is None else seed
+
 
 class ExitStatus(Enum):
     SUCCESS = 0
