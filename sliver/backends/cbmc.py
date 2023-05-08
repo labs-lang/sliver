@@ -262,7 +262,7 @@ class Cbmc(Backend):
                 if self.cli[Args.CONCRETIZATION] != "none":
                     c.concretize_file(fname)
                 if self.cli[Args.CONCRETIZATION] == "sat":
-                    # exc = ThreadPoolExecutor()
+                    exc = ThreadPoolExecutor()
                     with (tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as sleepy,  # noqa: E501
                           tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as script):  # noqa: E501
                         self.temp_files.append(sleepy.name)
@@ -274,8 +274,7 @@ class Cbmc(Backend):
                             f"{script.name} $1\n")
                         sleepy.close()
                         self._set_executable(sleepy.name)
-                        # exc.submit(self.sat_level_concretization, fname, info, c, script.name)  # noqa: E501
-                        self.sat_level_concretization(fname, info, c, script.name)  # noqa: E501
+                        exc.submit(self.sat_level_concretization, fname, info, c, script.name)  # noqa: E501
 
                     cmd.extend(["--external-sat-solver", sleepy.name])
 
