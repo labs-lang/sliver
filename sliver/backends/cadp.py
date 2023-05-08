@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, TimeoutExpired, check_output
 
-from ..atlas.atlas import get_quant_formula, get_state_vars
+from ..atlas.atlas import get_property, get_state_vars
 from ..atlas.mcl import translate_property
 from ..atlas.svl import svl
 from ..app.cex import translate_cadp
@@ -263,7 +263,7 @@ class CadpCompositional(CadpMonitor):
         self.temp_files.append(mcl_fname)
         self.verbose_output(mcl, "MCL property")
 
-        atlas = get_quant_formula(info)
+        atlas = get_property(info)
         atlas_vars = get_state_vars(atlas[0].quant)
         not_hidden = set()
         for x in atlas_vars:

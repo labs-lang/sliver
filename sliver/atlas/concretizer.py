@@ -6,12 +6,13 @@ import time
 from z3 import (And, Bool, If, Implies, Int, Not, Or, Solver, Sum, sat,
                 set_option, simplify)
 from z3.z3 import IntVector
+from sliver.atlas.atlas import make_dict, replace_externs, vars_to_strings
 
-from sliver.labsparse.labsparse.labs_ast import Attr, NodeType
-from sliver.labsparse.labsparse.labs_parser import QUANT
-from sliver.labsparse.labsparse.utils import eliminate_quantifiers
+from sliver.labsparse.labsparse.labs_ast import Attr, Node, NodeType
+from sliver.labsparse.labsparse.labs_parser import BEXPR, QUANT
+from sliver.labsparse.labsparse.utils import eliminate_quantifiers,
 
-from .atlas import (contains, make_dict, remove_quant, replace_externs)
+# from .atlas import (contains, make_dict, remove_quant, replace_externs)
 
 from ..app.cli import Args, ExitStatus, SliverError
 from ..app.info import get_var
@@ -49,7 +50,9 @@ def to_z3(node):
     """
     # if isinstance(node, OfNode):
     #     raise ValueError
-    if node(NodeType.EXPR) or node(NodeType.BUILTIN):
+    if not isinstance(node, Node):
+        return node
+    if Attr.OPERANDS in node:
         ops = {
             "+": lambda x, y: Sum(x, y),
             "-": lambda x, y: Sum(x, -y),
@@ -62,21 +65,24 @@ def to_z3(node):
             "<": lambda x, y: x < y,
             "<=": lambda x, y: x <= y,
             "%": lambda x, y: x % y,
-            # "or": lambda x, y: Or(x, y),
-            # "and": lambda x, y: And(x, y),
-            "and": lambda x: And(*x),
-            "or": lambda x: Or(*x),
-
+            "and": lambda *x: And(x),
+            "or": lambda *x: Or(x),
             "abs": lambda x: abs(x[0]),
             "max": lambda x: symMax(x),
             "min": lambda x: symMin(x),
             "not": lambda x: Not(x[0])
         }
-        return ops[node.op]([to_z3(a) for a in node[Attr.OPERANDS]])
+        args = [to_z3(a) for a in node[Attr.OPERANDS]]
+        try:
+            return ops[node[Attr.NAME]](*args)
+        except TypeError as e:
+            print(e)
+            raise TypeError(node[Attr.NAME], args)
+
     elif node(NodeType.LITERAL):
         return int(node[Attr.VALUE])
     else:
-        return node.as_labs()
+        return node
     # elif isinstance(node, BuiltIn):
     #     funs = {
     #         "abs": lambda x: abs(x[0]),
@@ -99,37 +105,8 @@ def to_z3(node):
     #         return node
 
 
-def quant_to_z3(quant, info, attrs, lstigs, envs):
-    dict_, formula = make_dict(quant)
-
-    def replace_with_attr(node, agent):
-        # return f"{f.var}_{agent}"
-        if node(NodeType.REF):
-            if node[Attr.NAME] == "id":
-                return agent
-            else:
-                var = info.lookup_var(node[Attr.NAME])
-                idx = var.index + (node[Attr.OFFSET] or 0)
-                if var.store == "i":
-                    return attrs[agent][idx]
-                elif var.store == "lstig":
-                    return lstigs[agent][idx]
-                elif var.store == "e":
-                    return envs[idx]
-                else:
-                    raise NotImplementedError
-        else:
-            raise ValueError
-
-    for var in dict_:
-        quant, agent_type = dict_[var]
-        if contains(formula, var):
-            formula, _ = remove_quant(
-                formula, quant, var, info.spawn.tids(agent_type),
-                replace_with_attr)
-    # TODO if to_z3(formula) is a conjunction of constraints,
-    # Return them as a list (apparently it helps Z3)
-    return simplify(to_z3(formula))
+def quant_to_z3(formula, info, attrs, lstigs, envs):
+    return simplify(to_z3(vars_to_strings(formula, info, attrs, lstigs, envs)))
 
 
 class Concretizer:
@@ -258,18 +235,11 @@ class Concretizer:
             self.envs = envs
 
         for assume in self.info.assumes:
-            formula = QUANT.parseString(assume)[0]
+            formula = (QUANT | BEXPR).parseString(assume)[0]
             print(formula.as_labs())
-            input()
             formula = eliminate_quantifiers(formula, self.info)
-            print(formula.as_labs())
-            input()
-            # print(formula)
-            # input()
-            # formula = replace_externs(formula, externs)
-            # print(formula)
-            # input()
-            
+            formula = replace_externs(formula, externs)
+
             constraint = quant_to_z3(
                 formula, self.info, self.attrs, self.lstigs, self.envs)
             self.s.add(constraint)
