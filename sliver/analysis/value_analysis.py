@@ -273,7 +273,7 @@ def value_analysis(cli, info, domain):
             blocks.update(n for n in node.walk() if n(NodeType.BLOCK))
             guards.update(
                 (a, n) for n in node.walk()
-                if n(NodeType.GUARDED))
+                if n(NodeType.GUARDED) or n(NodeType.CONDITIONAL))
             calls = (
                 n[Attr.NAME] for n in node.walk()
                 if n(NodeType.CALL)
