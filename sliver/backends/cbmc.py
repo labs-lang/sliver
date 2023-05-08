@@ -262,7 +262,7 @@ class Cbmc(Backend):
                 if self.cli[Args.CONCRETIZATION] != "none":
                     c.concretize_file(fname)
                 if self.cli[Args.CONCRETIZATION] == "sat":
-                    exc = ThreadPoolExecutor()
+                    # exc = ThreadPoolExecutor()
                     with (tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as sleepy,  # noqa: E501
                           tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as script):  # noqa: E501
                         self.temp_files.append(sleepy.name)

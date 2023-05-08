@@ -6,11 +6,11 @@ import time
 from z3 import (And, Bool, If, Implies, Int, Not, Or, Solver, Sum, sat,
                 set_option, simplify)
 from z3.z3 import IntVector
-from sliver.atlas.atlas import make_dict, replace_externs, vars_to_strings
+from sliver.atlas.atlas import vars_to_strings
 
 from sliver.labsparse.labsparse.labs_ast import Attr, Node, NodeType
 from sliver.labsparse.labsparse.labs_parser import BEXPR, QUANT
-from sliver.labsparse.labsparse.utils import eliminate_quantifiers,
+from sliver.labsparse.labsparse.utils import eliminate_quantifiers, replace_externs
 
 # from .atlas import (contains, make_dict, remove_quant, replace_externs)
 
@@ -76,7 +76,6 @@ def to_z3(node):
         try:
             return ops[node[Attr.NAME]](*args)
         except TypeError as e:
-            print(e)
             raise TypeError(node[Attr.NAME], args)
 
     elif node(NodeType.LITERAL):
@@ -106,7 +105,8 @@ def to_z3(node):
 
 
 def quant_to_z3(formula, info, attrs, lstigs, envs):
-    return simplify(to_z3(vars_to_strings(formula, info, attrs, lstigs, envs)))
+    vars_to_strings(formula, info, attrs, lstigs, envs)
+    return simplify(to_z3(formula))
 
 
 class Concretizer:
@@ -236,7 +236,6 @@ class Concretizer:
 
         for assume in self.info.assumes:
             formula = (QUANT | BEXPR).parseString(assume)[0]
-            print(formula.as_labs())
             formula = eliminate_quantifiers(formula, self.info)
             formula = replace_externs(formula, externs)
 

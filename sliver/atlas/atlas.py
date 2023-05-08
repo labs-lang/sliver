@@ -1,14 +1,9 @@
 #! /usr/bin/env python3
 
-from collections import namedtuple
 from copy import deepcopy
 
-from ..labsparse.labsparse.labs_ast import NodeType, Attr
-from ..labsparse.labsparse.labs_parser import BEXPR, MODALITY, QUANT
-
-
-Prop = namedtuple("Prop", ["modality", "quant"])
-PROP = (MODALITY + (QUANT | BEXPR)).setParseAction(lambda toks: Prop(*toks))  # noqa: E501
+from ..labsparse.labsparse.labs_ast import Attr, NodeType
+from ..labsparse.labsparse.labs_parser import PROPERTY
 
 
 def get_state_vars(formula):
@@ -27,9 +22,6 @@ def contains(formula, var):
 # def replace_with_string(f, agent):
 #     # TODO extend to arrays (check f.offset)
 #     return f"{f.var}_{agent}"
-
-
-
     # if isinstance(f, str) and f in externs:
     #     return externs[f]
     # elif isinstance(f, BinOp):
@@ -68,13 +60,15 @@ def make_dict(formula):
     #     return {}, formula
 
 
-def get_property(info, prop=None) -> Prop:
+def get_property(info, prop=None):
     if not prop:
         prop = info.properties[0]
-    return PROP.parseString(prop)
+    prop = "DUMMYNAME = " + prop
+    return PROPERTY.parseString(prop, parseAll=True)[0]
 
 
-def vars_to_strings(formula, info, attrs, lstigs, envs):
+def vars_to_strings(formula, info, attrs=None, lstigs=None, envs=None):
+    new_vars = set()
     """Turns (var of x) references into string literals"""
     for node, parent, attr, i in formula.walk_with_handle():
         if node(NodeType.REF) and node[Attr.OF] is not None:
@@ -84,15 +78,21 @@ def vars_to_strings(formula, info, attrs, lstigs, envs):
                 parent.set(attr, agent, i)
             else:
                 var = info.lookup_var(node[Attr.NAME])
-                idx = var.index + (node[Attr.OFFSET] or 0)
-                if var.store == "i":
-                    parent.set(attr, attrs[agent][idx], i)
-                elif var.store == "lstig":
-                    parent.set(attr, lstigs[agent][idx], i)
-                elif var.store == "e":
-                    parent.set(attr, envs[idx], i)
+                if attrs is None:
+                    v = f"{var.name}_{agent}"
+                    new_vars.add(v)
+                    parent.set(attr, v, i)
                 else:
-                    raise NotImplementedError
+                    idx = var.index + (node[Attr.OFFSET] or 0)
+                    if var.store == "i":
+                        parent.set(attr, attrs[agent][idx], i)
+                    elif var.store == "lstig":
+                        parent.set(attr, lstigs[agent][idx], i)
+                    elif var.store == "e":
+                        parent.set(attr, envs[idx], i)
+                    else:
+                        raise NotImplementedError
+    return new_vars
 
 # def get_formula(info, externs, prop=None, parsed=None):
 #     pass
