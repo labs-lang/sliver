@@ -274,7 +274,8 @@ class Cbmc(Backend):
                             f"{script.name} $1\n")
                         sleepy.close()
                         self._set_executable(sleepy.name)
-                        exc.submit(self.sat_level_concretization, fname, info, c, script.name)  # noqa: E501
+                        # exc.submit(self.sat_level_concretization, fname, info, c, script.name)  # noqa: E501
+                        self.sat_level_concretization(fname, info, c, script.name)  # noqa: E501
 
                     cmd.extend(["--external-sat-solver", sleepy.name])
 

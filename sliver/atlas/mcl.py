@@ -1,7 +1,9 @@
 #! /usr/bin/env python3
 
 from itertools import repeat
-from .atlas import get_formula, OfNode, BinOp, Nary, BuiltIn
+
+from sliver.labsparse.labsparse.labs_ast import Attr, NodeType
+from .atlas import get_formula
 
 
 def sprint_predicate(params, body):
@@ -156,22 +158,16 @@ nu Inv ({", ".join(nu_params)}) . (
 
 
 def pprint_mcl(node):
-    if isinstance(node, OfNode):
-        # Should never happen, since node should be the result
-        # of get_formula() and thus have no quantified variables.
-        raise Exception(f"Unexpected {node}")
-    if isinstance(node, BinOp):
+    if node(NodeType.BUILTIN):
+        return f"{node[Attr.NAME]}({', '.join(pprint_mcl(a) for a in node[Attr.OPERANDS])})"  # noqa: E501
+    elif node(NodeType.EXPR) or node(NodeType.COMPARISON):
         op = {
             "%": "mod",
             "!=": "<>"
-        }.get(node.op) or node.op
-        return f"({pprint_mcl(node.e1)} {op} {pprint_mcl(node.e2)})"
-    elif isinstance(node, BuiltIn):
-        return f"{node.fn}({', '.join(pprint_mcl(a) for a in node.args)})"
-    elif isinstance(node, Nary):
-        return "({})".format(f" {node.fn} ".join(pprint_mcl(a) for a in node.args))  # noqa: E501
+        }.get(node[Attr.NAME], node[Attr.NAME])
+        return "({})".format(f" {op} ".join(pprint_mcl(a) for a in node[Attr.OPERANDS]))  # noqa: E501
     else:
-        return node
+        return node.as_labs()
 
 
 def translate_property(info, externs, parsed=None):

@@ -7,8 +7,11 @@ from z3 import (And, Bool, If, Implies, Int, Not, Or, Solver, Sum, sat,
                 set_option, simplify)
 from z3.z3 import IntVector
 
-from .atlas import (QUANT, BinOp, BuiltIn, Nary, OfNode, contains,
-                    make_dict, remove_quant, replace_externs)
+from sliver.labsparse.labsparse.labs_ast import Attr, NodeType
+from sliver.labsparse.labsparse.labs_parser import QUANT
+from sliver.labsparse.labsparse.utils import eliminate_quantifiers
+
+from .atlas import (contains, make_dict, remove_quant, replace_externs)
 
 from ..app.cli import Args, ExitStatus, SliverError
 from ..app.info import get_var
@@ -44,9 +47,9 @@ def Count(boolvec):
 def to_z3(node):
     """Translate a (quantifier-free) ATLAS property to a Z3 constraint
     """
-    if isinstance(node, OfNode):
-        raise ValueError
-    if isinstance(node, BinOp):
+    # if isinstance(node, OfNode):
+    #     raise ValueError
+    if node(NodeType.EXPR) or node(NodeType.BUILTIN):
         ops = {
             "+": lambda x, y: Sum(x, y),
             "-": lambda x, y: Sum(x, -y),
@@ -59,30 +62,41 @@ def to_z3(node):
             "<": lambda x, y: x < y,
             "<=": lambda x, y: x <= y,
             "%": lambda x, y: x % y,
-            "or": lambda x, y: Or(x, y),
-            "and": lambda x, y: And(x, y)
-        }
-        return ops[node.op](to_z3(node.e1), to_z3(node.e2))
-    elif isinstance(node, BuiltIn):
-        funs = {
+            # "or": lambda x, y: Or(x, y),
+            # "and": lambda x, y: And(x, y),
+            "and": lambda x: And(*x),
+            "or": lambda x: Or(*x),
+
             "abs": lambda x: abs(x[0]),
             "max": lambda x: symMax(x),
             "min": lambda x: symMin(x),
             "not": lambda x: Not(x[0])
         }
-        return funs[node.fn]([to_z3(a) for a in node.args])
-    elif isinstance(node, Nary):
-        ops = {
-            "and": lambda x: And(*x),
-            "or": lambda x: Or(*x)
-        }
-        return ops[node.fn]([to_z3(a) for a in node.args])
+        return ops[node.op]([to_z3(a) for a in node[Attr.OPERANDS]])
+    elif node(NodeType.LITERAL):
+        return int(node[Attr.VALUE])
     else:
-        try:
-            parse_int = int(node)
-            return parse_int
-        except (ValueError, TypeError):
-            return node
+        return node.as_labs()
+    # elif isinstance(node, BuiltIn):
+    #     funs = {
+    #         "abs": lambda x: abs(x[0]),
+    #         "max": lambda x: symMax(x),
+    #         "min": lambda x: symMin(x),
+    #         "not": lambda x: Not(x[0])
+    #     }
+    #     return funs[node.fn])([to_z3(a) for a in node[Attr.OPERANDS]])
+    # elif isinstance(node, Nary):
+    #     ops = {
+    #         "and": lambda x: And(*x),
+    #         "or": lambda x: Or(*x)
+    #     }
+    #     return ops[node.fn]([to_z3(a) for a in node.args])
+    # else:
+    #     try:
+    #         parse_int = int(node)
+    #         return parse_int
+    #     except (ValueError, TypeError):
+    #         return node
 
 
 def quant_to_z3(quant, info, attrs, lstigs, envs):
@@ -90,27 +104,29 @@ def quant_to_z3(quant, info, attrs, lstigs, envs):
 
     def replace_with_attr(node, agent):
         # return f"{f.var}_{agent}"
-        if node.var == "id":
-            return agent
-        else:
-            var = info.lookup_var(node.var)
-            idx = var.index + (node.offset or 0)
-            if var.store == "i":
-                return attrs[agent][idx]
-            elif var.store == "lstig":
-                return lstigs[agent][idx]
-            elif var.store == "e":
-                return envs[idx]
+        if node(NodeType.REF):
+            if node[Attr.NAME] == "id":
+                return agent
             else:
-                raise NotImplementedError
+                var = info.lookup_var(node[Attr.NAME])
+                idx = var.index + (node[Attr.OFFSET] or 0)
+                if var.store == "i":
+                    return attrs[agent][idx]
+                elif var.store == "lstig":
+                    return lstigs[agent][idx]
+                elif var.store == "e":
+                    return envs[idx]
+                else:
+                    raise NotImplementedError
+        else:
+            raise ValueError
 
     for var in dict_:
         quant, agent_type = dict_[var]
         if contains(formula, var):
             formula, _ = remove_quant(
                 formula, quant, var, info.spawn.tids(agent_type),
-                replace_with_attr
-            )
+                replace_with_attr)
     # TODO if to_z3(formula) is a conjunction of constraints,
     # Return them as a list (apparently it helps Z3)
     return simplify(to_z3(formula))
@@ -243,7 +259,17 @@ class Concretizer:
 
         for assume in self.info.assumes:
             formula = QUANT.parseString(assume)[0]
-            formula = replace_externs(formula, externs)
+            print(formula.as_labs())
+            input()
+            formula = eliminate_quantifiers(formula, self.info)
+            print(formula.as_labs())
+            input()
+            # print(formula)
+            # input()
+            # formula = replace_externs(formula, externs)
+            # print(formula)
+            # input()
+            
             constraint = quant_to_z3(
                 formula, self.info, self.attrs, self.lstigs, self.envs)
             self.s.add(constraint)
