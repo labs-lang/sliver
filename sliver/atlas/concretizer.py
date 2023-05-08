@@ -6,16 +6,16 @@ import time
 from z3 import (And, Bool, If, Implies, Int, Not, Or, Solver, Sum, sat,
                 set_option, simplify)
 from z3.z3 import IntVector
-from sliver.atlas.atlas import vars_to_strings
 
+from sliver.atlas.atlas import vars_to_strings
 from sliver.labsparse.labsparse.labs_ast import Attr, Node, NodeType
 from sliver.labsparse.labsparse.labs_parser import BEXPR, QUANT
-from sliver.labsparse.labsparse.utils import eliminate_quantifiers, replace_externs
-
-# from .atlas import (contains, make_dict, remove_quant, replace_externs)
+from sliver.labsparse.labsparse.utils import (eliminate_quantifiers,
+                                              replace_externs)
 
 from ..app.cli import Args, ExitStatus, SliverError
 from ..app.info import get_var
+
 
 log = logging.getLogger('backend')
 RND_SEED = int(time.time())
@@ -75,7 +75,7 @@ def to_z3(node):
         args = [to_z3(a) for a in node[Attr.OPERANDS]]
         try:
             return ops[node[Attr.NAME]](*args)
-        except TypeError as e:
+        except TypeError:
             raise TypeError(node[Attr.NAME], args)
 
     elif node(NodeType.LITERAL):
