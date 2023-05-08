@@ -189,6 +189,7 @@ class Concretizer:
 
     def _reset_soft_constraints(self):
         # Remove previous soft constraints
+        # And forces the exclusion of past models
         self.softs = set()
         self.s.pop(self.s.num_scopes())
         for m in self.past_models:
@@ -402,7 +403,6 @@ class Concretizer:
                     for attr in self.envs
                     # Skip values that would be initialized to zero
                     if str(m[attr]) != "0"))
-
 
         if self.randomize:
             self._reset_soft_constraints()

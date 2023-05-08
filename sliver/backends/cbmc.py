@@ -262,7 +262,7 @@ class Cbmc(Backend):
     def simulate(self, fname, info):
         c = Concretizer(info, self.cli, True)
         from shutil import copyfile
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as orig:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as orig:  # noqa: E501
             self.temp_files.append(orig.name)
             copyfile(fname, orig.name)
             orig.close()
