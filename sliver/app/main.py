@@ -36,7 +36,9 @@ log = logging.getLogger("sliver")
 @click.option('--keep-files', **CLICK(Args.KEEP_FILES, is_flag=True))
 @click.option('--no-properties', **CLICK(Args.NO_PROPERTIES, is_flag=True))
 @click.option('--property', **CLICK(Args.PROPERTY))
-@click.option('--rnd-seed', **CLICK(Args.RND_SEED, type=int))
+@click.option('--rnd-seed',
+              type=click.IntRange(min=1),
+              **CLICK(Args.RND_SEED))
 @click.option('--show', **CLICK(Args.SHOW, is_flag=True))
 @click.option('--simulate', **CLICK(Args.SIMULATE, type=int))
 @click.option('--steps', **CLICK(Args.STEPS, type=int))
