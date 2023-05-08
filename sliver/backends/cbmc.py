@@ -149,14 +149,20 @@ class Cbmc(Backend):
                 # Skip stuff that has already been resolved by CBMC
                 if var not in ("TRUE", "FALSE")
             ))
+
+            seed = self.cli.get_seed()
+
             if weaks:
                 with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as weaks_f:  # noqa: E501
                     weaks_f.write(weaks)
                     self.temp_files.append(weaks_f.name)
             tryassume = f"""-try-assume-from="{weaks_f.name}" """ if weaks else ""  # noqa: E501
-            elim = "-no-elim " if num_vars < 2_000_000 else ""
+            more_random = "-no-elim -rnd-init " if num_vars < 1_000_000 else ""
             # TODO adjust rnd-freq based on CNF hardness
-            frequency = "-rnd-freq=0.15"
+            freq = (
+                "0.15" if num_vars < 1_000_000 else
+                "0.05" if num_vars < 3_000_000 else
+                "0.01")
             script = f"""
 #!/bin/bash
 
@@ -165,7 +171,7 @@ class Cbmc(Backend):
 # https://github.com/labs-lang/sliver
 
 # Invokes minisat with weak assumptions and nondet heuristics
-{minisat} -model {frequency} {elim}-rnd-init -rnd-seed=$RANDOM {tryassume}$1
+{minisat} -model -rnd-freq={freq} {more_random} -rnd-seed={seed} {tryassume}$1
 """
             sat_cmd = script.splitlines()[-1].strip()
             self.verbose_output(f"SAT solver call: {sat_cmd}")
