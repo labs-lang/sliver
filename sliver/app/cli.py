@@ -4,6 +4,7 @@ import logging
 import sys
 from dataclasses import dataclass
 from enum import Enum
+import time
 
 from .__about__ import __date__, __summary__, __version__
 
@@ -23,6 +24,7 @@ class Args(Enum):
     KEEP_FILES = "keep_files"
     NO_PROPERTIES = "no_properties"
     PROPERTY = "property"
+    RND_SEED = "rnd_seed"
     SHOW = "show"
     SIMULATE = "simulate"
     STEPS = "steps"
@@ -56,6 +58,9 @@ HELPMSG = {
     Args.KEEP_FILES: "Do not remove intermediate files.",
     Args.NO_PROPERTIES: "Ignore all properties.",
     Args.PROPERTY: "Property to consider, others will be ignored.",
+    Args.RND_SEED: (
+        "Seed for the random number generator."
+        "If none is given, the current time will be used."),
     Args.SHOW: "Print emulation program and exit.",
     Args.SIMULATE: (
         "Number of simulation traces to generate. "
@@ -87,6 +92,7 @@ DEFAULTS = {
     Args.KEEP_FILES: False,
     Args.NO_PROPERTIES: False,
     Args.PROPERTY: None,
+    Args.RND_SEED: None,
     Args.SHOW: False,
     Args.SIMULATE: 0,
     Args.STEPS: 0,
@@ -124,6 +130,11 @@ class CliArgs(dict):
             self[key.value] = value
         else:
             super().__setitem__(key, value)
+
+    def get_seed(self) -> int:
+        seed = self[Args.RND_SEED]
+        seed = int(time.time()) if seed is None else seed
+        return abs(seed)
 
 
 class ExitStatus(Enum):
