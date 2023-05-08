@@ -126,9 +126,6 @@ class Concretizer:
         if randomize:
             set_option(":auto_config", False)
             set_option(":smt.phase_selection", 5)
-            set_option(":smt.random_seed", RND_SEED)
-            random.seed(RND_SEED)
-            log.debug(f"Concretization: random seed is {RND_SEED}")
 
     def setup(self, program):
         if self.is_setup:
@@ -145,6 +142,12 @@ class Concretizer:
     def isOfType(self, var, typ):
         rng = self.info.spawn.range_of(typ)
         return And(var >= rng.start, var < rng.stop)
+
+    def _set_random_seed(self):
+        seed = self.cli.get_seed()
+        set_option(":smt.random_seed", seed)
+        random.seed(seed)
+        log.debug(f"Concretization: random seed is {seed}")
 
     def _add_soft_constraints(self):
         self.s.push()
@@ -408,6 +411,7 @@ class Concretizer:
         if self.randomize:
             self._reset_soft_constraints()
             self._add_soft_constraints()
+            self._set_random_seed()
 
         check = None
         softs = list(self.softs)
