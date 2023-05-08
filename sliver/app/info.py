@@ -217,7 +217,7 @@ class Spawn:
     def parse(c, picks=""):
         result = {}
         picks = dict([x.split(" ", 1) for x in picks.split(";")])
-        picks = {k: v.split("),(") for k,v in picks.items()}
+        picks = {k: v.split("),(") for k, v in picks.items()}
         reg = re.compile(r'\(+([^,]+),')
         for k in picks:
             matches = [reg.match(x) for x in picks[k] if reg.match(x)]
@@ -226,7 +226,7 @@ class Spawn:
         for comp, iface, lstig in zip(c[::3], c[1::3], c[2::3]):
             name, rng = comp.split(" ")
             compmin, compmax = rng.split(",")
-            result[(int(compmin), int(compmax))] = Agent(name, iface, lstig, picks[name])
+            result[(int(compmin), int(compmax))] = Agent(name, iface, lstig, picks[name])  # noqa: E501
 
         return Spawn(result)
 
