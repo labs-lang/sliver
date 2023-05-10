@@ -53,12 +53,18 @@ an [issue](https://github.com/labs-lang/sliver/issues).
 
 ## Publications
 
-[1] R. De Nicola, L. Di Stefano, and O. Inverso, “Multi-Agent Systems with Virtual Stigmergy,” in Software Technologies: Applications and Foundations (STAF) Workshops. LNCS, vol 11176. Springer, 2018. [Link](https://doi.org/10.1007/978-3-030-04771-9_26)
+R. De Nicola, L. Di Stefano, and O. Inverso, “Multi-Agent Systems with Virtual Stigmergy,” in Software Technologies: Applications and Foundations (STAF) Workshops. LNCS, vol 11176. Springer, 2018. [Link](https://doi.org/10.1007/978-3-030-04771-9_26)
 
-[2] R. De Nicola, L. Di Stefano, and O. Inverso, “Multi-agent systems with virtual stigmergy,” Sci. Comput. Program., vol. 187, p. 102345, 2020. [Link](https://doi.org/10.1016/j.scico.2019.102345)
+R. De Nicola, L. Di Stefano, and O. Inverso, “Multi-agent systems with virtual stigmergy,” Sci. Comput. Program., vol. 187, p. 102345, 2020. [Link](https://doi.org/10.1016/j.scico.2019.102345)
 
-[3] L. Di Stefano, F. Lang, and W. Serwe, “Combining SLiVER with CADP to Analyze Multi-agent Systems,” in 22nd International Conference on Coordination Models and Languages (COORDINATION). LNCS, vol. 12134. Springer, 2020. [Link](https://doi.org/10.1007/978-3-030-50029-0_23)
+R. De Nicola, L. Di Stefano, O. Inverso, and S. Valiani, “Modelling Flocks of Birds from the Bottom Up”, in 11th International Symposium on Leveraging Applications of Formal Methods, Verification and Validation (ISoLA), LNCS, vol. 13703. Springer, 2022. [Link](https://doi.org/10.1007/978-3-031-19759-8_6)
 
-[4] L. Di Stefano, “Modelling and Verification of Multi-Agent Systems via Sequential Emulation,” PhD Thesis, Gran Sasso Science Institute, L’Aquila, Italy, 2020. [Link](https://iris.gssi.it/handle/20.500.12571/10181)
+R. De Nicola, L. Di Stefano, O. Inverso, and S. Valiani, “Process algebras and flocks of birds”, in A journey from process algebra via timed automata to model learning - Essays dedicated to Frits Vaandrager on the occasion of his 60th birthday. LNCS, vol. 13560. Springer, 2022. [Link](https://doi.org/10.1007/978-3-031-15629-8_27)
 
-[5] L. Di Stefano and F. Lang, “Verifying temporal properties of stigmergic collective systems using CADP,” in 10th International Symposium On Leveraging Applications of Formal Methods, Verification and Validation (ISoLA), LNCS, vol. 13036. Springer, 2021 (To appear).
+L. Di Stefano, “Modelling and Verification of Multi-Agent Systems via Sequential Emulation,” PhD Thesis, Gran Sasso Science Institute, L’Aquila, Italy, 2020. [Link](https://iris.gssi.it/handle/20.500.12571/10181)
+
+L. Di Stefano, F. Lang, and W. Serwe, “Combining SLiVER with CADP to Analyze Multi-agent Systems,” in 22nd International Conference on Coordination Models and Languages (COORDINATION). LNCS, vol. 12134. Springer, 2020. [Link](https://doi.org/10.1007/978-3-030-50029-0_23)
+
+L. Di Stefano and F. Lang, “Verifying temporal properties of stigmergic collective systems using CADP,” in 10th International Symposium On Leveraging Applications of Formal Methods, Verification and Validation (ISoLA), LNCS, vol. 13036. Springer, 2021. [Link](https://doi.org/10.1007/978-3-030-89159-6_29)
+
+L. Di Stefano and F. Lang, “Compositional Verification of Stigmergic Collective Systems”, in 24th International Conference on Verification, Model Checking, and Abstract Interpretation (VMCAI), LNCS, vol. 13881. Springer, 2023. [Link](https://doi.org/10.1007/978-3-031-24950-1_8)
