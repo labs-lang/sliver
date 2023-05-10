@@ -144,7 +144,7 @@ class CliArgs(dict):
             self.externs[k] = int(v)
 
     def __getitem__(self, key: Args):
-        return self.get(key.value, DEFAULTS[key])
+        return self.get(key.value, DEFAULTS.get(key))
 
     def __setitem__(self, key: Args, value):
         if isinstance(key, Args):
