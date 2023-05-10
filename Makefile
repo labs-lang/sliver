@@ -30,7 +30,7 @@ build/%/sliver.py :
 	@cp ./LICENSE $(@D) ;
 	@cp ./*.* $(@D) ;
 	@# Remove untracked files from release directory
-	@rm $(foreach f, $(BLACKLIST), $(@D)/$(f)) ;
+	@rm -f $(foreach f, $(BLACKLIST), $(@D)/$(f)) ;
 
 build/%/examples/README.md : $(labs_examples)
 	@echo Copying examples...
