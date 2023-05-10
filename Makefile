@@ -17,6 +17,7 @@ VERSION := $(strip $(shell grep version sliver/app/__about__.py | grep = | sed '
 RELEASENAME = sliver-v$(VERSION)_$(strip $(subst -,_, ${platform}))
 BUILD_DIR = build/$(platform)
 SLIVER_DIR = $(BUILD_DIR)/sliver
+BLACKLIST = $(shell git ls-files --others --exclude-standard)
 
 build/%/sliver/labs/LabsTranslate : $(labs_sources) $(labs_templates)
 	@echo Building LabsTranslate...
@@ -28,6 +29,8 @@ build/%/sliver.py :
 	@cp ./HISTORY $(@D) ;
 	@cp ./LICENSE $(@D) ;
 	@cp ./*.* $(@D) ;
+	@# Remove untracked files from release directory
+	@rm $(foreach f, $(BLACKLIST), $(@D)/$(f)) ;
 
 build/%/examples/README.md : $(labs_examples)
 	@echo Copying examples...
