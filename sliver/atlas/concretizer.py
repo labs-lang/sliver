@@ -7,11 +7,15 @@ from z3 import (And, Bool, If, Implies, Int, Not, Or, Solver, Sum, sat,
                 set_option, simplify)
 from z3.z3 import IntVector
 
-from .atlas import (QUANT, BinOp, BuiltIn, Nary, OfNode, contains,
-                    make_dict, remove_quant, replace_externs)
+from sliver.atlas.atlas import vars_to_strings
+from sliver.labsparse.labsparse.labs_ast import Attr, Node, NodeType
+from sliver.labsparse.labsparse.labs_parser import BEXPR, QUANT
+from sliver.labsparse.labsparse.utils import (eliminate_quantifiers,
+                                              replace_externs)
 
 from ..app.cli import Args, ExitStatus, SliverError
 from ..app.info import get_var
+
 
 log = logging.getLogger('backend')
 RND_SEED = int(time.time())
@@ -44,9 +48,11 @@ def Count(boolvec):
 def to_z3(node):
     """Translate a (quantifier-free) ATLAS property to a Z3 constraint
     """
-    if isinstance(node, OfNode):
-        raise ValueError
-    if isinstance(node, BinOp):
+    # if isinstance(node, OfNode):
+    #     raise ValueError
+    if not isinstance(node, Node):
+        return node
+    if Attr.OPERANDS in node:
         ops = {
             "+": lambda x, y: Sum(x, y),
             "-": lambda x, y: Sum(x, -y),
@@ -59,60 +65,47 @@ def to_z3(node):
             "<": lambda x, y: x < y,
             "<=": lambda x, y: x <= y,
             "%": lambda x, y: x % y,
-            "or": lambda x, y: Or(x, y),
-            "and": lambda x, y: And(x, y)
-        }
-        return ops[node.op](to_z3(node.e1), to_z3(node.e2))
-    elif isinstance(node, BuiltIn):
-        funs = {
+            "and": lambda *x: And(x),
+            "or": lambda *x: Or(x),
             "abs": lambda x: abs(x[0]),
             "max": lambda x: symMax(x),
             "min": lambda x: symMin(x),
             "not": lambda x: Not(x[0])
         }
-        return funs[node.fn]([to_z3(a) for a in node.args])
-    elif isinstance(node, Nary):
-        ops = {
-            "and": lambda x: And(*x),
-            "or": lambda x: Or(*x)
-        }
-        return ops[node.fn]([to_z3(a) for a in node.args])
-    else:
+        args = [to_z3(a) for a in node[Attr.OPERANDS]]
         try:
-            parse_int = int(node)
-            return parse_int
-        except (ValueError, TypeError):
-            return node
+            return ops[node[Attr.NAME]](*args)
+        except TypeError:
+            raise TypeError(node[Attr.NAME], args)
+
+    elif node(NodeType.LITERAL):
+        return int(node[Attr.VALUE])
+    else:
+        return node
+    # elif isinstance(node, BuiltIn):
+    #     funs = {
+    #         "abs": lambda x: abs(x[0]),
+    #         "max": lambda x: symMax(x),
+    #         "min": lambda x: symMin(x),
+    #         "not": lambda x: Not(x[0])
+    #     }
+    #     return funs[node.fn])([to_z3(a) for a in node[Attr.OPERANDS]])
+    # elif isinstance(node, Nary):
+    #     ops = {
+    #         "and": lambda x: And(*x),
+    #         "or": lambda x: Or(*x)
+    #     }
+    #     return ops[node.fn]([to_z3(a) for a in node.args])
+    # else:
+    #     try:
+    #         parse_int = int(node)
+    #         return parse_int
+    #     except (ValueError, TypeError):
+    #         return node
 
 
-def quant_to_z3(quant, info, attrs, lstigs, envs):
-    dict_, formula = make_dict(quant)
-
-    def replace_with_attr(node, agent):
-        # return f"{f.var}_{agent}"
-        if node.var == "id":
-            return agent
-        else:
-            var = info.lookup_var(node.var)
-            idx = var.index + (node.offset or 0)
-            if var.store == "i":
-                return attrs[agent][idx]
-            elif var.store == "lstig":
-                return lstigs[agent][idx]
-            elif var.store == "e":
-                return envs[idx]
-            else:
-                raise NotImplementedError
-
-    for var in dict_:
-        quant, agent_type = dict_[var]
-        if contains(formula, var):
-            formula, _ = remove_quant(
-                formula, quant, var, info.spawn.tids(agent_type),
-                replace_with_attr
-            )
-    # TODO if to_z3(formula) is a conjunction of constraints,
-    # Return them as a list (apparently it helps Z3)
+def quant_to_z3(formula, info, attrs, lstigs, envs):
+    vars_to_strings(formula, info, attrs, lstigs, envs)
     return simplify(to_z3(formula))
 
 
@@ -128,23 +121,15 @@ class Concretizer:
         self.sched = None
         self.picks = {}
         self.softs = set()
-        self.is_setup = False
+        self.past_models = []
+
         self.s = Solver()
+        self._setup_initial_state(self.info.externs)
+        self._setup_scheduler()
+
         if randomize:
             set_option(":auto_config", False)
             set_option(":smt.phase_selection", 5)
-            set_option(":smt.random_seed", RND_SEED)
-            random.seed(RND_SEED)
-            log.debug(f"Concretization: random seed is {RND_SEED}")
-
-    def setup(self, program):
-        if self.is_setup:
-            return
-        self._concretize_initial_state(self.info.externs)
-        self._concretize_scheduler()
-        for p in self._scan_picks(program):
-            self.add_pick(*p)
-        self.is_setup = True
 
     def isAnAgent(self, var):
         return And(var >= 0, var < self.agents)
@@ -152,6 +137,12 @@ class Concretizer:
     def isOfType(self, var, typ):
         rng = self.info.spawn.range_of(typ)
         return And(var >= rng.start, var < rng.stop)
+
+    def _set_random_seed(self):
+        seed = self.cli.get_seed()
+        set_option(":smt.random_seed", seed)
+        random.seed(seed)
+        log.debug(f"Concretization: random seed is {seed}")
 
     def _add_soft_constraints(self):
         self.s.push()
@@ -164,7 +155,8 @@ class Concretizer:
                     continue
                 fresh_bool = Bool(f"{v.store}_{tid}_{v.index}_%%soft%%")
                 self.softs.add(fresh_bool)
-                self.s.add(Implies(fresh_bool, attr == v.rnd_value(tid)))
+                rnd = v.rnd_value(tid)
+                self.s.add(Implies(fresh_bool, attr == rnd))
 
         for i, env_var in enumerate(self.envs):
             v = get_var(self.info.e, i)
@@ -197,9 +189,11 @@ class Concretizer:
 
     def _reset_soft_constraints(self):
         # Remove previous soft constraints
+        # And forces the exclusion of past models
         self.softs = set()
-        while self.s.num_scopes() > 0:
-            self.s.pop()
+        self.s.pop(self.s.num_scopes())
+        for m in self.past_models:
+            self.s.add(m)
 
     def _init_constraint(self, v, attrs, id):
         def c(attr):
@@ -212,7 +206,7 @@ class Concretizer:
                 return (attr == int(values))
         self.s.add(*(c(a) for a in attrs))
 
-    def _concretize_initial_state(self, externs):
+    def _setup_initial_state(self, externs):
         for tid in range(self.agents):
             a = self.info.spawn[tid]
             for v in a.iface.values():
@@ -242,13 +236,15 @@ class Concretizer:
             self.envs = envs
 
         for assume in self.info.assumes:
-            formula = QUANT.parseString(assume)[0]
+            formula = (QUANT | BEXPR).parseString(assume)[0]
+            formula = eliminate_quantifiers(formula, self.info)
             formula = replace_externs(formula, externs)
+
             constraint = quant_to_z3(
                 formula, self.info, self.attrs, self.lstigs, self.envs)
             self.s.add(constraint)
 
-    def _concretize_scheduler(self):
+    def _setup_scheduler(self):
         steps = self.cli[Args.STEPS]
         self.sched = IntVector("sched", steps)
         self.s.add(*(self.isAnAgent(x) for x in self.sched))
@@ -325,7 +321,7 @@ class Concretizer:
     TYPEOFAGENTID sched[BOUND];
     for (unsigned i = 0; i < BOUND; ++i) {{
         sched[i] = __CPROVER_nondet_int();
-        __CPROVER_assume(sched[i] < MAXCOMPONENTS);
+        sched[i] = sched[i] < MAXCOMPONENTS ? sched[i] : 0;
     }}
 """,
                     program)
@@ -363,11 +359,11 @@ class Concretizer:
 
         return program
 
-    def concretize_file(self, fname):
+    def concretize_file(self, fname, dest=None):
         with open(fname) as file:
             program = file.read()
         program = self.concretize_program(program)
-        with open(fname, "w") as file:
+        with open(dest if dest is not None else fname, "w") as file:
             file.write(program)
 
     def get_concretization(self, program, return_model=False):
@@ -408,11 +404,12 @@ class Concretizer:
                     # Skip values that would be initialized to zero
                     if str(m[attr]) != "0"))
 
-        self.setup(program)
-
         if self.randomize:
             self._reset_soft_constraints()
             self._add_soft_constraints()
+            self._set_random_seed()
+        for p in self._scan_picks(program):
+            self.add_pick(*p)
 
         check = None
         softs = list(self.softs)
@@ -430,7 +427,6 @@ class Concretizer:
                 if not softs:
                     break
                 softs.pop()
-                # log.debug(f"unsat, retracting {softs.pop()}...")
 
         if check == sat:
             m = self.s.model()
@@ -439,10 +435,10 @@ class Concretizer:
             for decl in m:
                 const = decl()
                 # Ignore variables used for soft constraints
-                if """%%soft%%""" not in str(const):
+                if "%%soft%%" not in str(const):
                     block.append(const != m[decl])
             if block:
-                self.s.add(Or(block))
+                self.past_models.append(Or(block))
 
             return m if return_model else (fmt_globals(m), fmt_inits(m))
         else:

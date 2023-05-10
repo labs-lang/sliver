@@ -149,14 +149,20 @@ class Cbmc(Backend):
                 # Skip stuff that has already been resolved by CBMC
                 if var not in ("TRUE", "FALSE")
             ))
+
+            seed = self.cli.get_seed()
+
             if weaks:
                 with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as weaks_f:  # noqa: E501
                     weaks_f.write(weaks)
                     self.temp_files.append(weaks_f.name)
             tryassume = f"""-try-assume-from="{weaks_f.name}" """ if weaks else ""  # noqa: E501
-            elim = "-no-elim " if num_vars < 2_000_000 else ""
+            more_random = "-no-elim -rnd-init " if num_vars < 1_000_000 else ""
             # TODO adjust rnd-freq based on CNF hardness
-            frequency = "-rnd-freq=0.15"
+            freq = (
+                "0.15" if num_vars < 1_000_000 else
+                "0.05" if num_vars < 3_000_000 else
+                "0.01")
             script = f"""
 #!/bin/bash
 
@@ -165,7 +171,7 @@ class Cbmc(Backend):
 # https://github.com/labs-lang/sliver
 
 # Invokes minisat with weak assumptions and nondet heuristics
-{minisat} -model {frequency} {elim}-rnd-init -rnd-seed=$RANDOM {tryassume}$1
+{minisat} -model -rnd-freq={freq} {more_random} -rnd-seed={seed} {tryassume}$1
 """
             sat_cmd = script.splitlines()[-1].strip()
             self.verbose_output(f"SAT solver call: {sat_cmd}")
@@ -254,15 +260,19 @@ class Cbmc(Backend):
         return weaks
 
     def simulate(self, fname, info):
-        cmd = self.get_cmdline(fname, info)
         c = Concretizer(info, self.cli, True)
+        from shutil import copyfile
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as orig:  # noqa: E501
+            self.temp_files.append(orig.name)
+            copyfile(fname, orig.name)
+            orig.close()
+        exc = ThreadPoolExecutor()
         for i in range(self.cli[Args.SIMULATE]):
             try:
                 # Concretization step
                 if self.cli[Args.CONCRETIZATION] != "none":
-                    c.concretize_file(fname)
+                    c.concretize_file(orig.name, dest=fname)
                 if self.cli[Args.CONCRETIZATION] == "sat":
-                    exc = ThreadPoolExecutor()
                     with (tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as sleepy,  # noqa: E501
                           tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as script):  # noqa: E501
                         self.temp_files.append(sleepy.name)
@@ -275,7 +285,7 @@ class Cbmc(Backend):
                         sleepy.close()
                         self._set_executable(sleepy.name)
                         exc.submit(self.sat_level_concretization, fname, info, c, script.name)  # noqa: E501
-
+                    cmd = self.get_cmdline(fname, info)
                     cmd.extend(["--external-sat-solver", sleepy.name])
 
                 if self.cli[Args.TIMEOUT] > 0:

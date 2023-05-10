@@ -1,3 +1,11 @@
+Version 4.0 - 2023-05
+
+C translation: general improvements
+LAbS: Added conditional processes (cond => P) (C encoding only)
+LAbS: Added multi-dimensional arrays (e.g., arr[x, y, z]) (C encoding only)
+SLiVER: Fixed ESBMC backend for SMT-based BMC
+SLiVER: Improved performance of CBMC simulation workflow
+
 Version 3.0 - 2022-07
 
 LAbS: Added blocks of actions "{a1; a2; ... ; an}"
@@ -9,7 +17,6 @@ LAbS: Added nondeterministic agent selection "pick"
 LAbS: Added ternary operator "if cond then expr1 else expr2"
 LAbS: Underscores ("_") can now be used within all names (but not at the beginning of a name)
 LAbS: Arithmetic expressions can now be used where a Boolean expression is expected ("expr" is desugared into "expr != 0")
-
 SLiVER: CBMC backend now supports simulation
 SLiVER: Added a compositional CADP backend "cadp-comp" (experimental)
 

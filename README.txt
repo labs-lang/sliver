@@ -1,6 +1,6 @@
 
-            SLiVER  4.0-230417
-              18 April 2023
+            SLiVER  4.0
+            10 May 2023
 
 The SLiVER LAbS VERification tool
 
@@ -27,13 +27,19 @@ sliver/           SLiVER code
 
 To install SLiVER, please follow the steps below:
 
-    1. install Python 3.10 or higher
+    1. install Python 3.10 or higher.
+       We recommend setting up a dedicated Python installation/environment
+       by using pyenv or similar tools.
 
     2. create a directory, suppose this is called /workspace
 
     3. extract the entire package contents in /workspace
     
-    4. set execution permissions (chmod +x) for sliver.py and cbmc-simulator
+    4. set execution permissions (chmod +x) for the following files:
+        - sliver.py
+        - sliver/cbmc/cbmc-simulator
+        - sliver/cbmc/cbmc-5-74
+        - sliver/minisat/minisat
 
     5. Install dependencies with (pip install -r requirements.txt)
 

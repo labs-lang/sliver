@@ -7,8 +7,8 @@ from functools import reduce, lru_cache
 from itertools import product
 
 from ..app.cli import Args
-from ..labsparse.labs_ast import Expr, QueryResult
-from ..labsparse.labs_parser import Attr, NodeType, parse_to_dict
+from ..labsparse.labsparse.labs_ast import Expr, QueryResult
+from ..labsparse.labsparse.labs_parser import Attr, NodeType, parse_to_dict
 
 
 def merge(s0, s1, State):
@@ -47,7 +47,7 @@ def make_init(info, local_names, domain):
                 else:
                     s0[var.name] = abstract
 
-    s0["id"] = domain.abstract(*range(0, info.spawn.num_agents() - 1))
+    s0["id"] = domain.abstract_range(range(0, info.spawn.num_agents()))
     State = namedtuple("State", [*local_names, *s0.keys()])
     for x in local_names:
         s0[x] = domain.NO
@@ -273,7 +273,7 @@ def value_analysis(cli, info, domain):
             blocks.update(n for n in node.walk() if n(NodeType.BLOCK))
             guards.update(
                 (a, n) for n in node.walk()
-                if n(NodeType.GUARDED))
+                if n(NodeType.GUARDED) or n(NodeType.CONDITIONAL))
             calls = (
                 n[Attr.NAME] for n in node.walk()
                 if n(NodeType.CALL)

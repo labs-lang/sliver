@@ -1,7 +1,11 @@
 #! /usr/bin/env python3
 
 from itertools import repeat
-from .atlas import get_formula, OfNode, BinOp, Nary, BuiltIn
+
+from sliver.atlas.atlas import get_property, vars_to_strings
+from sliver.labsparse.labsparse.labs_ast import Attr, Node, NodeType
+from sliver.labsparse.labsparse.utils import (eliminate_quantifiers,
+                                              replace_externs)
 
 
 def sprint_predicate(params, body):
@@ -156,30 +160,29 @@ nu Inv ({", ".join(nu_params)}) . (
 
 
 def pprint_mcl(node):
-    if isinstance(node, OfNode):
-        # Should never happen, since node should be the result
-        # of get_formula() and thus have no quantified variables.
-        raise Exception(f"Unexpected {node}")
-    if isinstance(node, BinOp):
+    if not isinstance(node, Node):
+        return node
+    if node(NodeType.BUILTIN):
+        return f"{node[Attr.NAME]}({', '.join(pprint_mcl(a) for a in node[Attr.OPERANDS])})"  # noqa: E501
+    elif Attr.OPERANDS in node:
         op = {
             "%": "mod",
             "!=": "<>"
-        }.get(node.op) or node.op
-        return f"({pprint_mcl(node.e1)} {op} {pprint_mcl(node.e2)})"
-    elif isinstance(node, BuiltIn):
-        return f"{node.fn}({', '.join(pprint_mcl(a) for a in node.args)})"
-    elif isinstance(node, Nary):
-        return "({})".format(f" {node.fn} ".join(pprint_mcl(a) for a in node.args))  # noqa: E501
+        }.get(node[Attr.NAME], node[Attr.NAME])
+        return "({})".format(f" {op} ".join(pprint_mcl(a) for a in node[Attr.OPERANDS]))  # noqa: E501
     else:
-        return node
+        return node.as_labs()
 
 
 def translate_property(info, externs, parsed=None):
     """Retrieve the first property in info.properties
     and translate it into MCL.
     """
-    formula, new_vars, modality = get_formula(info, externs, parsed)
-    # Sort variables by agent id and index
+
+    prop = get_property(info)
+    qformula = eliminate_quantifiers(prop[Attr.CONDITION], info)
+    qformula = replace_externs(qformula, externs)
+    new_vars = vars_to_strings(qformula, info)
 
     def key_of(v):
         name, agent_id = v.rsplit("_", 1)
@@ -188,18 +191,18 @@ def translate_property(info, externs, parsed=None):
 
     new_vars = sorted(list(new_vars), key=key_of)
 
-    result = sprint_predicate(new_vars, pprint_mcl(formula))
-    if modality == "always":
+    result = sprint_predicate(new_vars, pprint_mcl(qformula))
+    if prop.modality == "always":
         result += sprint_invariant(new_vars, info)
-    elif modality in ("eventually", "finally"):
+    elif prop.modality in ("eventually", "finally"):
         result += sprint_finally(new_vars, info)
-    elif modality == "fairly":
+    elif prop.modality == "fairly":
         result += sprint_reach(new_vars, info)
         result += sprint_invariant(new_vars, info, "Reach", short_circuit="Predicate")  # noqa: E501
-    elif modality == "fairly_inf":
+    elif prop.modality == "fairly_inf":
         result += sprint_reach(new_vars, info)
         result += sprint_invariant(new_vars, info, "Reach")  # noqa: E501
     else:
-        raise Exception(f"Unrecognized modality {modality}")
+        raise Exception(f"Unrecognized modality {prop.modality}")
 
     return result

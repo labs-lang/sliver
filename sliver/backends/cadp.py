@@ -3,7 +3,10 @@ import logging
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, TimeoutExpired, check_output
 
-from ..atlas.atlas import get_quant_formula, get_state_vars
+from sliver.labsparse.labsparse.labs_ast import Attr
+from sliver.labsparse.labsparse.utils import eliminate_quantifiers
+
+from ..atlas.atlas import get_property, get_state_vars
 from ..atlas.mcl import translate_property
 from ..atlas.svl import svl
 from ..app.cex import translate_cadp
@@ -89,7 +92,7 @@ class CadpMonitor(Backend):
         super().cleanup(fname)
 
     def preprocess(self, code, fname):
-        base_name = Path(fname).stem.upper()
+        base_name = Path(fname).stem
         return code.replace("module HEADER is", f"module {base_name} is")
 
     def handle_success(self, out, info) -> ExitStatus:
@@ -206,7 +209,7 @@ class CadpCompositional(CadpMonitor):
         return ["svl", self._svl_fname(fname)]
 
     def _svl_fname(self, fname):
-        return f"SVL_{Path(fname).stem}.svl"
+        return self.cwd / f"SVL_{Path(fname).stem}.svl"
 
     def _mcl_fname(self, fname):
         return Path(fname).with_suffix(".mcl")
@@ -263,8 +266,9 @@ class CadpCompositional(CadpMonitor):
         self.temp_files.append(mcl_fname)
         self.verbose_output(mcl, "MCL property")
 
-        atlas = get_quant_formula(info)
-        atlas_vars = get_state_vars(atlas[0].quant)
+        atlas = get_property(info)[Attr.CONDITION]
+        atlas_noq = eliminate_quantifiers(atlas, info)
+        atlas_vars = get_state_vars(atlas_noq)
         not_hidden = set()
         for x in atlas_vars:
             var = info.lookup_var(x)

@@ -162,7 +162,8 @@ class Esbmc(Backend):
                 sign = getattr(s_analysis, f)
                 if var.store == "e":
                     loop_assumptions.extend(
-                        f"__CPROVER_assume({x});" for x in fmt_sign(var, sign))
+                        f"__CPROVER_assume({x});"
+                        for x in fmt_sign(var, sign) if x is not None)
             except KeyError:
                 # Local variable
                 continue
@@ -180,7 +181,7 @@ class Esbmc(Backend):
                         continue
                     loop_assumptions.extend((
                         f"__CPROVER_assume({x});"
-                        for x in fmt_sign(var, sign, tid)))
+                        for x in fmt_sign(var, sign, tid) if x is not None))
                 except KeyError:
                     # Local variable
                     continue
@@ -194,14 +195,14 @@ class Esbmc(Backend):
         head_of_loop = re.compile(r'while\s*\(1\)\s*{')
         code = head_of_loop.sub("while (1) {\n __invariants();", code)
 
-        esbmc_conf = """
+        esbmc_conf = f"""
         (without-bitwise)
         (replace-calls
             (__CPROVER_nondet nondet_int)
             (__CPROVER_assert __ESBMC_assert)
             (__CPROVER_assume __ESBMC_assume)
         )
-        (without-arrays)
+        {"(without-arrays)" if self.cli[Args.STEPS] == 0 else ""}
         """
         return absentee.parse_and_execute(code, esbmc_conf)
 

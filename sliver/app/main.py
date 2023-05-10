@@ -14,40 +14,35 @@ if not hasattr(sys.modules[__name__], '__file__'):
     __file__ = inspect.getfile(inspect.currentframe())
 
 __DIR = Path(__file__).parent.resolve()
-__existing = click.Path(exists=True)
+backends_type = click.Choice(tuple(ALL_BACKENDS.keys()))
+
 log = logging.getLogger("sliver")
 
 
 @click.command(help=LONGDESCR)
 @click.version_option(__version__, prog_name=__title__.lower())
-@click.argument('file', required=True, type=__existing)
+@click.argument('file', required=True, type=click.Path(exists=True))
 @click.argument('values', nargs=-1)
-@click.option('--backend',
-              type=click.Choice(tuple(ALL_BACKENDS.keys())),
-              **CLICK(Args.BACKEND))
-@click.option('--concretization',
-              type=click.Choice(("src", "sat", "none")),
-              **CLICK(Args.CONCRETIZATION))
+@click.option('--backend', **CLICK(Args.BACKEND, type=backends_type))
+@click.option('--concretization', **CLICK(Args.CONCRETIZATION))
+@click.option('--bv/--no-bv', **CLICK(Args.BV))
+@click.option('--cores', **CLICK(Args.CORES))
 @click.option('--debug', **CLICK(Args.DEBUG, is_flag=True))
 @click.option('--fair/--no-fair', **CLICK(Args.FAIR))
-@click.option('--bv/--no-bv', **CLICK(Args.BV))
-@click.option('--simulate', **CLICK(Args.SIMULATE, type=int))
-@click.option('--show', **CLICK(Args.SHOW, is_flag=True))
-@click.option('--steps', **CLICK(Args.STEPS, type=int))
-@click.option('--sync/--no-sync', **CLICK(Args.SYNC))
-@click.option('--timeout', **CLICK(Args.TIMEOUT, type=int))
-@click.option('--cores', **CLICK(Args.CORES, type=int))
-@click.option('--from', **CLICK(Args.CORES_FROM, type=int))
-@click.option('--to', **CLICK(Args.CORES_TO, type=int))
-@click.option('--verbose', **CLICK(Args.VERBOSE, is_flag=True))
+@click.option('--from', **CLICK(Args.CORES_FROM))
+@click.option('--keep-files', **CLICK(Args.KEEP_FILES, is_flag=True))
 @click.option('--no-properties', **CLICK(Args.NO_PROPERTIES, is_flag=True))
 @click.option('--property', **CLICK(Args.PROPERTY))
-@click.option('--keep-files', **CLICK(Args.KEEP_FILES, is_flag=True))
-@click.option('--translate-cex',
-              **CLICK(Args.TRANSLATE_CEX, type=__existing))
-@click.option('--include',
-              multiple=True, type=__existing,
-              **CLICK(Args.INCLUDE))
+@click.option('--rnd-seed', **CLICK(Args.RND_SEED))
+@click.option('--show', **CLICK(Args.SHOW, is_flag=True))
+@click.option('--simulate', **CLICK(Args.SIMULATE))
+@click.option('--steps', **CLICK(Args.STEPS))
+@click.option('--sync/--no-sync', **CLICK(Args.SYNC))
+@click.option('--timeout', **CLICK(Args.TIMEOUT))
+@click.option('--to', **CLICK(Args.CORES_TO))
+@click.option('--verbose', **CLICK(Args.VERBOSE, is_flag=True))
+@click.option('--translate-cex', **CLICK(Args.TRANSLATE_CEX))
+@click.option('--include', multiple=True, **CLICK(Args.INCLUDE))
 def main(file, **kwargs):
     cli = CliArgs(file, kwargs)
     backend_arg, simulate, show = (
