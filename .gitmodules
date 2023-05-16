@@ -1,6 +1,6 @@
 [submodule "sliver/labsparse"]
 	path = sliver/labsparse
-	url = git@github.com:labs-lang/labsparse.git
+	url =  https://github.com/labs-lang/labsparse.git
 	ignore = dirty
 [submodule "labs-examples"]
 	path = labs-examples
