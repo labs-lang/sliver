@@ -18,8 +18,10 @@ from ..app.cli import Args, ExitStatus, SliverError
 from ..app.info import Info
 
 
+log = logging.getLogger('sliver')
+
+
 def log_call(cmd):
-    log = logging.getLogger('sliver')
     log.debug(f"Executing {' '.join(str(x) for x in cmd)}")
 
 
@@ -48,6 +50,7 @@ class Backend:
         #     self.timeout_cmd = "/usr/local/bin/gtimeout"
         self.cli = cli
         self.base_dir = base_dir
+        self.info = None
         self.cwd = base_dir
         self.temp_files = []
         self.modalities = tuple()
@@ -150,6 +153,9 @@ class Backend:
         return call
 
     def get_info(self, parsed=False):
+        if self.info is not None:
+            return self.info
+        log.info(f"Gathering information on {self.cli.file}...")
         try:
             call_info = self._labs_cmdline() + ["--info"]
             log_call(call_info)
@@ -158,9 +164,10 @@ class Backend:
             if parsed:
                 info = info.replace("\n", "|")[:-1]
                 self.logger.debug(f"{info=}")
-                return Info.parse(info, self.cli[Args.VALUES])
-            else:
-                return info
+                info = Info.parse(info, self.cli[Args.VALUES])
+            self.check_info(info)
+            self.info = info
+            return info
         except CalledProcessError as e:
             self.logger.error(e)
             msg = e.stderr.decode()

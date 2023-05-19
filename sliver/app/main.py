@@ -72,9 +72,7 @@ def main(file, **kwargs):
     status = None
 
     try:
-        log.info(f"Gathering information on {cli.file}...")
         info = backend.get_info(parsed=True)
-        backend.check_info(info)
 
         sim_or_verify = "Running simulation" if simulate else "Verifying"
 
