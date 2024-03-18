@@ -360,9 +360,7 @@ def value_analysis(cli, info, domain):
         frontier = set((s0, ))
         fixpoint = False
         with ThreadPoolExecutor() as exc:
-            # TODO make analysis bound configurable
-            for i in range(bound):
-
+            for _ in range(bound):
                 futures = []
                 common_args = (externs, guard_map, info, State)
                 futures = [
@@ -391,8 +389,7 @@ def value_analysis(cli, info, domain):
 
     s1, fixpoint = loop(20, guard_map, s0)
     if not fixpoint:
-        # Lookahead without guards to find out
-        # (an underapproximation of)
+        # Lookahead to find out (an underapproximation of)
         # the set of variables that won't change anymore
         s2, _ = loop(1, guard_map, s1)
         wont_change = set(("id", ))  # id is guaranteed not to change
