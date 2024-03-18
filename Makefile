@@ -1,8 +1,8 @@
 .PHONY: osx linux rmsentinels
-osx: platform = osx.10.12-x64
+osx: platform = osx-x64
 osx: VENDOR_DIR = vendor/osx
 linux: VENDOR_DIR = vendor/linux
-osx_cseq: platform = osx.10.12-x64
+osx_cseq: platform = osx-x64
 linux: platform = linux-x64
 linux_cseq: platform = linux-x64
 zip_linux: platform = linux-x64
@@ -21,7 +21,7 @@ BLACKLIST = $(shell git ls-files --others --exclude-standard)
 
 build/%/sliver/labs/LabsTranslate : $(labs_sources) $(labs_templates)
 	@echo Building LabsTranslate...
-	dotnet publish labs/LabsTranslate/LabsTranslate.fsproj -r $(platform) -c Release --self-contained -o $(SLIVER_DIR)/labs -p:PublishSingleFile=true -p:PublishTrimmed=true ;
+	dotnet publish labs/LabsTranslate/LabsTranslate.fsproj -r $(platform) -c Release --self-contained -o $(SLIVER_DIR)/labs -p:PublishSingleFile=true ;
 	@rm -f $(SLIVER_DIR)/labs/*.pdb ;
 
 # sliver.py is a sentinel for files that should go in the root dir
@@ -59,11 +59,11 @@ rmsentinels:
 	@rm -f $(SLIVER_DIR)/cbmc/cbmc-simulator ;
 
 osx: rmsentinels \
-	build/osx.10.12-x64/sliver/__main__.py \
-	build/osx.10.12-x64/sliver.py \
-	build/osx.10.12-x64/sliver/labs/LabsTranslate \
-	build/osx.10.12-x64/sliver/minisat/minisat \
-	build/osx.10.12-x64/examples/README.md
+	build/osx-x64/sliver/__main__.py \
+	build/osx-x64/sliver.py \
+	build/osx-x64/sliver/labs/LabsTranslate \
+	build/osx-x64/sliver/minisat/minisat \
+	build/osx-x64/examples/README.md
 
 linux: rmsentinels \
 	build/linux-x64/sliver/__main__.py \
