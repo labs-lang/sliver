@@ -128,8 +128,9 @@ class Concretizer:
         self._setup_scheduler()
 
         if randomize:
-            set_option(":auto_config", False)
-            set_option(":smt.phase_selection", 5)
+            self.s.set(":auto_config", False)
+            self.s.set(":smt.phase_selection", 5)
+            self.s.set(":smt.arith.random_initial_value", True)
 
     def isAnAgent(self, var):
         return And(var >= 0, var < self.agents)
@@ -169,23 +170,23 @@ class Concretizer:
 
         # Experimental: soft constraints on picks
         # (Does not seem necessary so far)
-        # for name in self.picks:
-        #     p, size, typ = self.picks[name]
-        #     for step in range(self.cli[Args.STEPS]):
-        #         choices = list(
-        #             self.info.spawn.range_of(typ)
-        #             if typ
-        #             else range(self.agents))
-        #         try:
-        #             choices.remove(self.sched[step])
-        #         except ValueError:
-        #             pass
-        #         for i in range(size):
-        #             random.shuffle(choices)
-        #             for i in range(size):
-        #                 soft = Bool(f"pick_{name}_{step}_{i}_%%soft%%")
-        #                 self.softs.add(soft)
-        #                 self.s.add(Implies(soft, p[step][i] == choices.pop()))  # noQA: E501
+        for name in self.picks:
+            p, size, typ = self.picks[name]
+            for step in range(self.cli[Args.STEPS]):
+                choices = list(
+                    self.info.spawn.range_of(typ)
+                    if typ
+                    else range(self.agents))
+                try:
+                    choices.remove(self.sched[step])
+                except ValueError:
+                    pass
+                for i in range(size):
+                    random.shuffle(choices)
+                    for i in range(size):
+                        soft = Bool(f"pick_{name}_{step}_{i}_%%soft%%")
+                        self.softs.add(soft)
+                        self.s.add(Implies(soft, p[step][i] == choices.pop()))  # noQA: E501
 
     def _reset_soft_constraints(self):
         # Remove previous soft constraints
