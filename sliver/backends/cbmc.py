@@ -268,6 +268,7 @@ class Cbmc(Backend):
             orig.close()
         exc = ThreadPoolExecutor()
         for i in range(self.cli[Args.SIMULATE]):
+            cmd = self.get_cmdline(fname, info)
             try:
                 # Concretization step
                 if self.cli[Args.CONCRETIZATION] != "none":
@@ -285,7 +286,6 @@ class Cbmc(Backend):
                         sleepy.close()
                         self._set_executable(sleepy.name)
                         exc.submit(self.sat_level_concretization, fname, info, c, script.name)  # noqa: E501
-                    cmd = self.get_cmdline(fname, info)
                     cmd.extend(["--external-sat-solver", sleepy.name])
 
                 if self.cli[Args.TIMEOUT] > 0:
