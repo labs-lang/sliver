@@ -10,7 +10,7 @@ zip_linux: platform = linux-x64
 # Source files
 sliver_sources = $(wildcard sliver/**/*.py) 
 labs_sources = $(wildcard labs/**/*.fs) 
-labs_templates = $(wildcard labs/LabsTranslate/templates/**/*.c) $(wildcard labs/LabsTranslate/templates/**/*.lnt) 
+labs_templates = $(wildcard labs/LabsTranslate/templates/**/*.c) $(wildcard labs/LabsTranslate/templates/**/*.lnt) $(wildcard labs/LabsTranslate/templates/**/*.smv) 
 labs_examples = $(wildcard labs_examples/**/*.*) labs-examples/LICENSE
 
 VERSION := $(strip $(shell grep version sliver/app/__about__.py | grep = | sed 's/"//g' | awk 'NF{print $$NF}'))

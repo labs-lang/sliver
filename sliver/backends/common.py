@@ -36,6 +36,7 @@ class Language(Enum):
     LNT = LanguageInfo(extension="lnt", encoding="lnt")
     LNT_MONITOR = LanguageInfo(extension="lnt", encoding="lnt-monitor")
     LNT_PARALLEL = LanguageInfo(extension="lnt", encoding="lnt-parallel")
+    NUXMV = LanguageInfo(extension="smv", encoding="nuxmv")
 
 
 class Backend:
