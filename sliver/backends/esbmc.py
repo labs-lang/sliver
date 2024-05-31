@@ -38,15 +38,13 @@ class Esbmc(Backend):
             cmd = [
                 esbmc, fname,
                 "--no-align-check", "--no-pointer-check", "--no-library",
-                "--no-unwinding-assertions", "--no-pointer-relation-check",
-                "--bv", "--32", "--quiet"
-            ]
+                "--no-unwinding-assertions", "--no-pointer-relation-check"]
 
-            if self.cli[Args.STEPS] == 0:
-                # Enable bidirectional k-induction, otherwise just do BMC
-                cmd.extend([
-                    "--k-induction", "--bidirectional", "--unlimited-k-steps"
-                ])
+            cmd.extend([
+                "--k-induction", "--bidirectional", "--unlimited-k-steps",
+                "--quiet", "--z3", "--ir"
+            ] if self.cli[Args.STEPS] == 0 else ["--bv", "--32"])
+
             if not self.cli[Args.DEBUG]:
                 cmd.extend(("--no-bounds-check", "--no-div-by-zero-check"))
             return cmd
@@ -55,6 +53,10 @@ class Esbmc(Backend):
         return translateCPROVER54(cex, info)
 
     def preprocess(self, code, _):
+        # Get info and pc invariants
+        info = self.get_info(parsed=True)
+        info.scan_pcmap(code)
+
         # preprocess the generated C code
         preproc = pcpp.Preprocessor()
         preproc.parse(code)
@@ -63,7 +65,6 @@ class Esbmc(Backend):
         f.seek(0)
         code = f.read()
 
-        info = self.get_info(parsed=True)
         ranges, fix, depends, wont_change = value_analysis(self.cli, info, Stripes)  # noqa: E501
         self.verbose_output(
             f"Value analysis: {ranges=}, {fix=}, {depends=}, {wont_change=}")
@@ -186,7 +187,10 @@ class Esbmc(Backend):
                     # Local variable
                     continue
 
-        loop_assumptions = "\n    ".join(loop_assumptions)
+        loop_assumptions = "\n    ".join(loop_assumptions) + "\n    "
+        loop_assumptions += "\n    ".join(
+            f"__CPROVER_assume({x});" for x in info.get_pc_invariants())
+
         loop_assumptions = f"void __invariants(void) {{\n{loop_assumptions}\n}}"  # noqa: E501
         code = code.replace(
             """void __invariants(void) { }""",
@@ -195,15 +199,15 @@ class Esbmc(Backend):
         head_of_loop = re.compile(r'while\s*\(1\)\s*{')
         code = head_of_loop.sub("while (1) {\n __invariants();", code)
 
-        esbmc_conf = f"""
+        esbmc_conf = """
         (without-bitwise)
         (replace-calls
             (__CPROVER_nondet nondet_int)
             (__CPROVER_assert __ESBMC_assert)
             (__CPROVER_assume __ESBMC_assume)
         )
-        {"(without-arrays)" if self.cli[Args.STEPS] == 0 else ""}
         """
+        # {"(without-arrays)" if self.cli[Args.STEPS] == 0 else ""}
         return absentee.parse_and_execute(code, esbmc_conf)
 
     def handle_success(self, out, info) -> ExitStatus:

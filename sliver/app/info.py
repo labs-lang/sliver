@@ -67,6 +67,7 @@ class Info(object):
         self.spawn = spawn
         self.i = {}
         self.lstig = {}
+        self.pcs_raw = []
         self.externs = externs
         self.properties = tuple(p for p in props.split(";") if p)
         self.assumes = tuple(p for p in assumes.split(";") if p)
@@ -75,6 +76,20 @@ class Info(object):
             self.lstig.update(c.lstig)
         self.e = {i: v for i, v in enumerate(e)}
         self.raw = raw
+
+    def scan_pcmap(self, code):
+        self.pcs_raw = [ln.strip() for ln in code.splitlines() if "//PC//" in ln]  # noqa: E501
+
+    def get_pc_invariants(self):
+        pattern = re.compile(r"[^\/]*\/\/PC\/\/([^=]+)=(.+)")
+        result = []
+        for raw in self.pcs_raw:
+            match = pattern.match(raw)
+            agent, cond = match.group(1), match.group(2)
+            result.extend(
+                cond.replace("$tid$", str(tid))
+                for tid in self.spawn.tids(agent))
+        return result
 
     @staticmethod
     def parse(txt, externs=[]):
