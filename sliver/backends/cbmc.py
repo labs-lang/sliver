@@ -113,6 +113,8 @@ class Cbmc(Backend):
         CBMC_V, CBMC_SUBV = self.get_cbmc_version(cmd)
         if not (int(CBMC_V) <= 5 and int(CBMC_SUBV) <= 4):
             cmd += ["--trace", "--stop-on-fail"]
+        if (int(CBMC_V) >= 6):
+            cmd.append("--no-standard-checks")
         if self.cli[Args.DEBUG]:
             cmd += ["--bounds-check", "--signed-overflow-check"]
         cmd.append(fname)
