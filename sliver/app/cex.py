@@ -4,7 +4,7 @@ from pyparsing import (
     Forward, Suppress, Group, ParserElement, Keyword, dblQuotedString,
     removeQuotes, SkipTo, StringEnd, Regex, printables, replaceWith, Optional)
 from pyparsing import pyparsing_common as ppc
-
+from ..backends.cbmc_grammar import parser as lark_parser
 
 ATTR = re.compile(r"I\[([0-9]+)l?\]\[([0-9]+)l?\]")
 LSTIG = re.compile(r"Lvalue\[([0-9]+)l?\]\[([0-9]+)l?\]")
@@ -57,16 +57,13 @@ def translateCPROVER(cex, info, parser=TRACE):
             return fmt(is_lstig, "L", tid)
         return ""
 
-    def get_value(rhs):
-        return rhs.rsplit("(", 1)[0].strip()
-
     cex_start_pos = cex.find("Counterexample:") + 15
     cex_end_pos = cex.rfind("Violated property:")
-    states = parser.parseString(cex[cex_start_pos:cex_end_pos], parseAll=False)
+    states = lark_parser.parse(cex[cex_start_pos:cex_end_pos]).children
 
     inits = [
-        (s[1].lhs, get_value(s[1].rhs)) for s in states
-        if s[0].function == "init" and not LTSTAMP.match(s[1][0])]
+        (s.lhs, s.rhs) for s in states
+        if s.function == "init" and not LTSTAMP.match(s.lhs)]
     # Hack to display variables which were initialized to 0
     for (store, loc) in ((info.e, "E"), (info.i, "I"), (info.lstig, "L")):
         for tid in range(info.spawn.num_agents()):
@@ -80,10 +77,9 @@ def translateCPROVER(cex, info, parser=TRACE):
             if store == info.e:
                 break
 
-    others = [
-        (s[0].function, s[0].line, s[1].lhs, get_value(s[1].rhs))
-        for s in states
-        if s[0].function not in ("init", "__CPROVER_initialize")]
+    others = (
+        s for s in states
+        if s.function not in ("init", "__CPROVER_initialize"))
     yield "<initialization>"
     for i in inits:
         pprint = pprint_assign(*i, init=True)
@@ -94,28 +90,28 @@ def translateCPROVER(cex, info, parser=TRACE):
     agent = ""
     system = None
     last_line = None
-    for i, (func, line, var, value) in enumerate(others):
-        if var == "__LABS_step":
+    for i, state in enumerate(others):
+        if state.lhs == "__LABS_step":
             if system:
                 yield f"\n<end {system}>"
                 system = None
-            yield f"""\n<step {int(value.replace("u", ""))}>"""
-        elif var == "__sim_spurious" and value == "TRUE":
+            yield f"""\n<step {state.rhs}>"""
+        elif state.lhs == "__sim_spurious" and state.rhs is True:
             yield "\n<spurious>"
             break
-        elif var == "guessedkey":
-            system = func
-            yield f"\n<{pprint_agent(info, agent)}: {func} '{info.lstig[int(value)].name}'>"  # noqa: E501
-        elif var in ("firstAgent", "scheduled"):
-            agent = value
+        elif state.lhs == "guessedkey":
+            system = state.function
+            yield f"\n<{pprint_agent(info, agent)}: {state.function} '{info.lstig[int(state.rhs)].name}'>"  # noqa: E501
+        elif state.lhs in ("firstAgent", "scheduled"):
+            agent = state.rhs
         # simulation: printf messages
-        elif var == "format" and value.startswith('"(SIMULATION)'):
-            yield f"\n<{value[1:-1]}>"
+        elif state.lhs == "format" and state.rhs.startswith('"(SIMULATION)'):
+            yield f"\n<{state.rhs[1:-1]}>"
         # If multiple assignments correspond to the same line, it's because
         # we assigned to an array and CBMC is printing out the whole thing
-        elif last_line != line:
-            pprint = pprint_assign(var, value, agent)
-            last_line = line
+        elif last_line != state.line:
+            pprint = pprint_assign(state.lhs, state.rhs, agent)
+            last_line = state.line
             if pprint:
                 yield pprint
 
@@ -123,8 +119,6 @@ def translateCPROVER(cex, info, parser=TRACE):
     prop = PROP.parseString(violation)
     if prop[0] != "__sliver_simulation__":
         yield f"\n<property violated: '{prop[0]}'>"
-    # yield f"\n<Translation took {time.time()-tr_start} s>"
-    # yield f"\n<Full time is {time.time()-start} s>"
     yield "\n"
 
 
