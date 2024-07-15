@@ -150,6 +150,9 @@ class Info(object):
         else:
             return v.name
 
+    def pprint_agent(self, tid):
+        return "{} {}".format(self.spawn[int(tid)], tid)
+
     def pprint_assign(self, where, key, value):
         store, arrow = {
             "E": (self.e, "<--"),

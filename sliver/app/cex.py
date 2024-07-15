@@ -6,10 +6,6 @@ from pyparsing import pyparsing_common as ppc
 from pyparsing import removeQuotes, replaceWith
 
 
-def pprint_agent(info, tid):
-    return f"{info.spawn[int(tid)]} {tid}"
-
-
 def translate_cadp(cex, info):
     lines = cex.split('\n')
     first_line = next(
@@ -52,17 +48,17 @@ def translate_cadp(cex, info):
         elif step[0] == "MONITOR":
             yield f"""<property {"satisfied" if step[1] else "violated"}>\n"""
         elif step[0] == "E":
-            agent = pprint_agent(info, step[1])
+            agent = info.pprint_agent(step[1])
             yield f"{step.asList()}"
             yield f"{agent}:\t{info.pprint_assign(*step[:3])}\n"
         elif step[0] == "ATTR":
-            agent = pprint_agent(info, step[1])
+            agent = info.pprint_agent(step[1])
             yield f"{agent}:\t{info.pprint_assign('I', *step[2:4])}\n"
         elif step[0] == "L":
-            agent = pprint_agent(info, step[1])
+            agent = info.pprint_agent(step[1])
             if len(step) > 4:
                 # This was a stigmergic message sent from another agent
-                yield f"{agent}:\t{info.pprint_assign('L', *step[2:4])}\t(from {pprint_agent(info, step[4])})\n"  # noqa: E501
+                yield f"{agent}:\t{info.pprint_assign('L', *step[2:4])}\t(from {info.pprint_agent(step[4])})\n"  # noqa: E501
             else:
                 # This was an assignment from the agent itself
                 yield f"{agent}:\t{info.pprint_assign('L', *step[2:4])}\n"
@@ -79,7 +75,7 @@ def translate_nuxmv(cex, info):
         def fmt(match, store_name, tid):
             tid = match[1] if len(match.groups()) > 1 else tid
             k = match[2] if len(match.groups()) > 1 else match[1]
-            agent = f"{pprint_agent(info, tid)}:" if tid != "" else ""
+            agent = f"{info.pprint_agent(tid)}:" if tid != "" else ""
             assign = info.pprint_assign(store_name, int(k), value)
             # endline = " " if not(init) and store_name == "L" else "\n"
             return f"\n{agent}\t{assign}"

@@ -54,8 +54,6 @@ class NuXmv(Backend):
         return ExitStatus.SUCCESS
 
     def handle_success(self, out: str, info) -> ExitStatus:
-        # trace_start = out.find("-> State")
-        # print(out[trace_start::])
         print(*self.translate_cex(out, info), sep="", end="")
 
     def translate_cex(self, out, info):

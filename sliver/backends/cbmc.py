@@ -16,7 +16,6 @@ from subprocess import (DEVNULL, PIPE, STDOUT, CalledProcessError,
 
 from lark import Lark
 
-from ..app.cex import pprint_agent
 from ..app.cli import Args, ExitStatus, SliverError
 from ..app.info import get_var
 from ..atlas.concretizer import Concretizer
@@ -128,16 +127,12 @@ def translateCPROVER(cex, info, parser):
     ENV = re.compile(r"E\[([0-9]+)l?\]")
     # STUFF = Word(printables)
 
-    # TODO: fix property parser for "new" versions of CBMC
-    # PROP = Suppress(SkipTo(LineEnd())) + Suppress(SkipTo(LineStart())) + STUFF + Suppress(SkipTo(StringEnd()))  # noqa: E501
-
     def pprint_assign(var, value, tid="", init=False):
         def fmt(match, store_name, tid):
             tid = match[1] if len(match.groups()) > 1 else tid
             k = match[2] if len(match.groups()) > 1 else match[1]
-            agent = f"{pprint_agent(info, tid)}:" if tid != "" else ""
+            agent = f"{info.pprint_agent(tid)}:" if tid != "" else ""
             assign = info.pprint_assign(store_name, int(k), value)
-            # endline = " " if not(init) and store_name == "L" else "\n"
             return f"\n{agent}\t{assign}"
         is_attr = ATTR.match(var)
         if is_attr and info.i:
@@ -194,7 +189,7 @@ def translateCPROVER(cex, info, parser):
             break
         elif state.lhs == "guessedkey":
             system = state.function
-            yield f"\n<{pprint_agent(info, agent)}: {state.function} '{info.lstig[int(state.rhs)].name}'>"  # noqa: E501
+            yield f"\n<{info.pprint_agent(agent)}: {state.function} '{info.lstig[int(state.rhs)].name}'>"  # noqa: E501
         elif state.lhs in ("firstAgent", "scheduled"):
             agent = state.rhs
         # simulation: printf messages
