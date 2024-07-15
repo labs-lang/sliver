@@ -292,10 +292,10 @@ def get_var(lst, index):
     E.g. if lst contains an array X of size 3 and a scalar Y,
     get_var(lst, 2) returns X
     """
-    if type(index) != int:
+    if type(index) is not int:
         raise TypeError()
 
-    if type(lst) == dict:
+    if type(lst) is dict:
         lst = list(lst.values())
         lst.sort(key=lambda x: x.index)
 
