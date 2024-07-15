@@ -1,125 +1,13 @@
 import re
-from pyparsing import (
-    LineEnd, LineStart, Word, alphanums, delimitedList, OneOrMore, ZeroOrMore,
-    Forward, Suppress, Group, ParserElement, Keyword, dblQuotedString,
-    removeQuotes, SkipTo, StringEnd, Regex, printables, replaceWith, Optional)
+
+from pyparsing import (Forward, Group, Keyword, ParserElement, Suppress, Word,
+                       ZeroOrMore, alphanums, dblQuotedString, delimitedList)
 from pyparsing import pyparsing_common as ppc
-from ..backends.cbmc_grammar import parser as lark_parser
-
-ATTR = re.compile(r"I\[([0-9]+)l?\]\[([0-9]+)l?\]")
-LSTIG = re.compile(r"Lvalue\[([0-9]+)l?\]\[([0-9]+)l?\]")
-LTSTAMP = re.compile(r"Ltstamp\[([0-9]+)l?\]\[([0-9]+)l?\]")
-ENV = re.compile(r"E\[([0-9]+)l?\]")
-STUFF = Word(printables)
-STATE = Keyword("State").suppress()
-SKIP = Regex(r'Assumption:|(SIMULATION)') + SkipTo(STATE)
-
-
-HEADER = Regex(r'(?:State (?P<state>\d+) )?file (?P<file>[^\s]+)( function (?P<function>[^\s]+))? line (?P<line>\d+) (?:thread (?P<thread>\d+))?')  # noqa: E501
-HEADER_OLD = Regex(r'(?:State (?P<state>\d+) )?file (?P<file>[^\s]+) line (?P<line>\d+)( function (?P<function>[^\s]+))? (?:thread (?P<thread>\d+))?')  # noqa: E501
-SEP = Keyword("----------------------------------------------------")
-ASGN = Regex(r'(?P<lhs>[^\s=]+)\s?=\s?(?P<rhs>.+)')
-TRACE = OneOrMore(Group(Group(HEADER) + SEP.suppress() + Optional(Group(ASGN)))).ignore(OneOrMore(SKIP))  # noqa: E501
-TRACE_OLD = OneOrMore(Group(Group(HEADER_OLD) + SEP.suppress() + Group(ASGN))).ignore(OneOrMore(SKIP))  # noqa: E501
-# TODO: fix property parser for "new" versions of CBMC
-PROP = Suppress(SkipTo(LineEnd())) + Suppress(SkipTo(LineStart())) + STUFF + Suppress(SkipTo(StringEnd()))  # noqa: E501
+from pyparsing import removeQuotes, replaceWith
 
 
 def pprint_agent(info, tid):
     return f"{info.spawn[int(tid)]} {tid}"
-
-
-def translateCPROVER54(cex, info):
-    yield from translateCPROVER(cex, info, parser=TRACE_OLD)
-
-
-def translateCPROVERNEW(cex, info):
-    yield from translateCPROVER(cex, info, parser=TRACE)
-
-
-def translateCPROVER(cex, info, parser=TRACE):
-    def pprint_assign(var, value, tid="", init=False):
-        def fmt(match, store_name, tid):
-            tid = match[1] if len(match.groups()) > 1 else tid
-            k = match[2] if len(match.groups()) > 1 else match[1]
-            agent = f"{pprint_agent(info, tid)}:" if tid != "" else ""
-            assign = info.pprint_assign(store_name, int(k), value)
-            # endline = " " if not(init) and store_name == "L" else "\n"
-            return f"\n{agent}\t{assign}"
-        is_attr = ATTR.match(var)
-        if is_attr and info.i:
-            return fmt(is_attr, "I", tid)
-        is_env = ENV.match(var)
-        if is_env:
-            return fmt(is_env, "E", tid)
-        is_lstig = LSTIG.match(var)
-        if is_lstig:
-            return fmt(is_lstig, "L", tid)
-        return ""
-
-    cex_start_pos = cex.find("Counterexample:") + 15
-    cex_end_pos = cex.rfind("Violated property:")
-    states = lark_parser.parse(cex[cex_start_pos:cex_end_pos]).children
-
-    inits = [
-        (s.lhs, s.rhs) for s in states
-        if s.function == "init" and not LTSTAMP.match(s.lhs)]
-    # Hack to display variables which were initialized to 0
-    for (store, loc) in ((info.e, "E"), (info.i, "I"), (info.lstig, "L")):
-        for tid in range(info.spawn.num_agents()):
-            for var in store.values():
-                vals = var.values(tid)
-                if len(vals) == 1 and vals[0] == 0:
-                    size = var.size if var.is_array else 1
-                    for off in range(0, size):
-                        tid_fmt = f"[{tid}]" if loc != "E" else ""
-                        inits.append((f"{loc}{tid_fmt}[{var.index + off}]", "0"))  # noqa: E501
-            if store == info.e:
-                break
-
-    others = (
-        s for s in states
-        if s.function not in ("init", "__CPROVER_initialize"))
-    yield "<initialization>"
-    for i in inits:
-        pprint = pprint_assign(*i, init=True)
-        if pprint:
-            yield pprint
-    yield "\n<end initialization>"
-
-    agent = ""
-    system = None
-    last_line = None
-    for i, state in enumerate(others):
-        if state.lhs == "__LABS_step":
-            if system:
-                yield f"\n<end {system}>"
-                system = None
-            yield f"""\n<step {state.rhs}>"""
-        elif state.lhs == "__sim_spurious" and state.rhs is True:
-            yield "\n<spurious>"
-            break
-        elif state.lhs == "guessedkey":
-            system = state.function
-            yield f"\n<{pprint_agent(info, agent)}: {state.function} '{info.lstig[int(state.rhs)].name}'>"  # noqa: E501
-        elif state.lhs in ("firstAgent", "scheduled"):
-            agent = state.rhs
-        # simulation: printf messages
-        elif state.lhs == "format" and state.rhs.startswith('"(SIMULATION)'):
-            yield f"\n<{state.rhs[1:-1]}>"
-        # If multiple assignments correspond to the same line, it's because
-        # we assigned to an array and CBMC is printing out the whole thing
-        elif last_line != state.line:
-            pprint = pprint_assign(state.lhs, state.rhs, agent)
-            last_line = state.line
-            if pprint:
-                yield pprint
-
-    violation = cex[cex_end_pos + 18:]
-    prop = PROP.parseString(violation)
-    if prop[0] != "__sliver_simulation__":
-        yield f"\n<property violated: '{prop[0]}'>"
-    yield "\n"
 
 
 def translate_cadp(cex, info):
@@ -185,6 +73,7 @@ def translate_cadp(cex, info):
 def translate_nuxmv(cex, info):
     ATTR = re.compile(r"i\[([0-9]+)l?\]\[([0-9]+)l?\]")
     ENV = re.compile(r"e\[([0-9]+)l?\]")
+    LSTIG = re.compile(r"lstig\[([0-9]+)l?\]\[([0-9]+)l?\]")
 
     def pprint_assign(var, value, tid="", init=False):
         def fmt(match, store_name, tid):

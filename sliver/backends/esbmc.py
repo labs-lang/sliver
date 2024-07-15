@@ -11,10 +11,10 @@ import pcpp
 from sliver.analysis.domains import Stripes, Sign
 
 from ..absentee.absentee import absentee
-from ..app.cex import translateCPROVER54
 from ..app.cli import Args, ExitStatus, SliverError
 from ..analysis.value_analysis import value_analysis
 from .common import Backend, Language
+from .cbmc import translateCPROVER54
 
 
 class Esbmc(Backend):

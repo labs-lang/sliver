@@ -1,0 +1,39 @@
+%import common.INT
+%import common.SIGNED_NUMBER
+%import common.WS
+%ignore WS
+%ignore ASSUMPTION
+%ignore SIM_ANNOTATION
+
+ASSUMPTION: /Assumption:\n.*\n.*/m
+SIM_ANNOTATION: /(SIMULATION):.*/
+
+NAME: /[^-][^\s=]*/
+BITS: /[01 ]+/
+_SEP: "----------------------------------------------------"
+
+?rhs    : "TRUE"  -> true
+        | "FALSE"  -> false
+        | SIGNED_NUMBER ["u"]
+        | "{" rhs ("," rhs)* "}"
+
+integer : INT
+_name : NAME
+
+_rhs_bits    : BITS
+            | "{" _rhs_bits ("," _rhs_bits)* "}"
+
+header : \
+    "State" integer "file" _name "function" _name \
+    "line" integer "thread" integer
+
+header_54 : \
+    "State" integer "file" _name "line" integer \
+    "function" _name "thread" integer
+
+_asgn : _name "=" rhs "(" _rhs_bits ")"
+state : header _SEP _asgn
+state_54 : header_54 _SEP _asgn
+
+start : state*
+start_54 : state_54*

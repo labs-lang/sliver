@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+from dataclasses import dataclass
 import os
 from hashlib import sha1
 import platform
 from random import getrandbits
+import re
 import stat
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
@@ -12,11 +14,13 @@ from operator import mul
 from subprocess import (DEVNULL, PIPE, STDOUT, CalledProcessError,
                         check_output, run)
 
-from ..app.cex import translateCPROVER54, translateCPROVERNEW
+from lark import Lark
+
+from ..app.cex import pprint_agent
 from ..app.cli import Args, ExitStatus, SliverError
 from ..app.info import get_var
 from ..atlas.concretizer import Concretizer
-from .common import Backend, Language, log_call
+from .common import Backend, BaseTransformer, Language, log_call
 
 
 def to_cbmc_hex(numeric_string):
@@ -79,6 +83,135 @@ class DimacsMapping:
             n for n in self.mapping
             if n.startswith(name) and "FALSE" not in self[n]]
         return min(candidates, key=get_version)
+
+
+@dataclass
+class State:
+    state: int
+    file: str
+    function: str
+    line: int
+    lhs: str
+    rhs: any
+
+
+class CbmcCexTransformer(BaseTransformer):
+    def state(self, n):
+        header, lhs, rhs, *_ = n
+        state_id, file, function, line, _ = header.children
+        return State(state_id, file, function, line, lhs, rhs)
+
+
+def translateCPROVER54(cex, info):
+    with resources.path("sliver.grammars", "cbmc_cex.lark") as grammar_path:
+        with open(grammar_path) as grammar:
+            lark_parser = Lark(grammar,
+                               parser='lalr',
+                               start='start54',
+                               transformer=CbmcCexTransformer())
+    yield from translateCPROVER(cex, info, parser=lark_parser)
+
+
+def translateCPROVERNEW(cex, info):
+    with resources.path("sliver.grammars", "cbmc_cex.lark") as grammar_path:
+        with open(grammar_path) as grammar:
+            lark_parser = Lark(grammar,
+                               parser='lalr',
+                               transformer=CbmcCexTransformer())
+    yield from translateCPROVER(cex, info, parser=lark_parser)
+
+
+def translateCPROVER(cex, info, parser):
+    ATTR = re.compile(r"I\[([0-9]+)l?\]\[([0-9]+)l?\]")
+    LSTIG = re.compile(r"Lvalue\[([0-9]+)l?\]\[([0-9]+)l?\]")
+    LTSTAMP = re.compile(r"Ltstamp\[([0-9]+)l?\]\[([0-9]+)l?\]")
+    ENV = re.compile(r"E\[([0-9]+)l?\]")
+    # STUFF = Word(printables)
+
+    # TODO: fix property parser for "new" versions of CBMC
+    # PROP = Suppress(SkipTo(LineEnd())) + Suppress(SkipTo(LineStart())) + STUFF + Suppress(SkipTo(StringEnd()))  # noqa: E501
+
+    def pprint_assign(var, value, tid="", init=False):
+        def fmt(match, store_name, tid):
+            tid = match[1] if len(match.groups()) > 1 else tid
+            k = match[2] if len(match.groups()) > 1 else match[1]
+            agent = f"{pprint_agent(info, tid)}:" if tid != "" else ""
+            assign = info.pprint_assign(store_name, int(k), value)
+            # endline = " " if not(init) and store_name == "L" else "\n"
+            return f"\n{agent}\t{assign}"
+        is_attr = ATTR.match(var)
+        if is_attr and info.i:
+            return fmt(is_attr, "I", tid)
+        is_env = ENV.match(var)
+        if is_env:
+            return fmt(is_env, "E", tid)
+        is_lstig = LSTIG.match(var)
+        if is_lstig:
+            return fmt(is_lstig, "L", tid)
+        return ""
+
+    cex_start_pos = cex.find("Counterexample:") + 15
+    cex_end_pos = cex.rfind("Violated property:")
+    states = parser.parse(cex[cex_start_pos:cex_end_pos]).children
+
+    inits = [
+        (s.lhs, s.rhs) for s in states
+        if s.function == "init" and not LTSTAMP.match(s.lhs)]
+    # Hack to display variables which were initialized to 0
+    for (store, loc) in ((info.e, "E"), (info.i, "I"), (info.lstig, "L")):
+        for tid in range(info.spawn.num_agents()):
+            for var in store.values():
+                vals = var.values(tid)
+                if len(vals) == 1 and vals[0] == 0:
+                    size = var.size if var.is_array else 1
+                    for off in range(0, size):
+                        tid_fmt = f"[{tid}]" if loc != "E" else ""
+                        inits.append((f"{loc}{tid_fmt}[{var.index + off}]", "0"))  # noqa: E501
+            if store == info.e:
+                break
+
+    others = (
+        s for s in states
+        if s.function not in ("init", "__CPROVER_initialize"))
+    yield "<initialization>"
+    for i in inits:
+        pprint = pprint_assign(*i, init=True)
+        if pprint:
+            yield pprint
+    yield "\n<end initialization>"
+
+    agent = ""
+    system = None
+    last_line = None
+    for i, state in enumerate(others):
+        if state.lhs == "__LABS_step":
+            if system:
+                yield f"\n<end {system}>"
+                system = None
+            yield f"""\n<step {state.rhs}>"""
+        elif state.lhs == "__sim_spurious" and state.rhs is True:
+            yield "\n<spurious>"
+            break
+        elif state.lhs == "guessedkey":
+            system = state.function
+            yield f"\n<{pprint_agent(info, agent)}: {state.function} '{info.lstig[int(state.rhs)].name}'>"  # noqa: E501
+        elif state.lhs in ("firstAgent", "scheduled"):
+            agent = state.rhs
+        # simulation: printf messages
+        elif state.lhs == "format" and state.rhs.startswith('"(SIMULATION)'):
+            yield f"\n<{state.rhs[1:-1]}>"
+        # If multiple assignments correspond to the same line, it's because
+        # we assigned to an array and CBMC is printing out the whole thing
+        elif last_line != state.line:
+            pprint = pprint_assign(state.lhs, state.rhs, agent)
+            last_line = state.line
+            if pprint:
+                yield pprint
+
+    violation = cex[cex_end_pos + 18:].splitlines()
+    if len(violation) >= 3 and "__sliver_simulation__" not in violation[2]:
+        yield f"\n<property violated: '{violation[2].strip()}'>"
+    yield "\n"
 
 
 class Cbmc(Backend):
