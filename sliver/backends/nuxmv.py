@@ -2,11 +2,55 @@
 from hashlib import sha1
 from subprocess import run, PIPE
 import tempfile
+import re
 
 from sliver.app.cli import ExitStatus
 from ..app.cli import Args
 from .common import Backend, Language, log_call
-from ..app.cex import translate_nuxmv
+
+
+def translate_nuxmv(cex, info):
+    ATTR = re.compile(r"i\[([0-9]+)l?\]\[([0-9]+)l?\]")
+    ENV = re.compile(r"e\[([0-9]+)l?\]")
+    LSTIG = re.compile(r"lstig\[([0-9]+)l?\]\[([0-9]+)l?\]")
+
+    def pprint_assign(var, value, tid="", init=False):
+        def fmt(match, store_name, tid):
+            tid = match[1] if len(match.groups()) > 1 else tid
+            k = match[2] if len(match.groups()) > 1 else match[1]
+            agent = f"{info.pprint_agent(tid)}:" if tid != "" else ""
+            assign = info.pprint_assign(store_name, int(k), value)
+            return f"\n{agent}\t{assign}"
+        is_attr = ATTR.match(var)
+        if is_attr and info.i:
+            return fmt(is_attr, "I", tid)
+        is_env = ENV.match(var)
+        if is_env:
+            return fmt(is_env, "E", tid)
+        is_lstig = LSTIG.match(var)
+        if is_lstig:
+            return fmt(is_lstig, "L", tid)
+        return ""
+
+    tid = ""
+    for i, state in enumerate(cex.split("->")[2:]):
+        if i == 0:
+            yield "<initialization>"
+        elif i == 1:
+            yield "\n<end initialization>"
+        if i % 2 == 1:
+            yield f"""\n<step {(i // 2)}>"""
+        for asgn in state.split("<-")[1].split("\n"):
+            asgn = asgn.strip()
+            if asgn:
+                lhs, rhs = asgn.split("=")
+                if lhs == "tid":
+                    tid = rhs.strip()
+                    continue
+                pprint = pprint_assign(lhs, rhs, tid, i > 0)
+                if pprint:
+                    yield pprint
+    yield f"""\n<step {(i // 2)}>\n"""
 
 
 class NuXmv(Backend):
