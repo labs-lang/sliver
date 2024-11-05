@@ -1,3 +1,9 @@
+Version 5.0 - 2024-11
+
+C translation: general improvements
+LAbS: Added counting assignment to local variable (e.g., "c := count Agent x, ...")
+LAbS: Improved syntax of link expressions (used for stigmergies and pick instructions)
+
 Version 4.0 - 2023-05
 
 C translation: general improvements
@@ -17,6 +23,7 @@ LAbS: Added nondeterministic agent selection "pick"
 LAbS: Added ternary operator "if cond then expr1 else expr2"
 LAbS: Underscores ("_") can now be used within all names (but not at the beginning of a name)
 LAbS: Arithmetic expressions can now be used where a Boolean expression is expected ("expr" is desugared into "expr != 0")
+
 SLiVER: CBMC backend now supports simulation
 SLiVER: Added a compositional CADP backend "cadp-comp" (experimental)
 
