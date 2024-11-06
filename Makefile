@@ -1,4 +1,4 @@
-.PHONY: osx linux rmsentinels
+.PHONY: osx linux rmsentinels test
 osx: platform = osx-x64
 osx: VENDOR_DIR = vendor/osx
 linux: VENDOR_DIR = vendor/linux
@@ -6,12 +6,13 @@ osx_cseq: platform = osx-x64
 linux: platform = linux-x64
 linux_cseq: platform = linux-x64
 zip_linux: platform = linux-x64
+test: platform = osx-x64
 
 # Source files
 sliver_sources = $(wildcard sliver/**/*.py) 
 labs_sources = $(wildcard labs/**/*.fs) 
 labs_templates = $(wildcard labs/LabsTranslate/templates/**/*.c) $(wildcard labs/LabsTranslate/templates/**/*.lnt) $(wildcard labs/LabsTranslate/templates/**/*.smv) 
-labs_examples = $(wildcard labs-examples/**/*.labs) labs-examples/LICENSE
+labs_examples = $(wildcard labs-examples/**/*.labs)
 
 VERSION := $(strip $(shell grep version sliver/app/__about__.py | grep = | sed 's/"//g' | awk 'NF{print $$NF}'))
 RELEASENAME = sliver-v$(VERSION)_$(strip $(subst -,_, ${platform}))
@@ -32,7 +33,7 @@ build/%/sliver.py :
 	@# Remove untracked files from release directory
 	@rm -f $(foreach f, $(BLACKLIST), $(@D)/$(f)) ;
 
-build/%/examples/README.md : $(labs_examples)
+build/%/examples/README.md : $(labs_examples) labs-examples/LICENSE
 	@echo Copying examples...
 	@cp -r labs-examples $(BUILD_DIR)/examples
 
@@ -79,3 +80,16 @@ zip_linux : linux
 	cp -r build/$(platform) build/$(RELEASENAME)
 	cd build && zip -r $(RELEASENAME).zip $(RELEASENAME)
 	rm -rf build/$(RELEASENAME)
+
+# Very basic regression testing: run sliver on all examples and see if
+# it can produce a program (we just test the C encoding, for now)
+test : osx
+	@cd $(BUILD_DIR); \
+	for example in $(labs_examples); \
+	do ./sliver.py ../../$$example \
+		--show --steps 1 \
+		alpha=1 birds=1 delta=1 drop=1 foody=1 foodx=1 gamma=1 grid=1 k=1 \
+		lambda=1 m=1 n=1 no=1 omega=1 size=1 sz=1 range=1 thresh=1 tmin=1 tmax=1 \
+		workers=1 yes=1 \
+		|| exit 1; \
+	done
