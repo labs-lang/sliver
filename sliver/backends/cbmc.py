@@ -97,26 +97,21 @@ class State:
 class CbmcCexTransformer(BaseTransformer):
     def state(self, n):
         header, lhs, rhs, *_ = n
-        state_id, file, function, line, _ = header.children
+        state_id, file, function, line, *_ = header.children
         return State(state_id, file, function, line, lhs, rhs)
 
 
 def translateCPROVER54(cex, info):
     with resources.path("sliver.grammars", "cbmc_cex.lark") as grammar_path:
         with open(grammar_path) as grammar:
-            lark_parser = Lark(grammar,
-                               parser='lalr',
-                               start='start54',
-                               transformer=CbmcCexTransformer())
+            lark_parser = Lark(grammar, parser='lalr', start='start54')
     yield from translateCPROVER(cex, info, parser=lark_parser)
 
 
 def translateCPROVERNEW(cex, info):
     with resources.path("sliver.grammars", "cbmc_cex.lark") as grammar_path:
         with open(grammar_path) as grammar:
-            lark_parser = Lark(grammar,
-                               parser='lalr',
-                               transformer=CbmcCexTransformer())
+            lark_parser = Lark(grammar, parser='lalr')
     yield from translateCPROVER(cex, info, parser=lark_parser)
 
 
@@ -147,7 +142,10 @@ def translateCPROVER(cex, info, parser):
 
     cex_start_pos = cex.find("Counterexample:") + 15
     cex_end_pos = cex.rfind("Violated property:")
-    states = parser.parse(cex[cex_start_pos:cex_end_pos]).children
+    tree = parser.parse(cex[cex_start_pos:cex_end_pos])
+    transformer = CbmcCexTransformer()
+    tree = transformer.transform(tree)
+    states = tree.children
 
     inits = [
         (s.lhs, s.rhs) for s in states

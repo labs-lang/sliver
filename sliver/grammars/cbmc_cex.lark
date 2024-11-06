@@ -14,22 +14,18 @@ _SEP: "----------------------------------------------------"
 
 ?rhs    : "TRUE"  -> true
         | "FALSE"  -> false
-        | SIGNED_NUMBER ["u"]
+        | SIGNED_NUMBER [ "ul" | "u" | "l" ]
         | "{" rhs ("," rhs)* "}"
 
-integer : INT
+integer : INT 
 _name : NAME
 
-_rhs_bits    : BITS
+_rhs_bits   : BITS
             | "{" _rhs_bits ("," _rhs_bits)* "}"
 
-header : \
-    "State" integer "file" _name "function" _name \
-    "line" integer "thread" integer
+header : "State" integer "file" _name "function" _name "line" integer "thread" integer
 
-header_54 : \
-    "State" integer "file" _name "line" integer \
-    "function" _name "thread" integer
+header_54 : "State" integer "file" _name "line" integer "function" _name "thread" integer
 
 _asgn : _name "=" rhs "(" _rhs_bits ")"
 state : header _SEP _asgn

@@ -50,13 +50,11 @@ class BaseTransformer(Transformer):
         return False
 
     def SIGNED_NUMBER(self, n):
+        n = "".join(n)
         try:
             return int(n)
         except Exception:
             return float(n)
-
-    def NAME(self, n):
-        return str(n)
 
 
 class Backend:
