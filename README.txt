@@ -1,6 +1,6 @@
 
-            SLiVER  5.0
-          5 November 2024
+            SLiVER  5.1
+          6 November 2024
 
 The SLiVER LAbS VERification tool
 
@@ -71,4 +71,3 @@ Invoking the tool without options:
     ./sliver.py
 
 will provide further usage directions.
-

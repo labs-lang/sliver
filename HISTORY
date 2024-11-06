@@ -1,3 +1,8 @@
+Version 5.1 - 2024-11
+
+SLiVER: Fixed a bug with CBMC counterexample parsing
+LAbS: Updated/improved bundled examples
+
 Version 5.0 - 2024-11
 
 C translation: general improvements
