@@ -329,7 +329,9 @@ class labs_feeder_parallel(core.module.BasicModule):
 			l.release()
 
 def feed_sim(mod, cmd, info, timeout, number, basename):
-	"""Single-process simulation 
+	"""Single-process simulation
+
+	Might not work in sliver >= 6 (and anyway we're not using it at the moment)
 	"""
 	place = {
 		"I": 		'c init::1::_I!0@1#1 ',
