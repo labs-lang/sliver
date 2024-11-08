@@ -239,7 +239,8 @@ class Cbmc(Backend):
         with tempfile.NamedTemporaryFile() as dimacs_file:
             cmd = self.get_cmdline(fname, info)
             cmd.extend(("--dimacs", "--outfile", dimacs_file.name))
-            _ = check_output(cmd, stderr=DEVNULL)
+            log_call(cmd)
+            check_output(cmd, stderr=DEVNULL)
             dimacs_file.seek(0)
             return DimacsMapping(dimacs_file)
 
