@@ -84,7 +84,7 @@ HELPMSG = {
 DEFAULTS = {
     Args.BACKEND: "cbmc",
     Args.BV: True,
-    Args.CONCRETIZATION: "src",
+    Args.CONCRETIZATION: "sat",
     Args.CORES: 1,
     Args.DEBUG: False,
     Args.FAIR: False,
