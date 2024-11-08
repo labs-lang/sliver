@@ -150,18 +150,6 @@ def translateCPROVER(cex, info, parser):
     inits = [
         (s.lhs, s.rhs) for s in states
         if s.function == "init" and not LTSTAMP.match(s.lhs)]
-    # Hack to display variables which were initialized to 0
-    for (store, loc) in ((info.e, "E"), (info.i, "I"), (info.lstig, "L")):
-        for tid in range(info.spawn.num_agents()):
-            for var in store.values():
-                vals = var.values(tid)
-                if len(vals) == 1 and vals[0] == 0:
-                    size = var.size if var.is_array else 1
-                    for off in range(0, size):
-                        tid_fmt = f"[{tid}]" if loc != "E" else ""
-                        inits.append((f"{loc}{tid_fmt}[{var.index + off}]", "0"))  # noqa: E501
-            if store == info.e:
-                break
 
     others = (
         s for s in states
@@ -353,16 +341,12 @@ class Cbmc(Backend):
         nondets = (
             zip(mapping[name], bit_train())
             for name in mapping.mapping
-            if "nondetInRange::1::x" in name)
+            if "nondetInRange::1::x" in name or "nondetInit::1::x" in name)
         weaks = [(a, b) for n in nondets for a, b in n]
         for x in m:
             # TODO environment and stigmergy variables
             if str(x).startswith("I_"):
                 loc, agent, index = str(x).split("_")
-                var = get_var(info.spawn[int(agent)].iface, int(index))
-                # Skip if value is already deterministic
-                if len(var.values(int(agent))) == 1:
-                    continue
                 try:
                     dims = (
                         info.spawn.num_agents(),

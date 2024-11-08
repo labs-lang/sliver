@@ -14,7 +14,6 @@ from sliver.labsparse.labsparse.utils import (eliminate_quantifiers,
                                               replace_externs)
 
 from ..app.cli import Args, ExitStatus, SliverError
-from ..app.info import get_var
 
 
 log = logging.getLogger('backend')
@@ -70,7 +69,8 @@ def to_z3(node):
             "abs": lambda x: abs(x[0]),
             "max": lambda x: symMax(x),
             "min": lambda x: symMin(x),
-            "not": lambda x: Not(x[0])
+            "not": lambda x: Not(x[0]),
+            "unary-minus": lambda x: -x
         }
         args = [to_z3(a) for a in node[Attr.OPERANDS]]
         try:
@@ -147,27 +147,6 @@ class Concretizer:
 
     def _add_soft_constraints(self):
         self.s.push()
-        for tid in range(self.agents):
-            a = self.info.spawn[tid]
-            for i, attr in enumerate(self.attrs[tid]):
-                v = get_var(a.iface, i)
-                if len(v.values(tid)) == 1:
-                    # var is deterministic, no need for additional constraints
-                    continue
-                fresh_bool = Bool(f"{v.store}_{tid}_{v.index}_%%soft%%")
-                self.softs.add(fresh_bool)
-                rnd = v.rnd_value(tid)
-                self.s.add(Implies(fresh_bool, attr == rnd))
-
-        for i, env_var in enumerate(self.envs):
-            v = get_var(self.info.e, i)
-            if len(v.values(0)) == 1:
-                # var is deterministic, no need for additional constraints
-                continue
-            fresh_bool = Bool(f"{v.store}_{v.index}_%%soft%%")
-            self.softs.add(fresh_bool)
-            self.s.add(Implies(fresh_bool, attr == v.rnd_value(tid)))
-
         # Experimental: soft constraints on picks
         # (Does not seem necessary so far)
         for name in self.picks:
@@ -186,7 +165,7 @@ class Concretizer:
                     for i in range(size):
                         soft = Bool(f"pick_{name}_{step}_{i}_%%soft%%")
                         self.softs.add(soft)
-                        self.s.add(Implies(soft, p[step][i] == choices.pop()))  # noQA: E501
+                        self.s.add(Implies(soft, p[step][i] == choices.pop()))
 
     def _reset_soft_constraints(self):
         # Remove previous soft constraints
@@ -195,17 +174,6 @@ class Concretizer:
         self.s.pop(self.s.num_scopes())
         for m in self.past_models:
             self.s.add(m)
-
-    def _init_constraint(self, v, attrs, id):
-        def c(attr):
-            values = v.values(id)
-            if isinstance(values, range):
-                return And(attr >= values.start, attr < values.stop)
-            elif isinstance(values, list):
-                return Or(*(attr == int(x) for x in values))
-            else:
-                return (attr == int(values))
-        self.s.add(*(c(a) for a in attrs))
 
     def _setup_initial_state(self, externs):
         for tid in range(self.agents):
@@ -216,7 +184,6 @@ class Concretizer:
                     for i in range(v.index, v.index + v.size)]
                     if v.is_array
                     else [Int(f"I_{tid:0>2}_{v.index:0>2}")])
-                self._init_constraint(v, attrs, tid)
                 self.attrs[tid].extend(attrs)
             for v in a.lstig.values():
                 lstigs = ([
@@ -224,7 +191,6 @@ class Concretizer:
                     for i in range(v.index, v.index + v.size)]
                     if v.is_array
                     else [Int(f"L_{tid:0>2}_{v.index:0>2}")])
-                self._init_constraint(v, lstigs, tid)
                 self.lstigs[tid].extend(lstigs)
 
         for v in self.info.e.values():
@@ -233,7 +199,6 @@ class Concretizer:
                 for i in range(v.index, v.index + v.size)]
                 if v.is_array
                 else [Int(f"E_{v.index:0>2}")])
-            self._init_constraint(v, envs, 0)
             self.envs = envs
 
         for assume in self.info.assumes:

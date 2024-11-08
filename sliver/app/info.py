@@ -5,7 +5,7 @@ about a LAbS system
 """
 import re
 from ast import NodeVisitor, parse
-from random import choice
+from random import randrange
 
 
 class LabsExprVisitor(NodeVisitor):
@@ -162,14 +162,15 @@ class Info(object):
                if store else ""
 
     def instrument(self):
+        TYPE, MINVAL, MAXVAL = "short", -32768, 32767
 
         def fmt(location, var, offset=0):
+            rnd_value = randrange(MINVAL, MAXVAL+1)
             return [
-                (TYPE, location, offset + var.index + i, var.rnd_value())
+                (TYPE, location, offset + var.index + i, rnd_value)
                 for i in range(var.size)
             ]
 
-        TYPE = "short"
         out = [fmt("E", x) for x in self.e.values()]
         for (low, up), agent in self.spawn.items():
             i_length = len(agent.iface)
@@ -253,11 +254,10 @@ class Variable:
     """Representation of a single variable
     """
 
-    def __init__(self, index, name, init, store="e"):
+    def __init__(self, index, name, store="e"):
         self.index = int(index)
         self.size = 1
         self.store = store
-        self.init = init
         if "[" in name:
             self.name, size = name.split("[")
             self.size = int(size[:-1])
@@ -265,28 +265,6 @@ class Variable:
         else:
             self.name = name
             self.is_array = False
-
-    def values(self, id):
-        visitor = LabsExprVisitor(id)
-        if self.init[0] == "[":
-            return [
-                visitor.visit_string(v)
-                for v in self.init[1:-1].split(",")]
-        elif ".." in self.init:
-            low, up = self.init.split("..")
-            return range(
-                visitor.visit_string(low),
-                visitor.visit_string(up))
-        elif self.init == "undef":
-            return [-32767]  # UNDEF
-        else:
-            return [visitor.visit_string(self.init)]
-
-    def rnd_value(self, id):
-        """Returns a random, feasible initial value for the variable.
-        """
-        val = choice(self.values(id))
-        return val
 
 
 def get_var(lst, index):
