@@ -9,6 +9,7 @@ from functools import cached_property
 from importlib import resources
 from pathlib import Path
 from subprocess import PIPE, STDOUT, CalledProcessError, check_output, run
+from tempfile import NamedTemporaryFile
 from lark import Transformer
 
 
@@ -197,31 +198,30 @@ class Backend:
             log_call(call)
             cmd = run(call, **self._run_args)
             out = cmd.stdout.decode()
-            fname = str(self.base_dir / self.make_slug())
-            # Insert --include'd code
-            included = "___includes___\n\n"
-            for inc_fname in self.cli[Args.INCLUDE]:
-                with open(inc_fname) as f:
-                    included += f.read()
-            out = out.replace("___includes___", included)
-            out = self.preprocess(out, fname)
+            with NamedTemporaryFile("w", suffix=".c", delete=False) as file:
+                # Insert --include'd code
+                included = "___includes___\n\n"
+                for inc_fname in self.cli[Args.INCLUDE]:
+                    with open(inc_fname) as f:
+                        included += f.read()
+                out = out.replace("___includes___", included)
+                out = self.preprocess(out, file.name)
 
-            if self.cli[Args.SHOW]:
-                # TODO add concretize cli options
-                if self.cli[Args.SIMULATE] and self.language == Language.C:
-                    self.logger.info(f"Gathering information on {self.cli.file}...")  # noQA: E501
-                    info = self.get_info(parsed=True)
-                    self.check_info(info)
-                    c = Concretizer(info, self.cli, True)
-                    if self.cli[Args.CONCRETIZATION] != "none":
-                        out = c.concretize_program(out)
-                print(out)
-            else:
-                self.logger.debug(f"Writing emulation program to {fname}...")
-                with open(fname, 'w') as out_file:
-                    out_file.write(out)
-                self.temp_files.append(fname)
-            return fname
+                if self.cli[Args.SHOW]:
+                    # TODO add concretize cli options
+                    if self.cli[Args.SIMULATE] and self.language == Language.C:
+                        self.logger.info(f"Gathering information on {self.cli.file}...")  # noQA: E501
+                        info = self.get_info(parsed=True)
+                        self.check_info(info)
+                        c = Concretizer(info, self.cli, True)
+                        if self.cli[Args.CONCRETIZATION] != "none":
+                            out = c.concretize_program(out)
+                    print(out)
+                else:
+                    self.logger.debug(f"Writing emulation program to {file.name}...")  # noqa: E501
+                    file.write(out)
+                    self.temp_files.append(file.name)
+            return file.name
         except CalledProcessError as e:
             self.logger.error(e)
             msg = e.stderr.decode()
