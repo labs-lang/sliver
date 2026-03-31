@@ -3,10 +3,10 @@ from .cadp import Cadp, CadpCompositional, CadpMonitor
 from .cbmc import Cbmc
 from .cseq import Cseq
 from .esbmc import Esbmc
-from .nuxmv import NuXmv
+from .kratos import Kratos
 
 ALL_BACKENDS = {
-    **{clz.__name__.lower(): clz for clz in (Cbmc, Cseq, Esbmc, Cadp, NuXmv)},
+    **{clz.__name__.lower(): clz for clz in (Cbmc, Cseq, Esbmc, Cadp, Kratos)},
     "cadp-monitor": CadpMonitor,
     "cadp-comp": CadpCompositional
 }
