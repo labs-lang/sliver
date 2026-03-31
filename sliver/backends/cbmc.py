@@ -422,7 +422,7 @@ class Cbmc(Backend):
                         trace_hash.update(x.encode())
                         print(x, sep="", end="")
                     # This just prints a line of '=' that is as long as header
-                    print(f'{"" :=<{len(header)}}')
+                    print(f'{"":=<{len(header)}}')
                     self.verbose_output(f"Digest of trace #{i+1}: {trace_hash.hexdigest()}")  # noqa: E501
                 except Exception as e:
                     print(f"Counterexample translation failed: {e}")
