@@ -29,6 +29,7 @@ log = logging.getLogger("sliver")
 @click.option('--cores', **CLICK(Args.CORES))
 @click.option('--debug', **CLICK(Args.DEBUG, is_flag=True))
 @click.option('--fair/--no-fair', **CLICK(Args.FAIR))
+@click.option('--just/--no-just', is_flag=True)
 @click.option('--from', **CLICK(Args.CORES_FROM))
 @click.option('--keep-files', **CLICK(Args.KEEP_FILES, is_flag=True))
 @click.option('--no-properties', **CLICK(Args.NO_PROPERTIES, is_flag=True))
@@ -44,7 +45,10 @@ log = logging.getLogger("sliver")
 @click.option('--translate-cex', **CLICK(Args.TRANSLATE_CEX))
 @click.option('--include', multiple=True, **CLICK(Args.INCLUDE))
 def main(file, **kwargs):
-    cli = CliArgs(file, kwargs)
+    try:
+        cli = CliArgs(file, kwargs)
+    except SliverError as err:
+        err.handle(log=log, quit=True)
     backend_arg, simulate, show = (
         cli[Args.BACKEND],
         cli[Args.SIMULATE],

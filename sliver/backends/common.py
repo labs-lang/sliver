@@ -155,7 +155,9 @@ class Backend:
                 "--bound", str(self.cli[Args.STEPS]),
                 "--enc", self.language.value.encoding]
         flags = [
-            (self.cli[Args.FAIR], "--fair"),
+            (self.cli[Args.FAIR] or self.cli[Args.JUST], "--fair"),
+            (self.cli[Args.FAIR], "rr"),
+            (self.cli[Args.JUST], "justice"),
             (self.cli[Args.SIMULATE], "--simulation"),
             (not self.cli[Args.BV], "--no-bitvector"),
             (self.cli[Args.SYNC], "--sync"),
@@ -192,13 +194,15 @@ class Backend:
                 else ExitStatus.PARSING_ERROR)
             raise SliverError(status=status, error_message=msg)
 
-    def generate_code(self):
+    def generate_code(self, *args):
         call = self._labs_cmdline()
+        call.extend(args)
         try:
             log_call(call)
             cmd = run(call, **self._run_args)
             out = cmd.stdout.decode()
-            with NamedTemporaryFile("w", suffix=".c", delete=False) as file:
+            ext = f".{self.language.value.extension}"
+            with NamedTemporaryFile("w", suffix=ext, delete=False) as file:
                 # Insert --include'd code
                 included = "___includes___\n\n"
                 for inc_fname in self.cli[Args.INCLUDE]:

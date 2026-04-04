@@ -1,11 +1,6 @@
-import io
 from shutil import which
 from subprocess import PIPE, CalledProcessError, Popen
 
-import pcpp
-
-
-from ..absentee.absentee import absentee
 from ..app.cli import Args, ExitStatus
 from .common import Backend, Language
 
@@ -26,20 +21,17 @@ class Kratos(Backend):
             kratos, "-stage=mc",
             fname, '-cex_type=patheval']
 
+    def generate_code(self, *_):
+        return super().generate_code("--no-bitwise")
+
     def preprocess(self, code, _):
-        code = ("extern int __CPROVER_nondet_int();\n"
-                "extern int __CPROVER_nondet();\n"
+        code = ("extern int __CPROVER_nondet_int(void);\n"
+                "extern int __CPROVER_nondet(void);\n"
                 "extern void __CPROVER_assume(int);\n"
                 "void __CPROVER_assert(int cond, const char *msg) {\n"
                 "    if (!cond) { __CPROVER_error(); }\n"
                 "}") + code
 
-        preproc = pcpp.Preprocessor()
-        preproc.parse(code)
-        f = io.StringIO("")
-        preproc.write(oh=f)
-        f.seek(0)
-        code = absentee.parse_and_execute(f.read(), "(without-bitwise)")
         c2kratos = which("c2kratos")
         if c2kratos is None:
             raise RuntimeError("c2kratos not found in PATH")
@@ -48,7 +40,6 @@ class Kratos(Backend):
             "--builtin-error", "__CPROVER_error",
             "--builtin-assume", "__CPROVER_assume",
             "--nondet-prefix", "__CPROVER_nondet",
-            # "--blast-static-arrays", "9999",
             "--cpp", "cpp-11"  # TODO: make this configurable
         ]
         proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, text=True)

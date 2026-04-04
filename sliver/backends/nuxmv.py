@@ -33,24 +33,23 @@ def translate_nuxmv(cex, info):
         return ""
 
     tid = ""
-    for i, state in enumerate(cex.split("->")[2:]):
-        if i == 0:
-            yield "<initialization>"
-        elif i == 1:
+    yield "<initialization>"
+    for i, state in enumerate(cex.split("->")[1:]):
+        if i == 1:
             yield "\n<end initialization>"
-        if i % 2 == 1:
-            yield f"""\n<step {(i // 2)}>"""
-        for asgn in state.split("<-")[1].split("\n"):
-            asgn = asgn.strip()
-            if asgn:
-                lhs, rhs = asgn.split("=")
-                if lhs == "tid":
-                    tid = rhs.strip()
-                    continue
-                pprint = pprint_assign(lhs, rhs, tid, i > 0)
-                if pprint:
-                    yield pprint
-    yield f"""\n<step {(i // 2)}>\n"""
+        if i > 0:
+            yield f"""\n<step {(i)}>"""
+        asgns = [x.strip().split("=") for x in state.split("<-")[1].split("\n") if "=" in x]  # noqa: E501
+        state_dict = {lhs.strip(): rhs[0].strip() for lhs, *rhs in asgns}
+        # yield f"{state}, {state_dict}"
+        tid = state_dict.get("prev_tid" if i > 0 else "tid", "").strip()
+        for lhs, rhs in state_dict.items():
+            pprint = pprint_assign(lhs, rhs, tid, i > 0)
+            # print(f"{lhs=}, {rhs=}, {tid=}, {pprint=}")
+            # input()
+            if pprint:
+                yield pprint
+    yield "\n"
 
 
 class NuXmv(Backend):
@@ -66,11 +65,14 @@ class NuXmv(Backend):
             "msat_pick_state",
             f"msat_simulate -k {self.cli[Args.STEPS]*2}",
             "show_traces",
-            "quit"
-            ))
+            "quit"))
+
+        VERIFY_SCRIPT = '\n'.join((
+            "go_msat",
+            "check_ltlspec_ic3",
+            "quit"))
         with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as src_file:  # noqa: E501
-            if self.cli[Args.SIMULATE]:
-                src_file.write(SIM_SCRIPT)
+            src_file.write(SIM_SCRIPT if self.cli[Args.SIMULATE] else VERIFY_SCRIPT)  # noqa: E501
             src_file.close()
             self.temp_files.append(src_file.name)
 
@@ -93,7 +95,7 @@ class NuXmv(Backend):
                 trace_hash.update(x.encode())
                 print(x, sep="", end="")
             # This just prints a line of '=' that is as long as header
-            print(f'{"" :=<{len(header)}}')
+            print(f'{"":=<{len(header)}}')
             self.verbose_output(f"Digest of trace #{i+1}: {trace_hash.hexdigest()}")  # noqa: E501
         return ExitStatus.SUCCESS
 

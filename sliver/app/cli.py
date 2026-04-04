@@ -23,6 +23,7 @@ class Args(Enum):
     DEBUG = "debug"
     FAIR = "fair"
     INCLUDE = "include"
+    JUST = "just"
     KEEP_FILES = "keep_files"
     NO_PROPERTIES = "no_properties"
     PROPERTY = "property"
@@ -142,6 +143,11 @@ class CliArgs(dict):
         for x in self[Args.VALUES]:
             k, v = x.split("=")
             self.externs[k] = int(v)
+        if self[Args.FAIR] and self[Args.JUST]:
+            raise SliverError(
+                status=ExitStatus.INVALID_ARGS,
+                error_message="Cannot use --just with --fair."
+            )
 
     def __getitem__(self, key: Args):
         return self.get(key.value, DEFAULTS.get(key))
