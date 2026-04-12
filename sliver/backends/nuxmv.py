@@ -33,22 +33,25 @@ def translate_nuxmv(cex, info):
         return ""
 
     tid = ""
+    cex = cex.split("Trace Type: Counterexample")[1]
+
     yield "<initialization>"
     for i, state in enumerate(cex.split("->")[1:]):
         if i == 1:
             yield "\n<end initialization>"
         if i > 0:
             yield f"""\n<step {(i)}>"""
-        asgns = [x.strip().split("=") for x in state.split("<-")[1].split("\n") if "=" in x]  # noqa: E501
+        lines = [x.strip() for x in state.splitlines() if "<-" not in x]
+        asgns = [x.split("=") for x in lines if "=" in x]  # noqa: E501
         state_dict = {lhs.strip(): rhs[0].strip() for lhs, *rhs in asgns}
         # yield f"{state}, {state_dict}"
         tid = state_dict.get("prev_tid" if i > 0 else "tid", "").strip()
         for lhs, rhs in state_dict.items():
             pprint = pprint_assign(lhs, rhs, tid, i > 0)
-            # print(f"{lhs=}, {rhs=}, {tid=}, {pprint=}")
-            # input()
             if pprint:
                 yield pprint
+        if "-- Loop starts here" in lines:
+            yield "\n<loop starts here>"
     yield "\n"
 
 
@@ -100,7 +103,12 @@ class NuXmv(Backend):
         return ExitStatus.SUCCESS
 
     def handle_success(self, out: str, info) -> ExitStatus:
-        print(*self.translate_cex(out, info), sep="", end="")
+        if "is false" in out and "as demonstrated by the following execution sequence" in out:  # noqa: E501
+            print(*self.translate_cex(out, info), sep="", end="")
+            return ExitStatus.FAILED
+        elif "is true" in out:
+            return ExitStatus.SUCCESS
+        # print(*self.translate_cex(out, info), sep="", end="")
 
     def translate_cex(self, out, info):
         yield from translate_nuxmv(out, info)
