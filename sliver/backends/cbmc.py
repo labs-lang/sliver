@@ -100,18 +100,26 @@ class CbmcCexTransformer(BaseTransformer):
         state_id, file, function, line, *_ = header.children
         return State(state_id, file, function, line, lhs, rhs)
 
+    def header_esbmc(self, n):
+        state_id, file, line, _, *maybe_function, _ = n
+        function = maybe_function[0] if maybe_function else "init"
+        return state_id, file, line, function
 
-def translateCPROVER54(cex, info):
+    def NAME(self, name):
+        return str(name)
+
+    def state_esbmc(self, n):
+        header, *rest = n
+        state_id, file, line, function = header
+        lhs = rest[0] if rest else None
+        rhs = rest[1] if rest else None
+        return State(state_id, file, function, line, lhs, rhs)
+
+
+def translateCPROVERcex(cex, info, start="start"):
     with resources.path("sliver.grammars", "cbmc_cex.lark") as grammar_path:
         with open(grammar_path) as grammar:
-            lark_parser = Lark(grammar, parser='lalr', start='start54')
-    yield from translateCPROVER(cex, info, parser=lark_parser)
-
-
-def translateCPROVERNEW(cex, info):
-    with resources.path("sliver.grammars", "cbmc_cex.lark") as grammar_path:
-        with open(grammar_path) as grammar:
-            lark_parser = Lark(grammar, parser='lalr')
+            lark_parser = Lark(grammar, parser='lalr', start=start)
     yield from translateCPROVER(cex, info, parser=lark_parser)
 
 
@@ -141,26 +149,35 @@ def translateCPROVER(cex, info, parser):
         return ""
 
     cex_start_pos = cex.find("Counterexample:") + 15
+    if cex_start_pos == 14:
+        cex_start_pos = cex.find("[Counterexample]") + 16
     cex_end_pos = cex.rfind("Violated property:")
     tree = parser.parse(cex[cex_start_pos:cex_end_pos])
     transformer = CbmcCexTransformer()
     tree = transformer.transform(tree)
     states = tree.children
+    for s in states:
+        if not hasattr(s, "function") or s.function == "__CPROVER_initialize":
+            s.function = "init"
+
 
     inits = [
-        (s.lhs, s.rhs) for s in states
-        if s.function == "init" and not LTSTAMP.match(s.lhs)]
+        (s.lhs, s.rhs) for s in states if (
+            s.function == "init" and
+            s.lhs is not None and
+            not LTSTAMP.match(s.lhs))]
 
-    others = (
+    others = [
         s for s in states
-        if s.function not in ("init", "__CPROVER_initialize"))
+        if s.function not in ("init", "__CPROVER_initialize")
+        and s.lhs is not None]
+
     yield "<initialization>"
     for i in inits:
         pprint = pprint_assign(*i, init=True)
         if pprint:
             yield pprint
     yield "\n<end initialization>"
-
     agent = ""
     system = None
     last_line = None
@@ -440,9 +457,9 @@ class Cbmc(Backend):
         cmd = self.get_cmdline("", "")
         CBMC_V, CBMC_SUBV = self.get_cbmc_version(cmd)
         if not (int(CBMC_V) <= 5 and int(CBMC_SUBV) <= 4):
-            return translateCPROVERNEW(cex, info)
+            return translateCPROVERcex(cex, info)
         else:
-            return translateCPROVER54(cex, info)
+            return translateCPROVERcex(cex, info, start="start_54")
 
     def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode == 10:

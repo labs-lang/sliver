@@ -4,7 +4,7 @@ from pathlib import Path
 from subprocess import CalledProcessError
 
 from ..app.cli import Args, ExitStatus, SliverError
-from .cbmc import translateCPROVER54, translateCPROVERNEW
+from .cbmc import translateCPROVERcex
 from .common import Backend, Language
 
 
@@ -62,9 +62,9 @@ class Cseq(Backend):
 
     def translate_cex(self, cex, info):
         try:
-            return translateCPROVERNEW(cex, info)
+            return translateCPROVERcex(cex, info)
         except Exception:
-            return translateCPROVER54(cex, info)
+            return translateCPROVERcex(cex, info, start="start_54")
 
     def handle_error(self, err: CalledProcessError, fname, info):
         if err.returncode in (1, 10):

@@ -14,7 +14,7 @@ from ..absentee.absentee import absentee
 from ..app.cli import Args, ExitStatus, SliverError
 from ..analysis.value_analysis import value_analysis
 from .common import Backend, Language
-from .cbmc import translateCPROVER54
+from .cbmc import translateCPROVERcex
 
 
 class Esbmc(Backend):
@@ -50,7 +50,8 @@ class Esbmc(Backend):
             return cmd
 
     def translate_cex(self, cex, info):
-        return translateCPROVER54(cex, info)
+        return translateCPROVERcex(cex, info, start="start_esbmc")
+
 
     def preprocess(self, code, _):
         # Get info and pc invariants

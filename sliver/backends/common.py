@@ -11,6 +11,7 @@ from pathlib import Path
 from subprocess import PIPE, STDOUT, CalledProcessError, check_output, run
 from tempfile import NamedTemporaryFile
 from lark import Transformer
+import msgspec
 
 
 from ..atlas.concretizer import Concretizer
@@ -66,7 +67,7 @@ class Backend:
     def __init__(self, base_dir, cli):
         self.cli = cli
         self.base_dir = base_dir
-        self.info = None
+        self.info, self._ast = None, None
         self.cwd = base_dir
         self.temp_files = []
         self.modalities = tuple()
@@ -169,6 +170,15 @@ class Backend:
         if self.cli[Args.VALUES]:
             call.extend(["--values", *self.cli[Args.VALUES]])
         return call
+
+    def get_ast(self):
+        if self._ast is None:
+            call = self._labs_cmdline() + ["--ast"]
+            log_call(call)
+            info_call = run(call, **self._run_args)
+            ast_txt = info_call.stdout.decode()
+            self._ast = msgspec.json.decode(ast_txt)
+        return self._ast
 
     def get_info(self, parsed=False):
         if self.info is not None:

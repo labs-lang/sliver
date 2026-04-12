@@ -29,10 +29,13 @@ _rhs_bits   : BITS
 header : "State" integer "file" _name "function" _name "line" integer "thread" integer
 
 header_54 : "State" integer "file" _name "line" integer "function" _name "thread" integer
+header_esbmc : "State" integer "file" _name "line" integer "column" integer ("function" _name)? "thread" integer
 
-_asgn : _name "=" rhs "(" _rhs_bits ")"
+_asgn : _name "=" rhs ("(" _rhs_bits ")")?
 state : header _SEP _asgn
 state_54 : header_54 _SEP _asgn
+state_esbmc : header_esbmc _SEP (_asgn)?
 
 start : state*
 start_54 : state_54*
+start_esbmc : state_esbmc*
