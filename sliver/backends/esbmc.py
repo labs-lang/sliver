@@ -52,8 +52,19 @@ class Esbmc(Backend):
     def translate_cex(self, cex, info):
         return translateCPROVERcex(cex, info, start="start_esbmc")
 
+    def generate_code(self, *_):
+        return super().generate_code("--no-bitwise")
 
     def preprocess(self, code, _):
+        info = self.get_info(parsed=True)
+        ast = self.get_ast()
+        code = (
+            code.replace("__CPROVER_nondet()", "nondet_int()")
+            .replace("__CPROVER_assert(", "__ESBMC_assert(")
+            .replace("__CPROVER_assume(", "__ESBMC_assume("))
+        return code
+
+    def preprocess_old(self, code, _):
         # Get info and pc invariants
         info = self.get_info(parsed=True)
         info.scan_pcmap(code)
