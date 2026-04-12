@@ -75,7 +75,7 @@ class CadpMonitor(Backend):
                 print(header)
                 for ln in self.translate_cex(out, info):
                     print(ln, sep="", end="")
-                print(f'{"" :=<{len(header)}}')
+                print(f'{"":=<{len(header)}}')
             return ExitStatus.SUCCESS
         except CalledProcessError as err:
             self.verbose_output(err.output.decode(), "Backend output")
