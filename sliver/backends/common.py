@@ -173,7 +173,7 @@ class Backend:
 
     def get_ast(self):
         if self._ast is None:
-            call = self._labs_cmdline() + ["--ast"]
+            call = self._labs_cmdline() + ["--only-ast"]
             log_call(call)
             info_call = run(call, **self._run_args)
             ast_txt = info_call.stdout.decode()
@@ -204,13 +204,24 @@ class Backend:
                 else ExitStatus.PARSING_ERROR)
             raise SliverError(status=status, error_message=msg)
 
-    def generate_code(self, *args):
+    def generate_code(self, get_ast=False, *args):
         call = self._labs_cmdline()
         call.extend(args)
+        with NamedTemporaryFile(suffix=".json", delete=not get_ast) as tmp:
+            if get_ast:
+                self.temp_files.append(tmp.name)
+                call.extend(["--ast", tmp.name])
+
+            def callback():
+                if not get_ast:
+                    return None
+                with open(tmp.name) as f:
+                    return msgspec.json.decode(f.read())
         try:
             log_call(call)
             cmd = run(call, **self._run_args)
             out = cmd.stdout.decode()
+            self._ast = callback()
             ext = f".{self.language.value.extension}"
             with NamedTemporaryFile("w", suffix=ext, delete=False) as file:
                 # Insert --include'd code

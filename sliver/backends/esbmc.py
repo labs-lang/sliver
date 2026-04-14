@@ -1,14 +1,9 @@
 
-import io
 import os
 from importlib import resources
 import re
 from shutil import which
 from subprocess import CalledProcessError
-
-import pcpp
-
-from sliver.analysis.domains import Stripes, Sign
 
 from ..app.cli import Args, ExitStatus, SliverError
 from ..analysis.value_analysis import value_analysis
@@ -52,11 +47,13 @@ class Esbmc(Backend):
         return translateCPROVERcex(cex, info, start="start_esbmc")
 
     def generate_code(self, *_):
-        return super().generate_code(
+        filename = super().generate_code(
+            True,
             "--no-bitwise",
             "--c-assume-fn", "__ESBMC_assume",
             "--c-assert-fn", "__ESBMC_assert",
             "--c-nondet-fn", "nondet_int")
+        return filename
 
     def preprocess(self, code, _):
         info = self.get_info(parsed=True)
