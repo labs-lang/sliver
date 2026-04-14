@@ -10,7 +10,6 @@ import pcpp
 
 from sliver.analysis.domains import Stripes, Sign
 
-from ..absentee.absentee import absentee
 from ..app.cli import Args, ExitStatus, SliverError
 from ..analysis.value_analysis import value_analysis
 from .common import Backend, Language
@@ -53,7 +52,11 @@ class Esbmc(Backend):
         return translateCPROVERcex(cex, info, start="start_esbmc")
 
     def generate_code(self, *_):
-        return super().generate_code("--no-bitwise")
+        return super().generate_code(
+            "--no-bitwise",
+            "--c-assume-fn", "__ESBMC_assume",
+            "--c-assert-fn", "__ESBMC_assert",
+            "--c-nondet-fn", "nondet_int")
 
     def preprocess(self, code, _):
         info = self.get_info(parsed=True)
@@ -214,17 +217,7 @@ class Esbmc(Backend):
 
         head_of_loop = re.compile(r'while\s*\(1\)\s*{')
         code = head_of_loop.sub("while (1) {\n __invariants();", code)
-
-        esbmc_conf = """
-        (without-bitwise)
-        (replace-calls
-            (__CPROVER_nondet nondet_int)
-            (__CPROVER_assert __ESBMC_assert)
-            (__CPROVER_assume __ESBMC_assume)
-        )
-        """
-        # {"(without-arrays)" if self.cli[Args.STEPS] == 0 else ""}
-        return absentee.parse_and_execute(code, esbmc_conf)
+        return code
 
     def handle_success(self, out, info) -> ExitStatus:
         result = super().handle_success(out, info)
