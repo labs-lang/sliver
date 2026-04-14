@@ -58,6 +58,10 @@ class Esbmc(Backend):
     def preprocess(self, code, _):
         info = self.get_info(parsed=True)
         ast = self.get_ast()
+        ranges, fix, depends, wont_change = value_analysis(self.cli, info, ast)
+        self.verbose_output(
+            f"Value analysis: {ranges=}, {fix=}, {depends=}, {wont_change=}")
+
         code = (
             code.replace("__CPROVER_nondet()", "nondet_int()")
             .replace("__CPROVER_assert(", "__ESBMC_assert(")

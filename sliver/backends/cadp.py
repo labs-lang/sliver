@@ -13,7 +13,6 @@ from ..app.cex import translate_cadp
 from ..app.cli import Args, ExitStatus, SliverError
 from ..app.info import get_var
 from ..analysis.value_analysis import value_analysis
-from ..analysis.domains import Stripes
 
 from .common import Backend, Language, log_call
 
@@ -217,7 +216,8 @@ class CadpCompositional(CadpMonitor):
     def preprocess(self, code, fname):
         code = super().preprocess(code, fname)
         info = self.get_info(parsed=True)
-        ranges, fixpoint, *_ = value_analysis(self.cli, info, Stripes)
+        ast = self.get_ast()
+        ranges, fixpoint, *_ = value_analysis(self.cli, info, ast)
         self.verbose_output(str(ranges), "Value analysis")
         if not fixpoint:
             raise SliverError(

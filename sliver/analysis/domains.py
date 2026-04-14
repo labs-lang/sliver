@@ -210,7 +210,7 @@ class Sign:
 
 
 class Interval:
-    def __init__(self, mn, mx=None):
+    def __init__(self, mn=None, mx=None):
         if not isinstance(mn, int):
             print(mn, type(mn))
         if mx is not None and mn > mx:
@@ -218,22 +218,33 @@ class Interval:
         self.min = mn
         self.max = mn if mx is None else mx
 
+    def is_empty(self):
+        return self.min is None and self.max is None
+
     def __hash__(self):
         return hash((self.min, self.max))
 
     def __contains__(self, n):
-        return self.min <= n <= self.max
+        return not self.is_empty() and self.min <= n <= self.max
 
     def __iter__(self):
+        if self.is_empty():
+            yield from []
         yield from range(self.min, self.max)
         yield self.max
 
     def is_within(self, other):
+        if self.is_empty():
+            return True
+        elif other.is_empty():
+            return False
         return (
             self.min >= other.min and
             self.max <= other.max)
 
     def overlaps(self, other):
+        if self.is_empty() or other.is_empty():
+            return False
         return (
             self.is_within(other) or
             other.is_within(self) or
@@ -241,6 +252,8 @@ class Interval:
             other.min <= self.max <= other.max)
 
     def adjacent(self, other):
+        if self.is_empty() or other.is_empty():
+            return False
         return not self.overlaps(other) and (
             self.max == other.min - 1 or
             self.min == other.max + 1)
@@ -252,6 +265,10 @@ class Interval:
     def equality(self, other):
         if isinstance(other, int):
             other = Interval(other)
+        if self.is_empty():
+            return I(int(other.is_empty()))
+        elif other.is_empty():
+            return I(0)
         if self.min > other.max or self.max < other.min:
             return I(0)
         elif self.min == self.max == other.min == other.max:
@@ -373,6 +390,19 @@ class Stripes:
                 return Stripes(i0), Stripes(i1)
             else:
                 return None, None
+
+    @staticmethod
+    def of_sympy(sympy_set):
+        if sympy_set.is_empty:
+            return Stripes()
+        elif sympy_set.is_FiniteSet:
+            return Stripes(*[I(int(x)) for x in sympy_set])
+        elif sympy_set.is_Interval:
+            return Stripes(I(int(sympy_set.start), int(sympy_set.end)))
+        elif sympy_set.is_Union:
+            return Stripes(*[Stripes.of_sympy(arg).stripes for arg in sympy_set.args])  # noqa: E501
+        else:
+            raise ValueError(f"Cannot convert {sympy_set} to Stripes")
 
     @staticmethod
     def abstract(*values):
