@@ -21,9 +21,8 @@ class Args(Enum):
     CORES_FROM = "from"
     CORES_TO = "to"
     DEBUG = "debug"
-    FAIR = "fair"
+    FAIR = "fairness"
     INCLUDE = "include"
-    JUST = "just"
     KEEP_FILES = "keep_files"
     NO_PROPERTIES = "no_properties"
     PROPERTY = "property"
@@ -54,7 +53,12 @@ HELPMSG = {
     Args.CORES_TO: "Parallel analysis: partition end.",
     Args.CORES: "Number of CPU cores for parallel analysis.",
     Args.DEBUG: "Enable additional checks in the backend.",
-    Args.FAIR: "Enforce fair interleaving of components.",
+    Args.FAIR: (
+        "Specify fairness scheduling assumptions."
+        "\nrr = round-robin;"
+        "\njustice = each agent is scheduled infinitely often "
+        "(only for infinite traces)."
+        "\nIf neither is given, no fairness assumptions are made."),
     Args.INCLUDE: (
         "Add custom code to generated program "
         "(may be specified multiple times)."),
@@ -88,7 +92,7 @@ DEFAULTS = {
     Args.CONCRETIZATION: "sat",
     Args.CORES: 1,
     Args.DEBUG: False,
-    Args.FAIR: False,
+    Args.FAIR: None,
     Args.INCLUDE: tuple(),
     Args.KEEP_FILES: False,
     Args.NO_PROPERTIES: False,
@@ -143,11 +147,6 @@ class CliArgs(dict):
         for x in self[Args.VALUES]:
             k, v = x.split("=")
             self.externs[k] = int(v)
-        if self[Args.FAIR] and self[Args.JUST]:
-            raise SliverError(
-                status=ExitStatus.INVALID_ARGS,
-                error_message="Cannot use --just with --fair."
-            )
 
     def __getitem__(self, key: Args):
         return self.get(key.value, DEFAULTS.get(key))

@@ -15,6 +15,8 @@ if not hasattr(sys.modules[__name__], '__file__'):
 
 __DIR = Path(__file__).parent.resolve()
 backends_type = click.Choice(tuple(ALL_BACKENDS.keys()))
+fairness_type = click.Choice(("rr", "justice"))
+
 
 log = logging.getLogger("sliver")
 
@@ -28,8 +30,7 @@ log = logging.getLogger("sliver")
 @click.option('--bv/--no-bv', **CLICK(Args.BV))
 @click.option('--cores', **CLICK(Args.CORES))
 @click.option('--debug', **CLICK(Args.DEBUG, is_flag=True))
-@click.option('--fair/--no-fair', **CLICK(Args.FAIR))
-@click.option('--just/--no-just', is_flag=True)
+@click.option('--fairness', **CLICK(Args.FAIR, type=fairness_type))
 @click.option('--from', **CLICK(Args.CORES_FROM))
 @click.option('--keep-files', **CLICK(Args.KEEP_FILES, is_flag=True))
 @click.option('--no-properties', **CLICK(Args.NO_PROPERTIES, is_flag=True))

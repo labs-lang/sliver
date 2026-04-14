@@ -155,10 +155,8 @@ class Backend:
                 "--file", self.cli.file,
                 "--bound", str(self.cli[Args.STEPS]),
                 "--enc", self.language.value.encoding]
+
         flags = [
-            (self.cli[Args.FAIR] or self.cli[Args.JUST], "--fair"),
-            (self.cli[Args.FAIR], "rr"),
-            (self.cli[Args.JUST], "justice"),
             (self.cli[Args.SIMULATE], "--simulation"),
             (not self.cli[Args.BV], "--no-bitvector"),
             (self.cli[Args.SYNC], "--sync"),
@@ -167,6 +165,8 @@ class Backend:
             (self.cli[Args.NO_PROPERTIES], "--no-properties")]
         call.extend(b for a, b in flags if a)
 
+        if self.cli[Args.FAIR]:
+            call.extend(("--fair", self.cli[Args.FAIR]))
         if self.cli[Args.VALUES]:
             call.extend(["--values", *self.cli[Args.VALUES]])
         return call
