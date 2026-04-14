@@ -70,8 +70,10 @@ def main(file, **kwargs):
         else:
             fname = ""
     except SliverError as err:
+        backend.cleanup(fname)
         err.handle(log=log, quit=True)
     if fname and show:
+        backend.cleanup(fname)
         sys.exit(ExitStatus.SUCCESS.value)
     status = None
 

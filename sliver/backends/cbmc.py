@@ -17,7 +17,6 @@ from subprocess import (DEVNULL, PIPE, STDOUT, CalledProcessError,
 from lark import Lark
 
 from ..app.cli import Args, ExitStatus, SliverError
-from ..app.info import get_var
 from ..atlas.concretizer import Concretizer
 from .common import Backend, BaseTransformer, Language, log_call
 
@@ -159,7 +158,6 @@ def translateCPROVER(cex, info, parser):
     for s in states:
         if not hasattr(s, "function") or s.function == "__CPROVER_initialize":
             s.function = "init"
-
 
     inits = [
         (s.lhs, s.rhs) for s in states if (
