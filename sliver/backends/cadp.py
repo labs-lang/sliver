@@ -3,10 +3,8 @@ import logging
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, TimeoutExpired, check_output
 
-from sliver.labsparse.labsparse.labs_ast import Attr
-from sliver.labsparse.labsparse.utils import eliminate_quantifiers
 
-from ..atlas.atlas import get_property, get_state_vars
+from ..atlas.atlas import get_property, get_state_vars, qelim
 from ..atlas.mcl import translate_property
 from ..atlas.svl import svl
 from ..app.cex import translate_cadp
@@ -147,7 +145,7 @@ class Cadp(CadpMonitor):
         return f"{fname}.mcl"
 
     def verify(self, fname, info):
-        mcl = translate_property(info, self.cli.externs)
+        mcl = translate_property(info, self.get_ast())
         mcl_fname = self._mcl_fname(fname)
         log.debug(f"Writing MCL query to {mcl_fname}...")
         with open(mcl_fname, "w") as f:
@@ -258,7 +256,7 @@ class CadpCompositional(CadpMonitor):
         return code
 
     def verify(self, fname, info):
-        mcl = translate_property(info, self.cli.externs)
+        mcl = translate_property(info, self.get_ast())
         mcl_fname = self._mcl_fname(fname)
         log.debug(f"Writing MCL query to {mcl_fname}...")
         with open(mcl_fname, "w") as f:
@@ -266,8 +264,9 @@ class CadpCompositional(CadpMonitor):
         self.temp_files.append(mcl_fname)
         self.verbose_output(mcl, "MCL property")
 
-        atlas = get_property(info)[Attr.CONDITION]
-        atlas_noq = eliminate_quantifiers(atlas, info)
+        atlas = get_property(self.get_ast())
+        atlas_noq = qelim(info, atlas)
+        # TODO
         atlas_vars = get_state_vars(atlas_noq)
         not_hidden = set()
         for x in atlas_vars:

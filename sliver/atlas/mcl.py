@@ -2,10 +2,7 @@
 
 from itertools import repeat
 
-from sliver.atlas.atlas import get_property, vars_to_strings
-from sliver.labsparse.labsparse.labs_ast import Attr, Node, NodeType
-from sliver.labsparse.labsparse.utils import (eliminate_quantifiers,
-                                              replace_externs)
+from sliver.atlas.atlas import get_property, qelim, vars_to_strings
 
 
 def sprint_predicate(params, body):
@@ -160,28 +157,17 @@ nu Inv ({", ".join(nu_params)}) . (
 
 
 def pprint_mcl(node):
-    if not isinstance(node, Node):
-        return node
-    if node(NodeType.BUILTIN):
-        return f"{node[Attr.NAME]}({', '.join(pprint_mcl(a) for a in node[Attr.OPERANDS])})"  # noqa: E501
-    elif Attr.OPERANDS in node:
-        op = {
-            "%": "mod",
-            "!=": "<>"
-        }.get(node[Attr.NAME], node[Attr.NAME])
-        return "({})".format(f" {op} ".join(pprint_mcl(a) for a in node[Attr.OPERANDS]))  # noqa: E501
-    else:
-        return node.as_labs()
+    # TODO
+    return node
 
 
-def translate_property(info, externs, parsed=None):
+def translate_property(info, ast):
     """Retrieve the first property in info.properties
     and translate it into MCL.
     """
 
-    prop = get_property(info)
-    qformula = eliminate_quantifiers(prop[Attr.CONDITION], info)
-    qformula = replace_externs(qformula, externs)
+    prop = get_property(ast)
+    qformula = qelim(info, prop)
     new_vars = vars_to_strings(qformula, info)
 
     def key_of(v):
