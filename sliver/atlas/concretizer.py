@@ -1,20 +1,19 @@
+from functools import reduce
 import logging
 import random
 import re
+import sys
 import time
 
-from z3 import (And, Bool, If, Implies, Int, Not, Or, Solver, Sum, sat,
-                set_option, simplify)
-from z3.z3 import IntVector
+import sympy
+from z3 import (And, Bool, If, Implies, Int, Or, Solver, Sum, sat, set_param,
+                simplify)
+from z3.z3 import Z3_OP_UNINTERPRETED, BoolVal, IntVector, IntNumRef
 
-from sliver.atlas.atlas import vars_to_strings
-from sliver.labsparse.labsparse.labs_ast import Attr, Node, NodeType
-from sliver.labsparse.labsparse.labs_parser import BEXPR, QUANT
-from sliver.labsparse.labsparse.utils import (eliminate_quantifiers,
-                                              replace_externs)
+from sliver.analysis.value_analysis import json2z3
+from sliver.atlas.atlas import qelim
 
 from ..app.cli import Args, ExitStatus, SliverError
-
 
 log = logging.getLogger('backend')
 RND_SEED = int(time.time())
@@ -44,75 +43,92 @@ def Count(boolvec):
     return Sum(*(If(i, 1, 0) for i in boolvec))
 
 
-def to_z3(node):
-    """Translate a (quantifier-free) ATLAS property to a Z3 constraint
-    """
-    # if isinstance(node, OfNode):
-    #     raise ValueError
-    if not isinstance(node, Node):
-        return node
-    if Attr.OPERANDS in node:
-        ops = {
-            "+": lambda x, y: Sum(x, y),
-            "-": lambda x, y: Sum(x, -y),
-            "*": lambda x, y: x * y,
-            "/": lambda x, y: x / y,
-            "=": lambda x, y: x == y,
-            "!=": lambda x, y: x != y,
-            ">": lambda x, y: x > y,
-            ">=": lambda x, y: x >= y,
-            "<": lambda x, y: x < y,
-            "<=": lambda x, y: x <= y,
-            "%": lambda x, y: x % y,
-            "and": lambda *x: And(x),
-            "or": lambda *x: Or(x),
-            "abs": lambda x: abs(x[0]),
-            "max": lambda x: symMax(x),
-            "min": lambda x: symMin(x),
-            "not": lambda x: Not(x[0]),
-            "unary-minus": lambda x: -x
-        }
-        args = [to_z3(a) for a in node[Attr.OPERANDS]]
-        try:
-            return ops[node[Attr.NAME]](*args)
-        except TypeError:
-            raise TypeError(node[Attr.NAME], args)
-
-    elif node(NodeType.LITERAL):
-        return int(node[Attr.VALUE])
+def to_sympy(z3_expr):
+    if isinstance(z3_expr, IntNumRef):
+        return sympy.sympify(z3_expr.as_long())
+    if z3_expr.decl().kind() == Z3_OP_UNINTERPRETED and not z3_expr.children():
+        return sympy.symbols(z3_expr.decl().name())
+    elif z3_expr.decl().name() in ("true", "false"):
+        return BoolVal(z3_expr.decl().name() == "true")
+    elif z3_expr.decl().name() == "ite":
+        _, _, true_branch, false_branch = z3_expr.children()
+        return sympy.Or(to_sympy(true_branch), to_sympy(false_branch))
+    children = [to_sympy(c) for c in z3_expr.children()]
+    if z3_expr.decl().name() == "and":
+        return sympy.And(*children)
+    elif z3_expr.decl().name() == "or":
+        return sympy.Or(*children)
+    elif z3_expr.decl().name() == "+":
+        return sympy.Add(*children)
+    elif z3_expr.decl().name() == "-":
+        return reduce(lambda x, y: x - y, children, 0)
+    elif z3_expr.decl().name() == "*":
+        return reduce(lambda x, y: x * y, children, 1)
+    elif z3_expr.decl().name() == "not":
+        return ~(children[0])
+    elif z3_expr.decl().name() == "mod":
+        return children[0] % children[1]
+    elif z3_expr.decl().name() == "=":
+        return sympy.Eq(*children)
+    elif z3_expr.decl().name() == "!=":
+        return sympy.Ne(*children)
+    elif z3_expr.decl().name() == "<":
+        return sympy.Lt(*children)
+    elif z3_expr.decl().name() == "<=":
+        return sympy.Le(*children)
+    elif z3_expr.decl().name() == ">":
+        return sympy.Gt(*children)
+    elif z3_expr.decl().name() == ">=":
+        return sympy.Ge(*children)
     else:
-        return node
-    # elif isinstance(node, BuiltIn):
-    #     funs = {
-    #         "abs": lambda x: abs(x[0]),
-    #         "max": lambda x: symMax(x),
-    #         "min": lambda x: symMin(x),
-    #         "not": lambda x: Not(x[0])
-    #     }
-    #     return funs[node.fn])([to_z3(a) for a in node[Attr.OPERANDS]])
-    # elif isinstance(node, Nary):
-    #     ops = {
-    #         "and": lambda x: And(*x),
-    #         "or": lambda x: Or(*x)
-    #     }
-    #     return ops[node.fn]([to_z3(a) for a in node.args])
-    # else:
-    #     try:
-    #         parse_int = int(node)
-    #         return parse_int
-    #     except (ValueError, TypeError):
-    #         return node
+        raise NotImplementedError(f"Unsupported: {z3_expr.decl().name()}")
 
 
-def quant_to_z3(formula, info, attrs, lstigs, envs):
-    vars_to_strings(formula, info, attrs, lstigs, envs)
-    return simplify(to_z3(formula))
+def overapprox(s: sympy.Set | sympy.Mod):
+    if isinstance(s, sympy.Mod) and s.args[1].is_integer:
+        return sympy.Range(0, s.args[1], 1)
+    elif isinstance(s, sympy.Union) or isinstance(s, sympy.FiniteSet):
+        return reduce(lambda s1, s2: s1 | s2, (overapprox(arg) for arg in s.args))  # noqa: E501
+    elif isinstance(s, sympy.Intersection):
+        return reduce(lambda s1, s2: s1 & s2, (overapprox(arg) for arg in s.args))  # noqa: E501
+    elif isinstance(s, sympy.ConditionSet):
+        return s.base_set
+    else:
+        return s
+
+
+def pick_from(s: sympy.Set):
+    if s.is_Union or s.is_FiniteSet:
+        # Pick from one of the subsets
+        return pick_from(random.choice(s.args))
+    elif s.is_Intersection:
+        apx = overapprox(s)
+        if apx.is_Intersection:
+            # Reduction did not work, we give up
+            raise ValueError(f"Cannot approximate {s}")
+        return pick_from(apx)
+    elif isinstance(s, sympy.ConditionSet):
+        # Pick from the base set, ignoring the condition
+        return pick_from(s.base_set)
+    elif isinstance(s, sympy.Range):
+        inf, sup = s.inf, s.sup
+        # Well okay, in this case we _under_approximate :)
+        # If the range is infinite, we cap it to +- sys.maxsize
+        # (Max value that a Py_ssize_t can hold in CPython)
+        if inf.is_infinite:
+            inf = sys.maxsize if inf > 0 else -sys.maxsize
+        if sup.is_infinite:
+            sup = sys.maxsize if sup > 0 else -sys.maxsize
+        return random.randint(inf, sup)
+    else:
+        raise NotImplementedError(f"Unsupported set type: {type(s), s}")
 
 
 class Concretizer:
-    def __init__(self, info, cli, randomize=True):
+    def __init__(self, info, cli, ast, randomize=True):
         self.info = info
         self.cli = cli
+        self.ast = ast
         self.randomize = randomize
         self.agents = self.info.spawn.num_agents()
         self.attrs = [[] for _ in range(self.agents)]
@@ -124,7 +140,7 @@ class Concretizer:
         self.past_models = []
 
         self.s = Solver()
-        self._setup_initial_state(self.info.externs)
+        self._setup_initial_state()
         self._setup_scheduler()
 
         if randomize:
@@ -141,7 +157,12 @@ class Concretizer:
 
     def _set_random_seed(self):
         seed = self.cli.get_seed()
-        set_option(":smt.random_seed", seed)
+        set_param(":smt.random_seed", seed)
+        set_param(":sat.random_seed", seed)
+        set_param(":smt.arith.random_initial_value", True)
+        # 5 = random phase selection
+        self.s.set("phase_selection", 5)
+
         random.seed(seed)
         log.debug(f"Concretization: random seed is {seed}")
 
@@ -167,6 +188,42 @@ class Concretizer:
                         self.softs.add(soft)
                         self.s.add(Implies(soft, p[step][i] == choices.pop()))
 
+        def my_solveset(expr, var):
+            if isinstance(expr, sympy.Or) or isinstance(expr, sympy.And):
+                sets = []
+                for arg in expr.args:
+                    if var in arg.free_symbols:
+                        try:
+                            new_set = my_solveset(arg, var)
+                            sets.append(new_set)
+                        except Exception:
+                            continue
+                return (
+                    reduce(
+                        lambda s1, s2: s1 | s2
+                        if isinstance(expr, sympy.Or)
+                        else s1 & s2, sets)
+                ) if sets else sympy.S.EmptySet
+            else:
+                return sympy.solveset(expr, var, domain=sympy.S.Integers)
+
+        sympy_assume = sympy.And(*[to_sympy(a) for a in self.s.assertions()])
+        for x in sympy_assume.free_symbols:
+            if x.name.startswith("sched__"):
+                continue
+            sol = None
+            try:
+                sol = my_solveset(sympy_assume, x)
+                choice = pick_from(sol)
+                soft = Bool(f"assume_{x}_{choice}_%%soft%%")
+                self.softs.add(soft)
+                self.s.add(Implies(soft, Int(x.name) == choice))
+            except Exception:
+                log.debug(
+                    f"Could not pick a value for {x} "
+                    f"(solveset: {sol}). Skipping.")
+                continue
+
     def _reset_soft_constraints(self):
         # Remove previous soft constraints
         # And forces the exclusion of past models
@@ -175,39 +232,36 @@ class Concretizer:
         for m in self.past_models:
             self.s.add(m)
 
-    def _setup_initial_state(self, externs):
+    def _setup_initial_state(self):
         for tid in range(self.agents):
             a = self.info.spawn[tid]
             for v in a.iface.values():
                 attrs = ([
-                    Int(f"I_{tid:0>2}_{i:0>2}")
+                    Int(f"I_{tid}_{i}")
                     for i in range(v.index, v.index + v.size)]
                     if v.is_array
-                    else [Int(f"I_{tid:0>2}_{v.index:0>2}")])
+                    else [Int(f"I_{tid}_{v.index}")])
                 self.attrs[tid].extend(attrs)
             for v in a.lstig.values():
                 lstigs = ([
-                    Int(f"L_{tid:0>2}_{i:0>2}")
+                    Int(f"L_{tid}_{i}")
                     for i in range(v.index, v.index + v.size)]
                     if v.is_array
-                    else [Int(f"L_{tid:0>2}_{v.index:0>2}")])
+                    else [Int(f"L_{tid}_{v.index}")])
                 self.lstigs[tid].extend(lstigs)
 
         for v in self.info.e.values():
             envs = ([
-                Int(f"E_{i:0>2}")
+                Int(f"E_{i}")
                 for i in range(v.index, v.index + v.size)]
                 if v.is_array
-                else [Int(f"E_{v.index:0>2}")])
+                else [Int(f"E_{v.index}")])
             self.envs = envs
 
-        for assume in self.info.assumes:
-            formula = (QUANT | BEXPR).parseString(assume)[0]
-            formula = eliminate_quantifiers(formula, self.info)
-            formula = replace_externs(formula, externs)
+        for assume in self.ast["Assumes"].values():
+            formula = qelim(self.info, assume["Def"]["QuantPredicate"])
 
-            constraint = quant_to_z3(
-                formula, self.info, self.attrs, self.lstigs, self.envs)
+            constraint = simplify(json2z3(formula, self.info))
             self.s.add(constraint)
 
     def _setup_scheduler(self):
@@ -308,7 +362,7 @@ class Concretizer:
                     r'\[')
                 program = usages.sub(f"{pick_name}[__LABS_step][", program)
 
-            globs, inits = self.get_concretization(program)
+            globs, inits = self.concretization(program)
 
             re_init = make_regex("concrete-init")
 
@@ -379,6 +433,7 @@ class Concretizer:
 
         check = None
         softs = list(self.softs)
+
         # Randomize the order of soft sonstraints
         random.shuffle(softs)
         # ...But keep "pick" constraints at the beginning of the list

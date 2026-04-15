@@ -217,6 +217,10 @@ class Cbmc(Backend):
         self.modalities = ("always", "finally", "eventually", "between")
         self.language = Language.C
 
+    def generate_code(self, *_):
+        filename = super().generate_code(get_ast=True)
+        return filename
+
     def get_cbmc_version(self, cmd):
         CBMC_V, *CBMC_SUBV = check_output(
             [cmd[0], "--version"],
@@ -261,7 +265,7 @@ class Cbmc(Backend):
 
     def source_level_concretization(self, fname, info):
         cmd = self.get_cmdline(fname, info)
-        c = Concretizer(info, self.cli, True)
+        c = Concretizer(info, self.cli, self.get_ast(), True)
         c.concretize_file(fname)
         if self.cli[Args.TIMEOUT] > 0:
             cmd = [self.timeout_cmd, str(self.cli[Args.TIMEOUT]), *cmd]
@@ -349,16 +353,18 @@ class Cbmc(Backend):
         m = concretizer.get_concretization(program, return_model=True)
         mapping = self.get_dimacs_mapping(fname, info)
         self.verbose_output(f"DIMACS header: {mapping.info}")
+        self.logger.debug(f"Concretized state: {str(m).replace('\n', '')}")
 
-        def bit_train():
+        def bits():
             while True:
                 yield getrandbits(1)
 
         nondets = (
-            zip(mapping[name], bit_train())
+            zip(mapping[name], bits())
             for name in mapping.mapping
             if "nondetInRange::1::x" in name or "nondetInit::1::x" in name)
         weaks = [(a, b) for n in nondets for a, b in n]
+        self.logger.debug(weaks)
         for x in m:
             # TODO environment and stigmergy variables
             if str(x).startswith("I_"):
@@ -388,7 +394,7 @@ class Cbmc(Backend):
         return weaks
 
     def simulate(self, fname, info):
-        c = Concretizer(info, self.cli, True)
+        c = Concretizer(info, self.cli, self.get_ast(), True)
         from shutil import copyfile
         with tempfile.NamedTemporaryFile(mode="w", delete=False, encoding="utf-8") as orig:  # noqa: E501
             self.temp_files.append(orig.name)

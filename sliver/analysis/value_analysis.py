@@ -10,6 +10,7 @@ import jq
 import sympy
 from pyrsistent import pmap
 from sympy.core.relational import Relational
+import z3
 
 from sliver.analysis.domains import Stripes
 
@@ -83,6 +84,75 @@ def json2sympy(sym, obj):
         return sympy.symbols(var)
     else:
         raise NotImplementedError(f"sym2py {obj}")
+
+
+def json2z3(obj, info=None):
+    def recurse(o):
+        return json2z3(o, info)
+    if isinstance(obj, int) or isinstance(obj, bool):
+        return obj
+    if obj == "id":
+        return z3.Int("id")
+    if "IdOfAgent" in obj:
+        if isinstance(obj["IdOfAgent"], int):
+            return z3.IntVal(obj["IdOfAgent"])
+        return z3.Int(f"id@{obj['IdOfAgent']}")
+    if "IfElse" in obj:
+        return z3.If(
+            recurse(obj["IfElse"]),
+            recurse(obj["IfTrue"]),
+            recurse(obj["IfFalse"]))  # noqa: E501
+    if "Op" in obj:
+        terms = [recurse(t) for t in obj["Terms"]]
+        if obj["Op"] in ("and", "or"):
+            if len(terms) == 0:
+                return z3.BoolVal(obj["Op"] == "and")
+            if len(terms) == 1:
+                return terms[0]
+            return z3.And(terms) if obj["Op"] == "and" else z3.Or(terms)
+        elif obj["Op"] == "not":
+            return ~terms[0]
+        elif obj["Op"] == "+":
+            return reduce(lambda x, y: x + y, terms)
+        elif obj["Op"] == "-":
+            return reduce(lambda x, y: x - y, terms)
+        elif obj["Op"] == "*":
+            return reduce(lambda x, y: x * y, terms)
+        elif obj["Op"] == "==":
+            return terms[0] == terms[1]
+        elif obj["Op"] == "!=":
+            return terms[0] != terms[1]
+        elif obj["Op"] == ">":
+            return terms[0] > terms[1]
+        elif obj["Op"] == "<":
+            return terms[0] < terms[1]
+        elif obj["Op"] == ">=":
+            return terms[0] >= terms[1]
+        elif obj["Op"] == "<=":
+            return terms[0] <= terms[1]
+    elif "Var" in obj:
+        var = obj["Var"]
+        while "Item1" in var:
+            var = var["Item1"]
+        offset = obj.get("Offset")
+        of = obj["Var"].get("Item2")
+        if info is not None:
+            var_info = info.lookup_var(var["Name"])
+            if not isinstance(offset or 0, int):
+                raise ValueError(f"Non-integer offset {offset} in {obj}")
+            if not isinstance(of or 0, int):
+                raise ValueError(f"Non-integer ofAgent {of} in {obj}")
+            if var_info.store == "e":
+                var = f"E_{var_info.index + (offset or 0)}"
+            else:
+                store_name = {"i": "I", "l": "Lvalue"}[var_info.store]
+                var = f"{store_name}_{of}_{var_info.index + (offset or 0)}"
+        else:
+            offset = f"[][{offset}]" if offset is not None else ""
+            var = f"{var["Name"]}{offset}{f'@{of}' if of is not None else ''}"
+        return z3.Int(var)
+    else:
+        raise NotImplementedError(f"json2z3 {obj}")
 
 
 def handle_assumes(info, var_names, ast):

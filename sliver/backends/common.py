@@ -238,7 +238,7 @@ class Backend:
                         self.logger.info(f"Gathering information on {self.cli.file}...")  # noQA: E501
                         info = self.get_info(parsed=True)
                         self.check_info(info)
-                        c = Concretizer(info, self.cli, True)
+                        c = Concretizer(info, self.cli, self.get_ast(), True)
                         if self.cli[Args.CONCRETIZATION] != "none":
                             out = c.concretize_program(out)
                     print(out)
