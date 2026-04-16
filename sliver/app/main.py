@@ -63,6 +63,7 @@ def main(file, **kwargs):
     sprint_cli = ", ".join(f"{k}={v}" for k, v in cli.items())
     log.debug(f"CLI options: {file=}, {sprint_cli}")
     backend = ALL_BACKENDS[backend_arg](__DIR, cli)
+    fname = ""
     try:
         backend.check_cli()
         if not cli[Args.TRANSLATE_CEX] or show:
