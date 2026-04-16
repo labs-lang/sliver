@@ -181,14 +181,17 @@ class Backend:
         return self._ast
 
     def get_info(self, parsed=False):
-        if self.info is not None:
+        if parsed and self.info is not None:
             return self.info
-        log.info(f"Gathering information on {self.cli.file}...")
         try:
-            call_info = self._labs_cmdline() + ["--info"]
-            log_call(call_info)
-            info_call = run(call_info, **self._run_args)
-            info = info_call.stdout.decode()
+            if self._ast is not None:
+                info = self._ast["Info"]
+            else:
+                log.info(f"Gathering information on {self.cli.file}...")
+                call_info = self._labs_cmdline() + ["--info"]
+                log_call(call_info)
+                info_call = run(call_info, **self._run_args)
+                info = info_call.stdout.decode()
             if parsed:
                 info = info.replace("\n", "|")[:-1]
                 self.logger.debug(f"{info=}")
