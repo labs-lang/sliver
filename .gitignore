@@ -136,3 +136,12 @@ dmypy.json
 
 .vscode/
 build/
+
+# Build hook side effects (created on demand from vendor/ and labs/)
+sliver/labs/templates
+sliver/labs/LabsTranslate
+sliver/minisat/minisat
+sliver/minisat/LICENSE
+sliver/cbmc/cbmc-simulator
+sliver/cbmc/cbmc-5-74
+sliver/cbmc/LICENSE_cbmc
